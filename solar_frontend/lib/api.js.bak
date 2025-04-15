@@ -1,0 +1,697 @@
+// API Client
+const apiClient = {
+  // Base fetch function with authentication handling
+  async fetch(url, options = {}) {
+    // Set default headers with authentication token if available
+    const token = localStorage.getItem('auth-token');
+    const headers = {
+      'Content-Type': 'application/json',
+      ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+      ...options.headers,
+    };
+
+    const response = await fetch(url, {
+      ...options,
+      headers,
+    });
+
+    // Handle 401 Unauthorized globally
+    if (response.status === 401 && url !== '/api/auth/login') {
+      // Redirect to login page or refresh token
+      localStorage.removeItem('auth-token');
+      window.location.href = '/login';
+      return null;
+    }
+
+    return response;
+  },
+
+  // Convenience methods
+  async get(url, options = {}) {
+    return this.fetch(url, { ...options, method: 'GET' });
+  },
+
+  async post(url, body, options = {}) {
+    return this.fetch(url, {
+      ...options,
+      method: 'POST',
+      body: JSON.stringify(body),
+    });
+  },
+
+  async put(url, body, options = {}) {
+    return this.fetch(url, {
+      ...options,
+      method: 'PUT',
+      body: JSON.stringify(body),
+    });
+  },
+
+  async delete(url, options = {}) {
+    return this.fetch(url, { ...options, method: 'DELETE' });
+  },
+};
+
+// Authentication API
+export const authApi = {
+  login: async (email, password) => {
+    try {
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Login failed');
+      }
+
+      const data = await response.json();
+
+      // Store the token in localStorage
+      if (data && data.token) {
+        localStorage.setItem('auth-token', data.token);
+        console.log("Token stored:", data.token);
+      } else {
+        console.warn("No token received from server");
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Login error:', error);
+      throw error;
+    }
+  },
+
+  logout: async () => {
+    try {
+      // Clear the token from localStorage
+      localStorage.removeItem('auth-token');
+
+      // Optionally notify the server
+      await fetch('/api/auth/logout', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('auth-token')}`,
+        },
+      });
+
+      return { success: true };
+    } catch (error) {
+      console.error('Logout error:', error);
+      // Still remove token even if server request fails
+      localStorage.removeItem('auth-token');
+      return { success: true };
+    }
+  },
+
+  register: async (userData) => {
+    try {
+      const response = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(userData),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Registration failed');
+      }
+
+      return response.json();
+    } catch (error) {
+      console.error('Registration error:', error);
+      throw error;
+    }
+  },
+
+  getCurrentUser: async () => {
+    try {
+      const token = localStorage.getItem('auth-token');
+
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+
+      const response = await fetch('/api/auth/me', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch user data');
+      }
+
+      return response.json();
+    } catch (error) {
+      console.error('Get current user error:', error);
+      throw error;
+    }
+  },
+};
+
+// Installation API
+export const installationApi = {
+  getAllInstallations: async (params = {}) => {
+    try {
+      const queryParams = new URLSearchParams(params).toString();
+      const url = `/api/installations${queryParams ? `?${queryParams}` : ''}`;
+
+      const response = await apiClient.get(url);
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch installations: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Error fetching installations:', error);
+      throw error;
+    }
+  },
+
+  getInstallationById: async (id) => {
+    try {
+      const response = await apiClient.get(`/api/installations/${id}`);
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch installation: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error(`Error fetching installation ${id}:`, error);
+      throw error;
+    }
+  },
+
+  createInstallation: async (installationData) => {
+    try {
+      const response = await apiClient.post('/api/installations', installationData);
+
+      if (!response.ok) {
+        throw new Error(`Failed to create installation: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Error creating installation:', error);
+      throw error;
+    }
+  },
+
+  updateInstallation: async (id, installationData) => {
+    try {
+      const response = await apiClient.put(`/api/installations/${id}`, installationData);
+
+      if (!response.ok) {
+        throw new Error(`Failed to update installation: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error(`Error updating installation ${id}:`, error);
+      throw error;
+    }
+  },
+
+  deleteInstallation: async (id) => {
+    try {
+      const response = await apiClient.delete(`/api/installations/${id}`);
+
+      if (!response.ok) {
+        throw new Error(`Failed to delete installation: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error(`Error deleting installation ${id}:`, error);
+      throw error;
+    }
+  }
+};
+
+// Security API for tamper events and responses
+export const securityApi = {
+  // Tamper Events
+  getEvents: async () => {
+    try {
+      const response = await apiClient.get('/api/security/events');
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch events: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Error fetching security events:', error);
+      throw error;
+    }
+  },
+
+  getEventById: async (eventId) => {
+    try {
+      const response = await apiClient.get(`/api/security/tamper-events/${eventId}`);
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch event: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error(`Error fetching security event ${eventId}:`, error);
+      throw error;
+    }
+  },
+
+  getEventsByInstallationId: async (installationId) => {
+    try {
+      const response = await apiClient.get(`/api/security/installations/${installationId}/events`);
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch events for installation: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error(`Error fetching events for installation ${installationId}:`, error);
+      throw error;
+    }
+  },
+
+  getUnresolvedEvents: async () => {
+    try {
+      const response = await apiClient.get('/api/security/admin/alerts');
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch unresolved events: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Error fetching unresolved events:', error);
+      throw error;
+    }
+  },
+
+  acknowledgeEvent: async (eventId) => {
+    try {
+      const response = await apiClient.put(`/api/security/events/${eventId}/acknowledge`);
+
+      if (!response.ok) {
+        throw new Error(`Failed to acknowledge event: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error(`Error acknowledging event ${eventId}:`, error);
+      throw error;
+    }
+  },
+
+  resolveEvent: async (eventId, resolutionDetails) => {
+    try {
+      const response = await apiClient.post(`/api/security/admin/events/${eventId}/resolve`, resolutionDetails);
+
+      if (!response.ok) {
+        throw new Error(`Failed to resolve event: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error(`Error resolving event ${eventId}:`, error);
+      throw error;
+    }
+  },
+
+  updateEventStatus: async (eventId, status) => {
+    try {
+      const response = await apiClient.put(`/api/security/admin/events/${eventId}/status`, { status });
+
+      if (!response.ok) {
+        throw new Error(`Failed to update event status: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error(`Error updating event status ${eventId}:`, error);
+      throw error;
+    }
+  },
+
+  // Tamper Responses
+  getResponsesByEventId: async (eventId) => {
+    try {
+      const response = await apiClient.get(`/api/security/responses/events/${eventId}`);
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch responses: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error(`Error fetching responses for event ${eventId}:`, error);
+      throw error;
+    }
+  },
+
+  createResponse: async (eventId, responseData) => {
+    try {
+      const response = await apiClient.post(`/api/security/responses/events/${eventId}`, responseData);
+
+      if (!response.ok) {
+        throw new Error(`Failed to create response: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error(`Error creating response for event ${eventId}:`, error);
+      throw error;
+    }
+  },
+
+  sendNotification: async (eventId, notificationData) => {
+    try {
+      const response = await apiClient.post(`/api/security/responses/events/${eventId}/notify`, notificationData);
+
+      if (!response.ok) {
+        throw new Error(`Failed to send notification: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error(`Error sending notification for event ${eventId}:`, error);
+      throw error;
+    }
+  },
+
+  executeAutoResponse: async (eventId) => {
+    try {
+      const response = await apiClient.post(`/api/security/responses/events/${eventId}/auto-response`);
+
+      if (!response.ok) {
+        throw new Error(`Failed to execute auto-response: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error(`Error executing auto-response for event ${eventId}:`, error);
+      throw error;
+    }
+  },
+
+  // Security Audit Logs
+  getUserSecurityLogs: async () => {
+    try {
+      const response = await apiClient.get('/api/security/audit');
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch security logs: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Error fetching security logs:', error);
+      throw error;
+    }
+  },
+
+  getLogsByInstallationId: async (installationId) => {
+    try {
+      const response = await apiClient.get(`/api/security/admin/installations/${installationId}/audit`);
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch logs for installation: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error(`Error fetching logs for installation ${installationId}:`, error);
+      throw error;
+    }
+  },
+
+  getLogsByTimeRange: async (installationId, startTime, endTime) => {
+    try {
+      const params = new URLSearchParams({
+        startTime,
+        endTime
+      }).toString();
+
+      const response = await apiClient.get(`/api/security/admin/installations/${installationId}/audit/time-range?${params}`);
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch logs by time range: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Error fetching logs by time range:', error);
+      throw error;
+    }
+  },
+
+  getLogsByActivityType: async (installationId, activityType) => {
+    try {
+      const url = installationId
+        ? `/api/security/admin/installations/${installationId}/audit/activity-type?type=${activityType}`
+        : `/api/security/admin/audit?type=${activityType}`;
+
+      const response = await apiClient.get(url);
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch logs by activity type: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Error fetching logs by activity type:', error);
+      throw error;
+    }
+  }
+};
+
+// Tamper Detection API
+export const tamperDetectionApi = {
+  // Get the status of tamper detection monitoring for an installation
+  getMonitoringStatus: async (installationId) => {
+    try {
+      const response = await apiClient.get(
+        `/api/security/detection/installations/${installationId}/status`
+      );
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}));
+        throw new Error(error.message || `Failed to get monitoring status: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error(`Error fetching monitoring status for installation ${installationId}:`, error);
+      throw error;
+    }
+  },
+
+  // Start monitoring for an installation
+  startMonitoring: async (installationId) => {
+    try {
+      const response = await apiClient.post(
+        `/api/security/detection/installations/${installationId}/start`
+      );
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}));
+        throw new Error(error.message || `Failed to start monitoring: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error(`Error starting monitoring for installation ${installationId}:`, error);
+      throw error;
+    }
+  },
+
+  // Stop monitoring for an installation
+  stopMonitoring: async (installationId) => {
+    try {
+      const response = await apiClient.post(
+        `/api/security/detection/installations/${installationId}/stop`
+      );
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}));
+        throw new Error(error.message || `Failed to stop monitoring: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error(`Error stopping monitoring for installation ${installationId}:`, error);
+      throw error;
+    }
+  },
+
+  // Run diagnostics for an installation
+  runDiagnostics: async (installationId) => {
+    try {
+      const response = await apiClient.post(
+        `/api/security/detection/installations/${installationId}/diagnostics`
+      );
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}));
+        throw new Error(error.message || `Failed to run diagnostics: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error(`Error running diagnostics for installation ${installationId}:`, error);
+      throw error;
+    }
+  },
+
+  // Get sensitivity settings for a specific event type
+  getSensitivity: async (installationId, eventType) => {
+    try {
+      const response = await apiClient.get(
+        `/api/security/detection/installations/${installationId}/sensitivity/${eventType}`
+      );
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}));
+        throw new Error(error.message || `Failed to get sensitivity settings: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error(`Error fetching sensitivity settings for installation ${installationId}:`, error);
+      throw error;
+    }
+  },
+
+  // Update sensitivity settings for a specific event type
+  updateSensitivity: async (installationId, eventType, threshold) => {
+    try {
+      const response = await apiClient.put(
+        `/api/security/detection/installations/${installationId}/sensitivity/${eventType}`,
+        { threshold }
+      );
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}));
+        throw new Error(error.message || `Failed to update sensitivity settings: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error(`Error updating sensitivity settings for installation ${installationId}:`, error);
+      throw error;
+    }
+  },
+
+  // Simulate tamper events for testing
+  simulateMovement: async (installationId, movementValue, rawData = null) => {
+    try {
+      const response = await apiClient.post(
+        `/api/security/detection/installations/${installationId}/simulate/movement`,
+        { movementValue, rawData }
+      );
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}));
+        throw new Error(error.message || `Failed to simulate movement: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error(`Error simulating movement for installation ${installationId}:`, error);
+      throw error;
+    }
+  },
+
+  simulateVoltage: async (installationId, voltageValue, rawData = null) => {
+    try {
+      const response = await apiClient.post(
+        `/api/security/detection/installations/${installationId}/simulate/voltage`,
+        { voltageValue, rawData }
+      );
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}));
+        throw new Error(error.message || `Failed to simulate voltage fluctuation: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error(`Error simulating voltage fluctuation for installation ${installationId}:`, error);
+      throw error;
+    }
+  },
+
+  simulateConnection: async (installationId, connected = false, rawData = null) => {
+    try {
+      const response = await apiClient.post(
+        `/api/security/detection/installations/${installationId}/simulate/connection`,
+        { connected, rawData }
+      );
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}));
+        throw new Error(error.message || `Failed to simulate connection change: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error(`Error simulating connection change for installation ${installationId}:`, error);
+      throw error;
+    }
+  },
+
+  simulateLocation: async (installationId, newLocation, previousLocation = null, rawData = null) => {
+    try {
+      const response = await apiClient.post(
+        `/api/security/detection/installations/${installationId}/simulate/location`,
+        { newLocation, previousLocation, rawData }
+      );
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}));
+        throw new Error(error.message || `Failed to simulate location change: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error(`Error simulating location change for installation ${installationId}:`, error);
+      throw error;
+    }
+  },
+
+  simulateTamper: async (installationId, eventType, confidenceScore, description, rawData = null) => {
+    try {
+      const response = await apiClient.post(
+        `/api/security/detection/installations/${installationId}/simulate/tamper`,
+        { eventType, confidenceScore, description, rawData }
+      );
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}));
+        throw new Error(error.message || `Failed to simulate tamper event: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error(`Error simulating tamper event for installation ${installationId}:`, error);
+      throw error;
+    }
+  }
+};
+
+// Export default apiClient
+export default apiClient;
+

@@ -1,0 +1,39 @@
+{
+  "general": {
+    "simulation_name": "Raspberry Pi Solar Installation Demo",
+    "installation_id": "RPi-DEMO-1234",
+    "server_url": "http://localhost:8080",
+    "simulation_speed": 1.0
+  },
+  "energy": {
+    "enabled": true,
+    "base_generation": 4500,
+    "peak_generation": 9000,
+    "consumption_min": 1800,
+    "consumption_max": 6500,
+    "interval": 15,
+    "simulate_weather": true
+  },
+  "heartbeat": {
+    "enabled": true,
+    "interval": 45,
+    "include_diagnostics": true,
+    "device_id": "RPi-INVERTER-01",
+    "battery_simulation": true
+  },
+  "tamper": {
+    "enabled": true,
+    "random_events": true,
+    "min_interval": 900,
+    "max_interval": 3600,
+    "physical_tamper_prob": 0.4,
+    "voltage_tamper_prob": 0.3,
+    "connection_tamper_prob": 0.2,
+    "location_tamper_prob": 0.1
+  },
+  "command": {
+    "enabled": true,
+    "polling_interval": 15,
+    "success_rate": 0.98
+  }
+}
