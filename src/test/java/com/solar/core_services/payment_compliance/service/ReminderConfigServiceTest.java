@@ -23,8 +23,10 @@ import static org.mockito.Mockito.*;
 
 /**
  * Test class for ReminderConfigService
- * Source file: src/main/java/com/solar/core_services/payment_compliance/service/ReminderConfigService.java
- * Implementation: src/main/java/com/solar/core_services/payment_compliance/service/impl/ReminderConfigServiceImpl.java
+ * Source file:
+ * src/main/java/com/solar/core_services/payment_compliance/service/ReminderConfigService.java
+ * Implementation:
+ * src/main/java/com/solar/core_services/payment_compliance/service/impl/ReminderConfigServiceImpl.java
  */
 @ExtendWith(MockitoExtension.class)
 public class ReminderConfigServiceTest {
@@ -52,7 +54,7 @@ public class ReminderConfigServiceTest {
         testConfig.setUpdatedAt(LocalDateTime.now().minusDays(15));
         testConfig.setCreatedBy("admin");
         testConfig.setUpdatedBy("admin");
-        
+
         // Create test config DTO
         testConfigDTO = ReminderConfigDTO.builder()
                 .id(1L)
@@ -69,10 +71,10 @@ public class ReminderConfigServiceTest {
     void shouldGetCurrentConfig() {
         // Given
         when(reminderConfigRepository.findLatestConfig()).thenReturn(Optional.of(testConfig));
-        
+
         // When
         ReminderConfigDTO result = reminderConfigService.getCurrentConfig();
-        
+
         // Then
         assertNotNull(result);
         assertEquals(testConfig.getId(), result.getId());
@@ -89,10 +91,10 @@ public class ReminderConfigServiceTest {
         // Given
         when(reminderConfigRepository.findLatestConfig()).thenReturn(Optional.empty());
         when(reminderConfigRepository.save(any(ReminderConfig.class))).thenReturn(testConfig);
-        
+
         // When
         ReminderConfigDTO result = reminderConfigService.getCurrentConfig();
-        
+
         // Then
         assertNotNull(result);
         verify(reminderConfigRepository, times(1)).findLatestConfig();
@@ -104,16 +106,16 @@ public class ReminderConfigServiceTest {
     void shouldUpdateConfigWithValidValues() {
         // Given
         testConfigDTO.setId(1L);
-        when(reminderConfigRepository.findById(1L)).thenReturn(Optional.of(testConfig));
+        when(reminderConfigRepository.findLatestConfig()).thenReturn(Optional.of(testConfig));
         when(reminderConfigRepository.save(any(ReminderConfig.class))).thenAnswer(invocation -> {
             ReminderConfig savedConfig = invocation.getArgument(0);
             savedConfig.setId(1L);
             return savedConfig;
         });
-        
+
         // When
         ReminderConfigDTO result = reminderConfigService.updateConfig(testConfigDTO, "user");
-        
+
         // Then
         assertNotNull(result);
         assertEquals(testConfigDTO.getFirstReminderDays(), result.getFirstReminderDays());
@@ -121,7 +123,7 @@ public class ReminderConfigServiceTest {
         assertEquals(testConfigDTO.getFinalReminderDays(), result.getFinalReminderDays());
         assertEquals(testConfigDTO.getReminderMethod(), result.getReminderMethod());
         assertEquals("user", result.getUpdatedBy());
-        verify(reminderConfigRepository, times(1)).findById(1L);
+        verify(reminderConfigRepository, times(1)).findLatestConfig();
         verify(reminderConfigRepository, times(1)).save(any(ReminderConfig.class));
     }
 
@@ -131,12 +133,10 @@ public class ReminderConfigServiceTest {
         // Given
         testConfigDTO.setFirstReminderDays(5);
         testConfigDTO.setSecondReminderDays(3); // Second is before first - invalid
-        
+
         // When/Then
-        assertThrows(IllegalArgumentException.class, () -> 
-            reminderConfigService.updateConfig(testConfigDTO, "user")
-        );
-        
+        assertThrows(IllegalArgumentException.class, () -> reminderConfigService.updateConfig(testConfigDTO, "user"));
+
         verify(reminderConfigRepository, never()).save(any(ReminderConfig.class));
     }
 
@@ -145,15 +145,18 @@ public class ReminderConfigServiceTest {
     void shouldCreateNewConfigWhenUpdatingAndNoneExists() {
         // Given
         testConfigDTO.setId(null); // Ensure ID is null to trigger creation path
+        when(reminderConfigRepository.findLatestConfig()).thenReturn(Optional.empty());
         when(reminderConfigRepository.save(any(ReminderConfig.class))).thenAnswer(invocation -> {
             ReminderConfig savedConfig = invocation.getArgument(0);
             savedConfig.setId(1L);
+            savedConfig.setCreatedAt(LocalDateTime.now());
+            savedConfig.setUpdatedAt(LocalDateTime.now());
             return savedConfig;
         });
-        
+
         // When
         ReminderConfigDTO result = reminderConfigService.updateConfig(testConfigDTO, "user");
-        
+
         // Then
         assertNotNull(result);
         assertEquals(testConfigDTO.getFirstReminderDays(), result.getFirstReminderDays());
@@ -161,8 +164,10 @@ public class ReminderConfigServiceTest {
         assertEquals(testConfigDTO.getFinalReminderDays(), result.getFinalReminderDays());
         assertEquals(testConfigDTO.getReminderMethod(), result.getReminderMethod());
         assertEquals("user", result.getUpdatedBy());
-        verify(reminderConfigRepository, never()).findById(anyLong());
-        verify(reminderConfigRepository, times(1)).save(any(ReminderConfig.class));
+        verify(reminderConfigRepository, times(1)).findLatestConfig();
+        // Now we expect save to be called twice - once for creating the default config
+        // and once for updating it
+        verify(reminderConfigRepository, times(2)).save(any(ReminderConfig.class));
     }
 
     @Test
@@ -170,10 +175,10 @@ public class ReminderConfigServiceTest {
     void shouldGetActiveReminderConfig() {
         // Given
         when(reminderConfigRepository.findLatestConfig()).thenReturn(Optional.of(testConfig));
-        
+
         // When
         ReminderConfig result = reminderConfigService.getActiveReminderConfig();
-        
+
         // Then
         assertNotNull(result);
         assertEquals(testConfig.getId(), result.getId());
@@ -185,10 +190,10 @@ public class ReminderConfigServiceTest {
     void shouldGetFirstReminderDays() {
         // Given
         when(reminderConfigRepository.findLatestConfig()).thenReturn(Optional.of(testConfig));
-        
+
         // When
         int days = reminderConfigService.getFirstReminderDays();
-        
+
         // Then
         assertEquals(testConfig.getFirstReminderDays(), days);
         verify(reminderConfigRepository, times(1)).findLatestConfig();
@@ -199,10 +204,10 @@ public class ReminderConfigServiceTest {
     void shouldGetSecondReminderDays() {
         // Given
         when(reminderConfigRepository.findLatestConfig()).thenReturn(Optional.of(testConfig));
-        
+
         // When
         int days = reminderConfigService.getSecondReminderDays();
-        
+
         // Then
         assertEquals(testConfig.getSecondReminderDays(), days);
         verify(reminderConfigRepository, times(1)).findLatestConfig();
@@ -213,10 +218,10 @@ public class ReminderConfigServiceTest {
     void shouldGetFinalReminderDays() {
         // Given
         when(reminderConfigRepository.findLatestConfig()).thenReturn(Optional.of(testConfig));
-        
+
         // When
         int days = reminderConfigService.getFinalReminderDays();
-        
+
         // Then
         assertEquals(testConfig.getFinalReminderDays(), days);
         verify(reminderConfigRepository, times(1)).findLatestConfig();
@@ -227,10 +232,10 @@ public class ReminderConfigServiceTest {
     void shouldGetReminderMethod() {
         // Given
         when(reminderConfigRepository.findLatestConfig()).thenReturn(Optional.of(testConfig));
-        
+
         // When
         String method = reminderConfigService.getReminderMethod();
-        
+
         // Then
         assertEquals(testConfig.getReminderMethod(), method);
         verify(reminderConfigRepository, times(1)).findLatestConfig();
@@ -241,10 +246,10 @@ public class ReminderConfigServiceTest {
     void shouldCheckIfAutoSendRemindersIsEnabled() {
         // Given
         when(reminderConfigRepository.findLatestConfig()).thenReturn(Optional.of(testConfig));
-        
+
         // When
         boolean isEnabled = reminderConfigService.isAutoSendRemindersEnabled();
-        
+
         // Then
         assertTrue(isEnabled);
         verify(reminderConfigRepository, times(1)).findLatestConfig();
@@ -256,12 +261,12 @@ public class ReminderConfigServiceTest {
         // Given
         testConfig.setAutoSendReminders(false);
         when(reminderConfigRepository.findLatestConfig()).thenReturn(Optional.of(testConfig));
-        
+
         // When
         boolean isEnabled = reminderConfigService.isAutoSendRemindersEnabled();
-        
+
         // Then
         assertFalse(isEnabled);
         verify(reminderConfigRepository, times(1)).findLatestConfig();
     }
-} 
+}

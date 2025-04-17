@@ -35,10 +35,10 @@ public class SolarInstallationServiceImpl implements SolarInstallationService {
         // Verify the customer exists
         User customer = userRepository.findById(customerId)
                 .orElseThrow(() -> new ResourceNotFoundException("Customer not found with ID: " + customerId));
-        
+
         // Get all installations for the customer
         List<SolarInstallation> installations = installationRepository.findByUser(customer);
-        
+
         // Convert to DTOs and return
         return installations.stream()
                 .map(this::convertToDTO)
@@ -49,8 +49,9 @@ public class SolarInstallationServiceImpl implements SolarInstallationService {
     public SolarInstallationDTO getInstallationById(Long installationId) {
         // Verify the installation exists
         SolarInstallation installation = installationRepository.findById(installationId)
-                .orElseThrow(() -> new ResourceNotFoundException("Solar installation not found with ID: " + installationId));
-        
+                .orElseThrow(
+                        () -> new ResourceNotFoundException("Solar installation not found with ID: " + installationId));
+
         // Convert to DTO and return
         return convertToDTO(installation);
     }
@@ -60,22 +61,37 @@ public class SolarInstallationServiceImpl implements SolarInstallationService {
     public SolarInstallationDTO createInstallation(SolarInstallationDTO installationDTO) {
         // Verify the customer exists
         User customer = userRepository.findById(installationDTO.getUserId())
-                .orElseThrow(() -> new ResourceNotFoundException("Customer not found with ID: " + installationDTO.getUserId()));
-        
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Customer not found with ID: " + installationDTO.getUserId()));
+
+        // Validate required fields explicitly
+        if (installationDTO.getName() == null || installationDTO.getName().trim().isEmpty()) {
+            // Try to use location if available, otherwise use a default name
+            String location = installationDTO.getLocation();
+            installationDTO.setName(location != null && !location.trim().isEmpty() ? "Installation at " + location
+                    : "New Solar Installation");
+        }
+
         // Create the installation
         SolarInstallation installation = new SolarInstallation();
         installation.setUser(customer);
+
+        // Set the name field explicitly
+        installation.setName(installationDTO.getName());
+
+        installation.setCapacity(installationDTO.getInstalledCapacityKW()); // Make sure capacity is set
         installation.setInstalledCapacityKW(installationDTO.getInstalledCapacityKW());
         installation.setLocation(installationDTO.getLocation());
-        installation.setInstallationDate(installationDTO.getInstallationDate() != null ? 
-                installationDTO.getInstallationDate() : LocalDateTime.now());
+        installation.setInstallationDate(
+                installationDTO.getInstallationDate() != null ? installationDTO.getInstallationDate()
+                        : LocalDateTime.now());
         installation.setStatus(SolarInstallation.InstallationStatus.ACTIVE);
         installation.setTamperDetected(false);
         installation.setLastTamperCheck(LocalDateTime.now());
-        
+
         // Save the installation
         SolarInstallation savedInstallation = installationRepository.save(installation);
-        
+
         // Convert to DTO and return
         return convertToDTO(savedInstallation);
     }
@@ -85,24 +101,30 @@ public class SolarInstallationServiceImpl implements SolarInstallationService {
     public SolarInstallationDTO updateInstallation(Long installationId, SolarInstallationDTO installationDTO) {
         // Verify the installation exists
         SolarInstallation installation = installationRepository.findById(installationId)
-                .orElseThrow(() -> new ResourceNotFoundException("Solar installation not found with ID: " + installationId));
-        
+                .orElseThrow(
+                        () -> new ResourceNotFoundException("Solar installation not found with ID: " + installationId));
+
         // Update the installation
+        if (installationDTO.getName() != null && !installationDTO.getName().trim().isEmpty()) {
+            installation.setName(installationDTO.getName());
+        }
+
         if (installationDTO.getInstalledCapacityKW() > 0) {
             installation.setInstalledCapacityKW(installationDTO.getInstalledCapacityKW());
+            installation.setCapacity(installationDTO.getInstalledCapacityKW()); // Update capacity as well
         }
-        
+
         if (installationDTO.getLocation() != null) {
             installation.setLocation(installationDTO.getLocation());
         }
-        
+
         if (installationDTO.getStatus() != null) {
             installation.setStatus(installationDTO.getStatus());
         }
-        
+
         // Save the installation
         SolarInstallation savedInstallation = installationRepository.save(installation);
-        
+
         // Convert to DTO and return
         return convertToDTO(savedInstallation);
     }
@@ -112,39 +134,40 @@ public class SolarInstallationServiceImpl implements SolarInstallationService {
     public SolarInstallationDTO updateDeviceStatus(DeviceStatusRequest request) {
         // Verify the installation exists
         SolarInstallation installation = installationRepository.findById(request.getInstallationId())
-                .orElseThrow(() -> new ResourceNotFoundException("Solar installation not found with ID: " + request.getInstallationId()));
-        
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Solar installation not found with ID: " + request.getInstallationId()));
+
         // Verify the device token
         if (!verifyDeviceToken(request.getInstallationId(), request.getDeviceToken())) {
             throw new SecurityException("Invalid device token for installation ID: " + request.getInstallationId());
         }
-        
+
         // Check if tamper status has changed
         boolean wasTampered = installation.isTamperDetected();
         boolean isTampered = request.isTamperDetected();
-        
+
         // Update tamper status if detected
         if (isTampered) {
             installation.setTamperDetected(true);
         }
-        
+
         // Update last tamper check timestamp
         installation.setLastTamperCheck(LocalDateTime.now());
-        
+
         // Save the installation
         SolarInstallation savedInstallation = installationRepository.save(installation);
-        
+
         // Convert to DTO
         SolarInstallationDTO installationDTO = convertToDTO(savedInstallation);
-        
+
         // Send real-time update via WebSocket
         webSocketService.sendInstallationStatusUpdate(savedInstallation.getId(), installationDTO);
-        
+
         // Send tamper alert if newly detected
         if (!wasTampered && isTampered) {
             webSocketService.sendTamperAlert(savedInstallation.getId(), installationDTO);
         }
-        
+
         return installationDTO;
     }
 
@@ -152,32 +175,32 @@ public class SolarInstallationServiceImpl implements SolarInstallationService {
     public SystemOverviewResponse getSystemOverview() {
         // Get all installations
         List<SolarInstallation> allInstallations = installationRepository.findAll();
-        
+
         // Count active and suspended installations
         int activeCount = 0;
         int suspendedCount = 0;
         double totalCapacity = 0;
-        
+
         for (SolarInstallation installation : allInstallations) {
             if (installation.getStatus() == SolarInstallation.InstallationStatus.ACTIVE) {
                 activeCount++;
             } else if (installation.getStatus() == SolarInstallation.InstallationStatus.SUSPENDED) {
                 suspendedCount++;
             }
-            
+
             totalCapacity += installation.getInstalledCapacityKW();
         }
-        
+
         // Get installations with tamper alerts
         List<SolarInstallation> tamperAlertInstallations = installationRepository.findByTamperDetectedTrue();
-        
+
         // Get today's data for all installations
         LocalDateTime startOfDay = LocalDateTime.of(LocalDate.now(), LocalTime.MIDNIGHT);
         LocalDateTime endOfDay = LocalDateTime.of(LocalDate.now(), LocalTime.MAX);
-        
+
         // Get month-to-date data
         LocalDateTime startOfMonth = LocalDateTime.of(LocalDate.now().withDayOfMonth(1), LocalTime.MIDNIGHT);
-        
+
         // Calculate system-wide values (placeholder calculations for now)
         double currentSystemGeneration = 0;
         double todayTotalGeneration = 0;
@@ -185,7 +208,7 @@ public class SolarInstallationServiceImpl implements SolarInstallationService {
         double monthToDateGeneration = 0;
         double monthToDateConsumption = 0;
         double averageEfficiency = 0;
-        
+
         // Build the system overview response
         SystemOverviewResponse response = SystemOverviewResponse.builder()
                 .totalActiveInstallations(activeCount)
@@ -205,7 +228,7 @@ public class SolarInstallationServiceImpl implements SolarInstallationService {
                         .map(this::convertToDTO)
                         .collect(Collectors.toList()))
                 .build();
-        
+
         return response;
     }
 
@@ -213,7 +236,7 @@ public class SolarInstallationServiceImpl implements SolarInstallationService {
     public List<SolarInstallationDTO> getInstallationsWithTamperAlerts() {
         // Get installations with tamper alerts
         List<SolarInstallation> tamperAlertInstallations = installationRepository.findByTamperDetectedTrue();
-        
+
         // Convert to DTOs and return
         return tamperAlertInstallations.stream()
                 .map(this::convertToDTO)
@@ -226,19 +249,25 @@ public class SolarInstallationServiceImpl implements SolarInstallationService {
         // In a real application, you would verify the token against a stored value
         return true;
     }
-    
+
     // Helper methods for DTO conversion
     private SolarInstallationDTO convertToDTO(SolarInstallation installation) {
-        return SolarInstallationDTO.builder()
+        SolarInstallationDTO.SolarInstallationDTOBuilder builder = SolarInstallationDTO.builder()
                 .id(installation.getId())
-                .userId(installation.getUser().getId())
-                .username(installation.getUser().getEmail())
+                .name(installation.getName()) // Include name in the DTO
                 .installedCapacityKW(installation.getInstalledCapacityKW())
                 .location(installation.getLocation())
                 .installationDate(installation.getInstallationDate())
                 .status(installation.getStatus())
                 .tamperDetected(installation.isTamperDetected())
-                .lastTamperCheck(installation.getLastTamperCheck())
-                .build();
+                .lastTamperCheck(installation.getLastTamperCheck());
+
+        // Safely handle null User reference
+        if (installation.getUser() != null) {
+            builder.userId(installation.getUser().getId())
+                    .username(installation.getUser().getEmail());
+        }
+
+        return builder.build();
     }
-} 
+}

@@ -9,8 +9,11 @@ import java.util.List;
 
 public interface SolarInstallationRepository extends JpaRepository<SolarInstallation, Long> {
     List<SolarInstallation> findByUser(User user);
+
     List<SolarInstallation> findByTamperDetectedTrue();
-    
+
+    List<SolarInstallation> findByUserIsNull();
+
     @Query("SELECT i FROM SolarInstallation i WHERE i.user.id = :userId")
     List<SolarInstallation> findByUserId(@Param("userId") Long userId);
-} 
+}

@@ -28,8 +28,10 @@ import static org.mockito.Mockito.never;
 
 /**
  * Test class for GracePeriodConfigService
- * Source file: src/main/java/com/solar/core_services/payment_compliance/service/GracePeriodConfigService.java
- * Implementation: src/main/java/com/solar/core_services/payment_compliance/service/impl/GracePeriodConfigServiceImpl.java
+ * Source file:
+ * src/main/java/com/solar/core_services/payment_compliance/service/GracePeriodConfigService.java
+ * Implementation:
+ * src/main/java/com/solar/core_services/payment_compliance/service/impl/GracePeriodConfigServiceImpl.java
  */
 @ExtendWith(MockitoExtension.class)
 public class GracePeriodConfigServiceTest {
@@ -55,7 +57,7 @@ public class GracePeriodConfigServiceTest {
         testConfig.setUpdatedAt(LocalDateTime.now().minusDays(15));
         testConfig.setCreatedBy("admin");
         testConfig.setUpdatedBy("admin");
-        
+
         // Create test config DTO
         testConfigDTO = GracePeriodConfigDTO.builder()
                 .id(1L)
@@ -72,10 +74,10 @@ public class GracePeriodConfigServiceTest {
     void shouldGetCurrentConfig() {
         // Given
         when(gracePeriodConfigRepository.findLatestConfig()).thenReturn(Optional.of(testConfig));
-        
+
         // When
         GracePeriodConfigDTO result = gracePeriodConfigService.getCurrentConfig();
-        
+
         // Then
         assertNotNull(result);
         assertEquals(testConfig.getId(), result.getId());
@@ -91,10 +93,10 @@ public class GracePeriodConfigServiceTest {
         // Given
         when(gracePeriodConfigRepository.findLatestConfig()).thenReturn(Optional.empty());
         when(gracePeriodConfigRepository.save(any(GracePeriodConfig.class))).thenReturn(testConfig);
-        
+
         // When
         GracePeriodConfigDTO result = gracePeriodConfigService.getCurrentConfig();
-        
+
         // Then
         assertNotNull(result);
         verify(gracePeriodConfigRepository, times(1)).findLatestConfig();
@@ -106,23 +108,23 @@ public class GracePeriodConfigServiceTest {
     void shouldUpdateConfig() {
         // Given
         testConfigDTO.setId(1L);
-        when(gracePeriodConfigRepository.findById(1L)).thenReturn(Optional.of(testConfig));
+        when(gracePeriodConfigRepository.findLatestConfig()).thenReturn(Optional.of(testConfig));
         when(gracePeriodConfigRepository.save(any(GracePeriodConfig.class))).thenAnswer(invocation -> {
             GracePeriodConfig savedConfig = invocation.getArgument(0);
             savedConfig.setId(1L);
             return savedConfig;
         });
-        
+
         // When
         GracePeriodConfigDTO result = gracePeriodConfigService.updateConfig(testConfigDTO, "user");
-        
+
         // Then
         assertNotNull(result);
         assertEquals(testConfigDTO.getNumberOfDays(), result.getNumberOfDays());
         assertEquals(testConfigDTO.getReminderFrequency(), result.getReminderFrequency());
         assertEquals(testConfigDTO.getAutoSuspendEnabled(), result.getAutoSuspendEnabled());
         assertEquals("user", result.getUpdatedBy());
-        verify(gracePeriodConfigRepository, times(1)).findById(1L);
+        verify(gracePeriodConfigRepository, times(1)).findLatestConfig();
         verify(gracePeriodConfigRepository, times(1)).save(any(GracePeriodConfig.class));
     }
 
@@ -131,23 +133,28 @@ public class GracePeriodConfigServiceTest {
     void shouldCreateNewConfigWhenUpdatingAndNoneExists() {
         // Given
         testConfigDTO.setId(null); // Ensure ID is null to trigger creation path
+        when(gracePeriodConfigRepository.findLatestConfig()).thenReturn(Optional.empty());
         when(gracePeriodConfigRepository.save(any(GracePeriodConfig.class))).thenAnswer(invocation -> {
             GracePeriodConfig savedConfig = invocation.getArgument(0);
             savedConfig.setId(1L);
+            savedConfig.setCreatedAt(LocalDateTime.now());
+            savedConfig.setUpdatedAt(LocalDateTime.now());
             return savedConfig;
         });
-        
+
         // When
         GracePeriodConfigDTO result = gracePeriodConfigService.updateConfig(testConfigDTO, "user");
-        
+
         // Then
         assertNotNull(result);
         assertEquals(testConfigDTO.getNumberOfDays(), result.getNumberOfDays());
         assertEquals(testConfigDTO.getReminderFrequency(), result.getReminderFrequency());
         assertEquals(testConfigDTO.getAutoSuspendEnabled(), result.getAutoSuspendEnabled());
         assertEquals("user", result.getUpdatedBy());
-        verify(gracePeriodConfigRepository, never()).findById(anyLong());
-        verify(gracePeriodConfigRepository, times(1)).save(any(GracePeriodConfig.class));
+        verify(gracePeriodConfigRepository, times(1)).findLatestConfig();
+        // Now we expect save to be called twice - once for creating the default config
+        // and once for updating it
+        verify(gracePeriodConfigRepository, times(2)).save(any(GracePeriodConfig.class));
     }
 
     @Test
@@ -155,10 +162,10 @@ public class GracePeriodConfigServiceTest {
     void shouldGetActiveGracePeriodConfig() {
         // Given
         when(gracePeriodConfigRepository.findLatestConfig()).thenReturn(Optional.of(testConfig));
-        
+
         // When
         GracePeriodConfig result = gracePeriodConfigService.getActiveGracePeriodConfig();
-        
+
         // Then
         assertNotNull(result);
         assertEquals(testConfig.getId(), result.getId());
@@ -170,10 +177,10 @@ public class GracePeriodConfigServiceTest {
     void shouldGetGracePeriodDays() {
         // Given
         when(gracePeriodConfigRepository.findLatestConfig()).thenReturn(Optional.of(testConfig));
-        
+
         // When
         int days = gracePeriodConfigService.getGracePeriodDays();
-        
+
         // Then
         assertEquals(testConfig.getNumberOfDays(), days);
         verify(gracePeriodConfigRepository, times(1)).findLatestConfig();
@@ -184,10 +191,10 @@ public class GracePeriodConfigServiceTest {
     void shouldGetReminderFrequency() {
         // Given
         when(gracePeriodConfigRepository.findLatestConfig()).thenReturn(Optional.of(testConfig));
-        
+
         // When
         int frequency = gracePeriodConfigService.getReminderFrequency();
-        
+
         // Then
         assertEquals(testConfig.getReminderFrequency(), frequency);
         verify(gracePeriodConfigRepository, times(1)).findLatestConfig();
@@ -198,10 +205,10 @@ public class GracePeriodConfigServiceTest {
     void shouldCheckIfAutoSuspendIsEnabled() {
         // Given
         when(gracePeriodConfigRepository.findLatestConfig()).thenReturn(Optional.of(testConfig));
-        
+
         // When
         boolean isEnabled = gracePeriodConfigService.isAutoSuspendEnabled();
-        
+
         // Then
         assertTrue(isEnabled);
         verify(gracePeriodConfigRepository, times(1)).findLatestConfig();
@@ -213,12 +220,12 @@ public class GracePeriodConfigServiceTest {
         // Given
         testConfig.setAutoSuspendEnabled(false);
         when(gracePeriodConfigRepository.findLatestConfig()).thenReturn(Optional.of(testConfig));
-        
+
         // When
         boolean isEnabled = gracePeriodConfigService.isAutoSuspendEnabled();
-        
+
         // Then
         assertFalse(isEnabled);
         verify(gracePeriodConfigRepository, times(1)).findLatestConfig();
     }
-} 
+}

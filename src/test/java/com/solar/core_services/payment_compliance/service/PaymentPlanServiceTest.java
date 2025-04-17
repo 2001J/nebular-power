@@ -39,8 +39,10 @@ import com.solar.core_services.energy_monitoring.model.SolarInstallation.Install
 
 /**
  * Test class for PaymentPlanService
- * Source file: src/main/java/com/solar/core_services/payment_compliance/service/PaymentPlanService.java
- * Implementation: src/main/java/com/solar/core_services/payment_compliance/service/impl/PaymentPlanServiceImpl.java
+ * Source file:
+ * src/main/java/com/solar/core_services/payment_compliance/service/PaymentPlanService.java
+ * Implementation:
+ * src/main/java/com/solar/core_services/payment_compliance/service/impl/PaymentPlanServiceImpl.java
  */
 @ExtendWith(MockitoExtension.class)
 public class PaymentPlanServiceTest {
@@ -56,6 +58,9 @@ public class PaymentPlanServiceTest {
 
     @Mock
     private PaymentEventPublisher eventPublisher;
+
+    @Mock
+    private GracePeriodConfigService gracePeriodConfigService;
 
     @InjectMocks
     private PaymentPlanServiceImpl paymentPlanService;
@@ -73,17 +78,17 @@ public class PaymentPlanServiceTest {
         testUser.setId(1L);
         testUser.setEmail("test@example.com");
         testUser.setFullName("Test User");
-        
+
         // Create test installation
         testInstallation = new SolarInstallation();
         testInstallation.setId(1L);
         testInstallation.setCapacity(5.0);
         testInstallation.setStatus(InstallationStatus.ACTIVE);
         testInstallation.setUser(testUser);
-        
+
         // Create test payment plans
         LocalDateTime now = LocalDateTime.now();
-        
+
         testPaymentPlan1 = PaymentPlan.builder()
                 .id(1L)
                 .installation(testInstallation)
@@ -101,7 +106,7 @@ public class PaymentPlanServiceTest {
                 .lateFeeAmount(new BigDecimal("25.00"))
                 .gracePeriodDays(7)
                 .build();
-        
+
         testPaymentPlan2 = PaymentPlan.builder()
                 .id(2L)
                 .installation(testInstallation)
@@ -119,7 +124,7 @@ public class PaymentPlanServiceTest {
                 .lateFeeAmount(new BigDecimal("20.00"))
                 .gracePeriodDays(5)
                 .build();
-        
+
         // Create test payment plan request
         testPaymentPlanRequest = PaymentPlanRequest.builder()
                 .installationId(testInstallation.getId())
@@ -137,10 +142,11 @@ public class PaymentPlanServiceTest {
         // Given
         when(installationRepository.findById(testInstallation.getId())).thenReturn(Optional.of(testInstallation));
         when(paymentPlanRepository.save(any(PaymentPlan.class))).thenReturn(testPaymentPlan1);
-        
+        when(gracePeriodConfigService.getGracePeriodDays()).thenReturn(7); // Mock the grace period config service
+
         // When
         PaymentPlanDTO result = paymentPlanService.createPaymentPlan(testPaymentPlanRequest);
-        
+
         // Then
         assertNotNull(result);
         assertEquals(testPaymentPlan1.getId(), result.getId());
@@ -155,10 +161,10 @@ public class PaymentPlanServiceTest {
         // Given
         when(paymentPlanRepository.findById(testPaymentPlan1.getId())).thenReturn(Optional.of(testPaymentPlan1));
         when(paymentPlanRepository.save(any(PaymentPlan.class))).thenReturn(testPaymentPlan1);
-        
+
         // When
         PaymentPlanDTO result = paymentPlanService.updatePaymentPlan(testPaymentPlan1.getId(), testPaymentPlanRequest);
-        
+
         // Then
         assertNotNull(result);
         assertEquals(testPaymentPlan1.getId(), result.getId());
@@ -172,10 +178,10 @@ public class PaymentPlanServiceTest {
     void shouldGetPaymentPlanById() {
         // Given
         when(paymentPlanRepository.findById(testPaymentPlan1.getId())).thenReturn(Optional.of(testPaymentPlan1));
-        
+
         // When
         PaymentPlanDTO result = paymentPlanService.getPaymentPlanById(testPaymentPlan1.getId());
-        
+
         // Then
         assertNotNull(result);
         assertEquals(testPaymentPlan1.getId(), result.getId());
@@ -189,10 +195,10 @@ public class PaymentPlanServiceTest {
         when(installationRepository.findById(testInstallation.getId())).thenReturn(Optional.of(testInstallation));
         when(paymentPlanRepository.findByInstallation(testInstallation))
                 .thenReturn(Arrays.asList(testPaymentPlan1, testPaymentPlan2));
-        
+
         // When
         List<PaymentPlanDTO> results = paymentPlanService.getPaymentPlansByInstallation(testInstallation.getId());
-        
+
         // Then
         assertNotNull(results);
         assertEquals(2, results.size());
@@ -206,10 +212,10 @@ public class PaymentPlanServiceTest {
         // Given
         when(installationRepository.findById(testInstallation.getId())).thenReturn(Optional.of(testInstallation));
         when(paymentPlanRepository.findActivePaymentPlan(any(), any())).thenReturn(Optional.of(testPaymentPlan1));
-        
+
         // When
         PaymentPlanDTO result = paymentPlanService.getActivePaymentPlan(testInstallation.getId());
-        
+
         // Then
         assertNotNull(result);
         assertEquals(testPaymentPlan1.getId(), result.getId());
@@ -223,13 +229,13 @@ public class PaymentPlanServiceTest {
         // Given
         BigDecimal paymentAmount = new BigDecimal("500.00");
         BigDecimal expectedRemainingAmount = new BigDecimal("7500.00");
-        
+
         when(paymentPlanRepository.findById(testPaymentPlan1.getId())).thenReturn(Optional.of(testPaymentPlan1));
         when(paymentPlanRepository.save(any(PaymentPlan.class))).thenReturn(testPaymentPlan1);
-        
+
         // When
         paymentPlanService.updateRemainingAmount(testPaymentPlan1.getId(), paymentAmount);
-        
+
         // Then
         assertEquals(expectedRemainingAmount, testPaymentPlan1.getRemainingAmount());
         verify(paymentPlanRepository, times(1)).findById(testPaymentPlan1.getId());
@@ -241,10 +247,10 @@ public class PaymentPlanServiceTest {
     void shouldGetPaymentPlanEntityById() {
         // Given
         when(paymentPlanRepository.findById(testPaymentPlan1.getId())).thenReturn(Optional.of(testPaymentPlan1));
-        
+
         // When
         PaymentPlan result = paymentPlanService.getPaymentPlanEntityById(testPaymentPlan1.getId());
-        
+
         // Then
         assertNotNull(result);
         assertEquals(testPaymentPlan1.getId(), result.getId());
@@ -256,12 +262,12 @@ public class PaymentPlanServiceTest {
     void shouldThrowExceptionWhenPaymentPlanNotFound() {
         // Given
         when(paymentPlanRepository.findById(anyLong())).thenReturn(Optional.empty());
-        
+
         // When/Then
         assertThrows(RuntimeException.class, () -> {
             paymentPlanService.getPaymentPlanEntityById(999L);
         });
-        
+
         verify(paymentPlanRepository, times(1)).findById(999L);
     }
 
@@ -270,11 +276,11 @@ public class PaymentPlanServiceTest {
     void shouldGeneratePaymentSchedule() {
         // Given
         when(paymentRepository.saveAll(any())).thenReturn(Collections.emptyList());
-        
+
         // When
         paymentPlanService.generatePaymentSchedule(testPaymentPlan1);
-        
+
         // Then
         verify(paymentRepository, times(1)).saveAll(any());
     }
-} 
+}

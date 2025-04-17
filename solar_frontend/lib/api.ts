@@ -1433,7 +1433,11 @@ export const paymentComplianceApi = {
   // Create payment plan for a customer
   createPaymentPlan: async (customerId, planData) => {
     try {
-      const response = await apiClient.post(`/api/admin/payments/customers/${customerId}/plan`, planData);
+      // Fix: Ensure we're passing a customer ID, not an object
+      const customerIdValue = typeof customerId === 'object' ? customerId.id : customerId;
+
+      console.log(`Creating payment plan for customer ID: ${customerIdValue}`, planData);
+      const response = await apiClient.post(`/api/admin/payments/customers/${customerIdValue}/plan`, planData);
       return response.data;
     } catch (error) {
       console.error(`Error creating payment plan for customer ${customerId}:`, error);

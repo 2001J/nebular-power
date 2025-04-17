@@ -130,6 +130,13 @@ export default function NewLoanPage() {
   const [loadingCustomers, setLoadingCustomers] = useState(true);
   const [loadingInstallations, setLoadingInstallations] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
+  const [globalPaymentSettings, setGlobalPaymentSettings] = useState({
+    gracePeriodDays: 7, // Default fallback value
+    lateFeePercentage: 0,
+    lateFeeFixedAmount: 0,
+    lateFeesEnabled: false
+  });
+  const [loadingSettings, setLoadingSettings] = useState(true);
 
   // Set up form with validation
   const form = useForm({
@@ -145,12 +152,50 @@ export default function NewLoanPage() {
       interestRate: 0,
       downPayment: 0,
       lateFeeAmount: 0,
-      gracePeriodDays: 7,
+      gracePeriodDays: 7, // Will be updated when global settings load
       includeLateFees: false,
       sendPaymentReminders: true,
       description: ""
     }
   });
+
+  // Load global payment settings on component mount
+  useEffect(() => {
+    const fetchGlobalSettings = async () => {
+      setLoadingSettings(true);
+      try {
+        const settings = await paymentComplianceApi.getGracePeriodConfig();
+        console.log("Loaded global payment settings:", settings);
+
+        // Update state with fetched settings
+        setGlobalPaymentSettings({
+          gracePeriodDays: settings.gracePeriodDays || settings.numberOfDays || 7,
+          lateFeePercentage: settings.lateFeePercentage || 0,
+          lateFeeFixedAmount: settings.lateFeeFixedAmount || 0,
+          lateFeesEnabled: settings.lateFeesEnabled || false
+        });
+
+        // Update form default values with global settings
+        form.setValue("gracePeriodDays", settings.gracePeriodDays || settings.numberOfDays || 7);
+
+        if (settings.lateFeesEnabled) {
+          form.setValue("includeLateFees", true);
+          form.setValue("lateFeeAmount", settings.lateFeeFixedAmount || 0);
+        }
+      } catch (error) {
+        console.error("Error loading global payment settings:", error);
+        toast({
+          title: "Warning",
+          description: "Could not load global payment settings. Using default values.",
+          variant: "destructive",
+        });
+      } finally {
+        setLoadingSettings(false);
+      }
+    };
+
+    fetchGlobalSettings();
+  }, [form]);
 
   // Load customers on component mount
   useEffect(() => {
@@ -225,10 +270,14 @@ export default function NewLoanPage() {
     };
 
     const customerId = form.watch("customerId");
+    console.log("Customer ID changed to:", customerId);
+
     if (customerId) {
       fetchInstallations(customerId);
-      const customer = customers.find(c => c.id === customerId);
-      setSelectedCustomer(customer);
+      // Convert IDs to strings for consistent comparison
+      const customer = customers.find(c => String(c.id) === String(customerId));
+      console.log("Selected customer:", customer);
+      setSelectedCustomer(customer || null);
     } else {
       setInstallations([]);
       setSelectedCustomer(null);
@@ -242,18 +291,28 @@ export default function NewLoanPage() {
       // Format the data for the API
       const paymentPlanData = {
         installationId: data.installationId,
+        name: `Payment Plan for Installation #${data.installationId}`,
         totalAmount: data.totalAmount,
         installmentAmount: data.installmentAmount,
         frequency: data.frequency,
         startDate: format(data.startDate, "yyyy-MM-dd"),
         endDate: format(data.endDate, "yyyy-MM-dd"),
         interestRate: data.interestRate || 0,
+        status: "ACTIVE",
         downPayment: data.downPayment || 0,
-        lateFeeAmount: data.includeLateFees ? (data.lateFeeAmount || 0) : 0,
+        // Set late fee amount only if includeLateFees is true
+        lateFeeAmount: data.includeLateFees ? data.lateFeeAmount || 0 : 0,
+        // Use global settings when checked but set to 0
+        useGlobalLateFees: data.includeLateFees && data.lateFeeAmount === 0,
+        // Grace period days (use global if set to 0)
         gracePeriodDays: data.gracePeriodDays || 0,
+        // If grace period is 0, use global settings
+        useGlobalGracePeriod: data.gracePeriodDays === 0,
         sendPaymentReminders: data.sendPaymentReminders,
         description: data.description || "Solar installation financing"
       };
+
+      console.log(`Creating payment plan for customer ID: ${data.customerId}`, paymentPlanData);
 
       // Call API to create payment plan
       const response = await paymentComplianceApi.createPaymentPlan(data.customerId, paymentPlanData);
@@ -325,10 +384,20 @@ export default function NewLoanPage() {
                       disabled={loadingCustomers}
                       onValueChange={field.onChange}
                       value={field.value}
+                      defaultValue={field.value}
                     >
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue placeholder={loadingCustomers ? "Loading customers..." : "Select a customer"} />
+                          <SelectValue>
+                            {loadingCustomers
+                              ? "Loading customers..."
+                              : field.value
+                                ? customers.find(c => String(c.id) === String(field.value))?.fullName ||
+                                customers.find(c => String(c.id) === String(field.value))?.email ||
+                                "Select a customer"
+                                : "Select a customer"
+                            }
+                          </SelectValue>
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
@@ -338,7 +407,7 @@ export default function NewLoanPage() {
                           </SelectItem>
                         ) : (
                           customers.map((customer) => (
-                            <SelectItem key={customer.id} value={customer.id}>
+                            <SelectItem key={customer.id} value={String(customer.id)}>
                               {customer.fullName || customer.email}
                             </SelectItem>
                           ))
@@ -360,16 +429,20 @@ export default function NewLoanPage() {
                       disabled={loadingInstallations || !form.watch("customerId")}
                       onValueChange={field.onChange}
                       value={field.value}
+                      defaultValue={field.value}
                     >
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue placeholder={
-                            !form.watch("customerId")
+                          <SelectValue>
+                            {!form.watch("customerId")
                               ? "First select a customer"
                               : loadingInstallations
                                 ? "Loading installations..."
-                                : "Select an installation"
-                          } />
+                                : field.value
+                                  ? installations.find(i => i.id === field.value)?.name || `Installation #${field.value}`
+                                  : "Select an installation"
+                            }
+                          </SelectValue>
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
@@ -631,10 +704,21 @@ export default function NewLoanPage() {
                         <FormControl>
                           <div className="relative">
                             <DollarSign className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                            <Input type="number" step="0.01" placeholder="0.00" {...field} className="pl-9" />
+                            <Input
+                              type="number"
+                              step="0.01"
+                              placeholder={loadingSettings ? "Loading..." : `Global default: $${globalPaymentSettings.lateFeeFixedAmount}`}
+                              {...field}
+                              className="pl-9"
+                            />
                           </div>
                         </FormControl>
-                        <FormDescription>Fixed amount charged for late payments</FormDescription>
+                        <FormDescription>
+                          Fixed amount charged for late payments. {
+                            !loadingSettings &&
+                            `Global setting: $${globalPaymentSettings.lateFeeFixedAmount}. Set to 0 to use global setting.`
+                          }
+                        </FormDescription>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -647,9 +731,18 @@ export default function NewLoanPage() {
                       <FormItem>
                         <FormLabel>Grace Period (Days)</FormLabel>
                         <FormControl>
-                          <Input type="number" {...field} />
+                          <Input
+                            type="number"
+                            {...field}
+                            placeholder={loadingSettings ? "Loading..." : `Global default: ${globalPaymentSettings.gracePeriodDays}`}
+                          />
                         </FormControl>
-                        <FormDescription>Days before late fee is applied</FormDescription>
+                        <FormDescription>
+                          Days before late fee is applied. {
+                            !loadingSettings &&
+                            `Global setting: ${globalPaymentSettings.gracePeriodDays} days. Set to 0 to use global setting.`
+                          }
+                        </FormDescription>
                         <FormMessage />
                       </FormItem>
                     )}

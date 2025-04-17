@@ -1,6 +1,8 @@
 package com.solar.core_services.payment_compliance.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.solar.core_services.energy_monitoring.model.SolarInstallation;
+import com.solar.core_services.energy_monitoring.repository.SolarInstallationRepository;
 import com.solar.core_services.payment_compliance.dto.GracePeriodConfigDTO;
 import com.solar.core_services.payment_compliance.dto.MakePaymentRequest;
 import com.solar.core_services.payment_compliance.dto.PaymentDTO;
@@ -65,7 +67,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Test class for AdminPaymentController
- * Source file: src/main/java/com/solar/core_services/payment_compliance/controller/AdminPaymentController.java
+ * Source file:
+ * src/main/java/com/solar/core_services/payment_compliance/controller/AdminPaymentController.java
  */
 @ExtendWith(MockitoExtension.class)
 public class AdminPaymentControllerTest {
@@ -86,7 +89,10 @@ public class AdminPaymentControllerTest {
 
     @Mock
     private ReminderConfigService reminderConfigService;
-    
+
+    @Mock
+    private SolarInstallationRepository installationRepository;
+
     @InjectMocks
     private AdminPaymentController controller;
 
@@ -106,11 +112,11 @@ public class AdminPaymentControllerTest {
         // Set up MockMvc without security context
         mockMvc = MockMvcBuilders.standaloneSetup(controller)
                 .build();
-        
+
         // Configure ObjectMapper for Java 8 date/time types
         objectMapper.registerModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule());
         objectMapper.disable(com.fasterxml.jackson.databind.SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
-        
+
         // Set up test data
         // Create test payment DTO
         testPaymentDTO = PaymentDTO.builder()
@@ -126,10 +132,10 @@ public class AdminPaymentControllerTest {
                 .statusReason("Payment overdue")
                 .daysOverdue(5)
                 .build();
-        
+
         // Create test payment page
         testPaymentPage = new PageImpl<>(Collections.singletonList(testPaymentDTO));
-        
+
         // Create test payment plan DTO
         testPaymentPlanDTO = PaymentPlanDTO.builder()
                 .id(1L)
@@ -147,7 +153,7 @@ public class AdminPaymentControllerTest {
                 .endDate(LocalDateTime.now().plusMonths(22))
                 .status(PaymentPlan.PaymentPlanStatus.ACTIVE)
                 .build();
-        
+
         // Create test payment plan request
         testPaymentPlanRequest = PaymentPlanRequest.builder()
                 .installationId(1L)
@@ -157,7 +163,7 @@ public class AdminPaymentControllerTest {
                 .endDate(LocalDate.now().plusYears(2))
                 .totalAmount(new BigDecimal("12000.00"))
                 .build();
-        
+
         // Create test grace period config DTO
         testGracePeriodConfigDTO = GracePeriodConfigDTO.builder()
                 .id(1L)
@@ -167,7 +173,7 @@ public class AdminPaymentControllerTest {
                 .createdBy("admin")
                 .updatedBy("admin")
                 .build();
-        
+
         // Create test reminder DTO
         testReminderDTO = PaymentReminderDTO.builder()
                 .id(1L)
@@ -178,7 +184,7 @@ public class AdminPaymentControllerTest {
                 .deliveryChannel("EMAIL")
                 .recipientAddress("test@example.com")
                 .build();
-        
+
         // Create test payment request
         testPaymentRequest = MakePaymentRequest.builder()
                 .paymentId(1L)
@@ -186,7 +192,7 @@ public class AdminPaymentControllerTest {
                 .paymentMethod("CASH")
                 .transactionId("MANUAL123")
                 .build();
-                
+
         // Create test reminder config DTO
         testReminderConfigDTO = ReminderConfigDTO.builder()
                 .id(1L)
@@ -201,198 +207,229 @@ public class AdminPaymentControllerTest {
     }
 
     @Test
-    @WithMockUser(username = "admin", roles = {"ADMIN"})
+    @WithMockUser(username = "admin", roles = { "ADMIN" })
     @DisplayName("Should get overdue payments")
     void shouldGetOverduePayments() throws Exception {
-        // This test requires @WebMvcTest to properly register the controller's request mappings
+        // This test requires @WebMvcTest to properly register the controller's request
+        // mappings
         // For now, we'll just verify that the service method would be called
-        
+
         // Given
         when(paymentService.getAllOverduePayments(any())).thenReturn(testPaymentPage);
-        
+
         // When
         ResponseEntity<Page<PaymentDTO>> response = controller.getOverduePayments(0, 10, "dueDate", "asc");
-        
+
         // Then
         verify(paymentService, times(1)).getAllOverduePayments(any());
     }
 
     @Test
-    @WithMockUser(username = "admin", roles = {"ADMIN"})
+    @WithMockUser(username = "admin", roles = { "ADMIN" })
     @DisplayName("Should get payments by installation")
     void shouldGetPaymentsByInstallation() throws Exception {
-        // This test requires @WebMvcTest to properly register the controller's request mappings
+        // This test requires @WebMvcTest to properly register the controller's request
+        // mappings
         // For now, we'll just verify that the service method would be called
-        
+
         // Given
         when(paymentService.getPaymentsByInstallation(eq(1L), any())).thenReturn(testPaymentPage);
-        
+
         // When
-        ResponseEntity<Page<PaymentDTO>> response = controller.getCustomerPayments(1L, 0, 10, "dueDate", "desc");
-        
+        ResponseEntity<Page<PaymentDTO>> response = controller.getInstallationPayments(1L, 0, 10, "dueDate", "desc");
+
         // Then
         verify(paymentService, times(1)).getPaymentsByInstallation(eq(1L), any());
     }
 
     @Test
-    @WithMockUser(username = "admin", roles = {"ADMIN"})
+    @WithMockUser(username = "admin", roles = { "ADMIN" })
     @DisplayName("Should record manual payment")
     void shouldRecordManualPayment() throws Exception {
-        // This test requires @WebMvcTest to properly register the controller's request mappings
+        // This test requires @WebMvcTest to properly register the controller's request
+        // mappings
         // For now, we'll just verify that the service method would be called
-        
+
         // Given
         when(paymentService.recordManualPayment(eq(1L), any(MakePaymentRequest.class))).thenReturn(testPaymentDTO);
-        
+
         // When
         ResponseEntity<PaymentDTO> response = controller.recordManualPayment(1L, testPaymentRequest);
-        
+
         // Then
         verify(paymentService, times(1)).recordManualPayment(eq(1L), any(MakePaymentRequest.class));
     }
 
     @Test
-    @WithMockUser(username = "admin", roles = {"ADMIN"})
+    @WithMockUser(username = "admin", roles = { "ADMIN" })
     @DisplayName("Should create payment plan")
     void shouldCreatePaymentPlan() throws Exception {
-        // This test requires @WebMvcTest to properly register the controller's request mappings
-        // For now, we'll just verify that the service method would be called
-        
         // Given
+        SolarInstallation mockInstallation = mock(SolarInstallation.class);
+        com.solar.user_management.model.User mockUser = mock(com.solar.user_management.model.User.class);
+
+        when(installationRepository.findById(1L)).thenReturn(java.util.Optional.of(mockInstallation));
+        when(mockInstallation.getUser()).thenReturn(mockUser);
+        when(mockUser.getId()).thenReturn(1L);
         when(paymentPlanService.createPaymentPlan(any(PaymentPlanRequest.class))).thenReturn(testPaymentPlanDTO);
-        
+
         // When
-        ResponseEntity<PaymentPlanDTO> response = controller.createPaymentPlan(1L, testPaymentPlanRequest);
-        
+        ResponseEntity<Object> response = controller.createPaymentPlan(1L, testPaymentPlanRequest);
+
         // Then
+        verify(installationRepository, times(1)).findById(1L);
+        verify(mockInstallation, times(1)).getUser();
+        verify(mockUser, times(1)).getId();
         verify(paymentPlanService, times(1)).createPaymentPlan(any(PaymentPlanRequest.class));
+        assertEquals(testPaymentPlanDTO, response.getBody());
     }
 
     @Test
-    @WithMockUser(username = "admin", roles = {"ADMIN"})
+    @WithMockUser(username = "admin", roles = { "ADMIN" })
     @DisplayName("Should update payment plan")
     void shouldUpdatePaymentPlan() throws Exception {
-        // This test requires @WebMvcTest to properly register the controller's request mappings
-        // For now, we'll just verify that the service method would be called
-        
         // Given
-        when(paymentPlanService.updatePaymentPlan(eq(1L), any(PaymentPlanRequest.class))).thenReturn(testPaymentPlanDTO);
-        
+        SolarInstallation mockInstallation = mock(SolarInstallation.class);
+        com.solar.user_management.model.User mockUser = mock(com.solar.user_management.model.User.class);
+
+        when(installationRepository.findById(1L)).thenReturn(java.util.Optional.of(mockInstallation));
+        when(mockInstallation.getUser()).thenReturn(mockUser);
+        when(mockUser.getId()).thenReturn(1L);
+        when(paymentPlanService.updatePaymentPlan(eq(1L), any(PaymentPlanRequest.class)))
+                .thenReturn(testPaymentPlanDTO);
+
         // When
-        ResponseEntity<PaymentPlanDTO> response = controller.updatePaymentPlan(1L, 1L, testPaymentPlanRequest);
-        
+        ResponseEntity<Object> response = controller.updatePaymentPlan(1L, 1L, testPaymentPlanRequest);
+
         // Then
+        verify(installationRepository, times(1)).findById(1L);
+        verify(mockInstallation, times(1)).getUser();
+        verify(mockUser, times(1)).getId();
         verify(paymentPlanService, times(1)).updatePaymentPlan(eq(1L), any(PaymentPlanRequest.class));
+        assertEquals(testPaymentPlanDTO, response.getBody());
     }
 
     @Test
-    @WithMockUser(username = "admin", roles = {"ADMIN"})
-    @DisplayName("Should get payment plan by ID")
+    @WithMockUser(username = "admin", roles = { "ADMIN" })
+    @DisplayName("Should get payment plan by installation ID")
     void shouldGetPaymentPlanById() throws Exception {
-        // This test requires @WebMvcTest to properly register the controller's request mappings
-        // For now, we'll just verify that the service method would be called
-        
         // Given
         List<PaymentPlanDTO> plans = Collections.singletonList(testPaymentPlanDTO);
+        List<SolarInstallation> installations = Collections.singletonList(mock(SolarInstallation.class));
+
+        // Mock finding installations by userId
+        when(installationRepository.findByUserId(1L)).thenReturn(installations);
+
+        // Mock getting payment plans by installationId
+        when(installations.get(0).getId()).thenReturn(1L);
         when(paymentPlanService.getPaymentPlansByInstallation(1L)).thenReturn(plans);
-        
+
         // When
         ResponseEntity<List<PaymentPlanDTO>> response = controller.getCustomerPaymentPlans(1L);
-        
+
         // Then
+        verify(installationRepository, times(1)).findByUserId(1L);
         verify(paymentPlanService, times(1)).getPaymentPlansByInstallation(1L);
     }
 
     @Test
-    @WithMockUser(username = "admin", roles = {"ADMIN"})
+    @WithMockUser(username = "admin", roles = { "ADMIN" })
     @DisplayName("Should get grace period config")
     void shouldGetGracePeriodConfig() throws Exception {
-        // This test requires @WebMvcTest to properly register the controller's request mappings
+        // This test requires @WebMvcTest to properly register the controller's request
+        // mappings
         // For now, we'll just verify that the service method would be called
-        
+
         // Given
         when(gracePeriodConfigService.getCurrentConfig()).thenReturn(testGracePeriodConfigDTO);
-        
+
         // When
         ResponseEntity<GracePeriodConfigDTO> response = controller.getGracePeriodConfig();
-        
+
         // Then
         verify(gracePeriodConfigService, times(1)).getCurrentConfig();
     }
 
     @Test
-    @WithMockUser(username = "admin", roles = {"ADMIN"})
+    @WithMockUser(username = "admin", roles = { "ADMIN" })
     @DisplayName("Should update grace period config")
     void shouldUpdateGracePeriodConfig() throws Exception {
-        // This test requires @WebMvcTest to properly register the controller's request mappings
+        // This test requires @WebMvcTest to properly register the controller's request
+        // mappings
         // For now, we'll just verify that the service method would be called
-        
+
         // Given
         Authentication authentication = mock(Authentication.class);
         when(authentication.getName()).thenReturn("admin");
         when(gracePeriodConfigService.updateConfig(any(GracePeriodConfigDTO.class), eq("admin")))
                 .thenReturn(testGracePeriodConfigDTO);
-        
+
         // When
-        ResponseEntity<GracePeriodConfigDTO> response = controller.updateGracePeriodConfig(authentication, testGracePeriodConfigDTO);
-        
+        ResponseEntity<GracePeriodConfigDTO> response = controller.updateGracePeriodConfig(authentication,
+                testGracePeriodConfigDTO);
+
         // Then
         verify(gracePeriodConfigService, times(1)).updateConfig(any(GracePeriodConfigDTO.class), eq("admin"));
     }
 
     @Test
-    @WithMockUser(username = "admin", roles = {"ADMIN"})
+    @WithMockUser(username = "admin", roles = { "ADMIN" })
     @DisplayName("Should send manual reminder")
     void shouldSendManualReminder() throws Exception {
-        // This test requires @WebMvcTest to properly register the controller's request mappings
+        // This test requires @WebMvcTest to properly register the controller's request
+        // mappings
         // For now, we'll just verify that the service method would be called
-        
+
         // Given
         doNothing().when(reminderService).sendManualReminder(eq(1L), any(PaymentReminder.ReminderType.class));
-        
+
         // When
         ResponseEntity<Void> response = controller.sendManualReminder(1L, "OVERDUE");
-        
+
         // Then
         verify(reminderService, times(1)).sendManualReminder(eq(1L), any(PaymentReminder.ReminderType.class));
     }
 
     @Test
-    @WithMockUser(username = "admin", roles = {"ADMIN"})
+    @WithMockUser(username = "admin", roles = { "ADMIN" })
     @DisplayName("Should get reminders by payment")
     void shouldGetRemindersByPayment() throws Exception {
-        // This test requires @WebMvcTest to properly register the controller's request mappings
-        // For now, we'll skip this test as the controller doesn't have a method to get reminders by payment
-        
+        // This test requires @WebMvcTest to properly register the controller's request
+        // mappings
+        // For now, we'll skip this test as the controller doesn't have a method to get
+        // reminders by payment
+
         // Skip this test since there's no corresponding controller method
     }
 
     @Test
     @DisplayName("Should return forbidden when not admin")
     void shouldReturnForbiddenWhenNotAdmin() throws Exception {
-        // This test requires @WebMvcTest to properly register the controller's request mappings
+        // This test requires @WebMvcTest to properly register the controller's request
+        // mappings
         // For now, we'll skip this test as it requires Spring Security context
-        
-        // In a real test with @WebMvcTest, this would verify that non-admin users get a 403 response
+
+        // In a real test with @WebMvcTest, this would verify that non-admin users get a
+        // 403 response
     }
-    
+
     @Test
-    @WithMockUser(username = "admin", roles = {"ADMIN"})
+    @WithMockUser(username = "admin", roles = { "ADMIN" })
     @DisplayName("Should get reminder config")
     void shouldGetReminderConfig() throws Exception {
         // Given
         when(reminderConfigService.getCurrentConfig()).thenReturn(testReminderConfigDTO);
-        
+
         // When
         ResponseEntity<ReminderConfigDTO> response = controller.getReminderConfig();
-        
+
         // Then
         verify(reminderConfigService, times(1)).getCurrentConfig();
         assertEquals(testReminderConfigDTO, response.getBody());
     }
 
     @Test
-    @WithMockUser(username = "admin", roles = {"ADMIN"})
+    @WithMockUser(username = "admin", roles = { "ADMIN" })
     @DisplayName("Should update reminder config")
     void shouldUpdateReminderConfig() throws Exception {
         // Given
@@ -400,32 +437,58 @@ public class AdminPaymentControllerTest {
         when(authentication.getName()).thenReturn("admin");
         when(reminderConfigService.updateConfig(any(ReminderConfigDTO.class), eq("admin")))
                 .thenReturn(testReminderConfigDTO);
-        
+
         // When
-        ResponseEntity<ReminderConfigDTO> response = controller.updateReminderConfig(authentication, testReminderConfigDTO);
-        
+        ResponseEntity<ReminderConfigDTO> response = controller.updateReminderConfig(authentication,
+                testReminderConfigDTO);
+
         // Then
         verify(reminderConfigService, times(1)).updateConfig(any(ReminderConfigDTO.class), eq("admin"));
         assertEquals(testReminderConfigDTO, response.getBody());
     }
-    
+
     @Test
-    @WithMockUser(username = "admin", roles = {"ADMIN"})
+    @WithMockUser(username = "admin", roles = { "ADMIN" })
     @DisplayName("Should return bad request when updating reminder config with invalid values")
     void shouldReturnBadRequestWhenUpdatingReminderConfigWithInvalidValues() throws Exception {
         // Given
         Authentication authentication = mock(Authentication.class);
         when(authentication.getName()).thenReturn("admin");
-        
+
         // Have service throw IllegalArgumentException to simulate validation error
         when(reminderConfigService.updateConfig(any(ReminderConfigDTO.class), eq("admin")))
                 .thenThrow(new IllegalArgumentException("Invalid reminder configuration"));
-        
+
         // When
-        ResponseEntity<ReminderConfigDTO> response = controller.updateReminderConfig(authentication, testReminderConfigDTO);
-        
+        ResponseEntity<ReminderConfigDTO> response = controller.updateReminderConfig(authentication,
+                testReminderConfigDTO);
+
         // Then
         verify(reminderConfigService, times(1)).updateConfig(any(ReminderConfigDTO.class), eq("admin"));
         assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
     }
-} 
+
+    @Test
+    @WithMockUser(username = "admin", roles = { "ADMIN" })
+    @DisplayName("Should get payment plans by customer ID")
+    void shouldGetPaymentPlansByCustomerId() throws Exception {
+        // Given
+        List<PaymentPlanDTO> plans = Collections.singletonList(testPaymentPlanDTO);
+        List<SolarInstallation> installations = Collections.singletonList(mock(SolarInstallation.class));
+
+        // Mock finding installations by userId
+        when(installationRepository.findByUserId(1L)).thenReturn(installations);
+
+        // Mock getting payment plans by installationId
+        when(installations.get(0).getId()).thenReturn(1L);
+        when(paymentPlanService.getPaymentPlansByInstallation(1L)).thenReturn(plans);
+
+        // When
+        ResponseEntity<List<PaymentPlanDTO>> response = controller.getCustomerPaymentPlans(1L);
+
+        // Then
+        verify(installationRepository, times(1)).findByUserId(1L);
+        verify(paymentPlanService, times(1)).getPaymentPlansByInstallation(1L);
+        assertEquals(plans, response.getBody());
+    }
+}

@@ -29,7 +29,8 @@ import static org.mockito.Mockito.*;
 
 /**
  * Test class for SolarInstallationService
- * Source file: src/main/java/com/solar/core_services/energy_monitoring/service/SolarInstallationService.java
+ * Source file:
+ * src/main/java/com/solar/core_services/energy_monitoring/service/SolarInstallationService.java
  */
 @ExtendWith(MockitoExtension.class)
 public class SolarInstallationServiceTest {
@@ -184,6 +185,7 @@ public class SolarInstallationServiceTest {
         // Given
         SolarInstallationDTO newInstallationDTO = SolarInstallationDTO.builder()
                 .userId(1L)
+                .name("New Test Installation")
                 .installedCapacityKW(4.0)
                 .location("New Location")
                 .build();
@@ -202,6 +204,7 @@ public class SolarInstallationServiceTest {
         assertThat(result).isNotNull();
         assertEquals(3L, result.getId());
         assertEquals(1L, result.getUserId());
+        assertEquals("New Test Installation", result.getName());
         assertEquals(4.0, result.getInstalledCapacityKW());
         assertEquals("New Location", result.getLocation());
         assertEquals(SolarInstallation.InstallationStatus.ACTIVE, result.getStatus());
@@ -425,4 +428,73 @@ public class SolarInstallationServiceTest {
         assertThat(result).isTrue(); // Changed from isFalse() to isTrue()
         // No need to verify repository calls since the implementation doesn't use it
     }
-} 
+
+    @Test
+    public void testCreateInstallation_WithoutName_Success() {
+        // Given
+        SolarInstallationDTO newInstallationDTO = SolarInstallationDTO.builder()
+                .userId(1L)
+                .installedCapacityKW(4.0)
+                .location("New Location")
+                .build();
+
+        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+        when(installationRepository.save(any(SolarInstallation.class))).thenAnswer(invocation -> {
+            SolarInstallation savedInstallation = invocation.getArgument(0);
+            savedInstallation.setId(3L);
+            return savedInstallation;
+        });
+
+        // When
+        SolarInstallationDTO result = installationService.createInstallation(newInstallationDTO);
+
+        // Then
+        assertThat(result).isNotNull();
+        assertEquals(3L, result.getId());
+        assertEquals(1L, result.getUserId());
+        assertEquals("Installation at New Location", result.getName()); // Verify default name generation
+        assertEquals(4.0, result.getInstalledCapacityKW());
+        assertEquals("New Location", result.getLocation());
+        assertEquals(SolarInstallation.InstallationStatus.ACTIVE, result.getStatus());
+        assertEquals(false, result.isTamperDetected());
+
+        verify(userRepository, times(1)).findById(1L);
+        verify(installationRepository, times(1)).save(any(SolarInstallation.class));
+    }
+
+    @Test
+    public void testUpdateInstallation_WithNameUpdate_Success() {
+        // Given
+        SolarInstallationDTO updateDTO = SolarInstallationDTO.builder()
+                .id(1L)
+                .userId(1L)
+                .name("Updated Installation Name")
+                .installedCapacityKW(6.0)
+                .location("Updated Location")
+                .status(SolarInstallation.InstallationStatus.MAINTENANCE)
+                .build();
+
+        installation1.setName("Original Name");
+
+        when(installationRepository.findById(1L)).thenReturn(Optional.of(installation1));
+        when(installationRepository.save(any(SolarInstallation.class))).thenAnswer(invocation -> {
+            SolarInstallation savedInstallation = invocation.getArgument(0);
+            return savedInstallation;
+        });
+
+        // When
+        SolarInstallationDTO result = installationService.updateInstallation(1L, updateDTO);
+
+        // Then
+        assertThat(result).isNotNull();
+        assertEquals(1L, result.getId());
+        assertEquals(1L, result.getUserId());
+        assertEquals("Updated Installation Name", result.getName()); // Verify name was updated
+        assertEquals(6.0, result.getInstalledCapacityKW());
+        assertEquals("Updated Location", result.getLocation());
+        assertEquals(SolarInstallation.InstallationStatus.MAINTENANCE, result.getStatus());
+
+        verify(installationRepository, times(1)).findById(1L);
+        verify(installationRepository, times(1)).save(any(SolarInstallation.class));
+    }
+}

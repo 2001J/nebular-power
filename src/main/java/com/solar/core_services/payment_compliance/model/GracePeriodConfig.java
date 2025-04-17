@@ -3,6 +3,7 @@ package com.solar.core_services.payment_compliance.model;
 import jakarta.persistence.*;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Data
@@ -23,6 +24,15 @@ public class GracePeriodConfig {
     @Column(name = "auto_suspend_enabled", nullable = false)
     private Boolean autoSuspendEnabled = true;
 
+    @Column(name = "late_fees_enabled", nullable = false)
+    private Boolean lateFeesEnabled = false; // Late fees disabled by default
+
+    @Column(name = "late_fee_percentage", nullable = false)
+    private BigDecimal lateFeePercentage = BigDecimal.ZERO; // Percentage-based late fee
+
+    @Column(name = "late_fee_fixed_amount", nullable = false)
+    private BigDecimal lateFeeFixedAmount = BigDecimal.ZERO; // Fixed amount late fee
+
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
 
@@ -42,4 +52,4 @@ public class GracePeriodConfig {
     protected void onUpdate() {
         this.updatedAt = LocalDateTime.now();
     }
-} 
+}

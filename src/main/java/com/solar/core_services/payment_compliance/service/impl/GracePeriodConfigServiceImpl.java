@@ -8,6 +8,7 @@ import com.solar.exception.ResourceNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import java.math.BigDecimal;
 
 @Service
 @RequiredArgsConstructor
@@ -25,25 +26,21 @@ public class GracePeriodConfigServiceImpl implements GracePeriodConfigService {
     @Override
     @Transactional
     public GracePeriodConfigDTO updateConfig(GracePeriodConfigDTO configDTO, String username) {
-        GracePeriodConfig config;
-        
-        if (configDTO.getId() != null) {
-            config = gracePeriodConfigRepository.findById(configDTO.getId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Grace period config not found with id: " + configDTO.getId()));
-            
-            config.setNumberOfDays(configDTO.getNumberOfDays());
-            config.setReminderFrequency(configDTO.getReminderFrequency());
-            config.setAutoSuspendEnabled(configDTO.getAutoSuspendEnabled());
-            config.setUpdatedBy(username);
-        } else {
-            config = new GracePeriodConfig();
-            config.setNumberOfDays(configDTO.getNumberOfDays());
-            config.setReminderFrequency(configDTO.getReminderFrequency());
-            config.setAutoSuspendEnabled(configDTO.getAutoSuspendEnabled());
-            config.setCreatedBy(username);
-            config.setUpdatedBy(username);
-        }
-        
+        // Always fetch the latest config, regardless of whether ID is provided
+        GracePeriodConfig config = getActiveGracePeriodConfig();
+
+        // Update the existing config
+        config.setNumberOfDays(configDTO.getNumberOfDays());
+        config.setReminderFrequency(configDTO.getReminderFrequency());
+        config.setAutoSuspendEnabled(configDTO.getAutoSuspendEnabled());
+
+        // Update late fee settings
+        config.setLateFeesEnabled(configDTO.getLateFeesEnabled());
+        config.setLateFeePercentage(configDTO.getLateFeePercentage());
+        config.setLateFeeFixedAmount(configDTO.getLateFeeFixedAmount());
+
+        config.setUpdatedBy(username);
+
         GracePeriodConfig savedConfig = gracePeriodConfigRepository.save(config);
         return mapToDTO(savedConfig);
     }
@@ -81,17 +78,38 @@ public class GracePeriodConfigServiceImpl implements GracePeriodConfigService {
     public boolean isAutoSuspendEnabled() {
         return getActiveGracePeriodConfig().getAutoSuspendEnabled();
     }
-    
+
+    @Override
+    @Transactional(readOnly = true)
+    public boolean isLateFeesEnabled() {
+        return getActiveGracePeriodConfig().getLateFeesEnabled();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public BigDecimal getLateFeeAmount() {
+        return getActiveGracePeriodConfig().getLateFeeFixedAmount();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public BigDecimal getLateFeePercentage() {
+        return getActiveGracePeriodConfig().getLateFeePercentage();
+    }
+
     private GracePeriodConfigDTO mapToDTO(GracePeriodConfig config) {
         return GracePeriodConfigDTO.builder()
                 .id(config.getId())
                 .numberOfDays(config.getNumberOfDays())
                 .reminderFrequency(config.getReminderFrequency())
                 .autoSuspendEnabled(config.getAutoSuspendEnabled())
+                .lateFeesEnabled(config.getLateFeesEnabled())
+                .lateFeePercentage(config.getLateFeePercentage())
+                .lateFeeFixedAmount(config.getLateFeeFixedAmount())
                 .createdAt(config.getCreatedAt())
                 .updatedAt(config.getUpdatedAt())
                 .createdBy(config.getCreatedBy())
                 .updatedBy(config.getUpdatedBy())
                 .build();
     }
-} 
+}

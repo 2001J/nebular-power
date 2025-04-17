@@ -60,7 +60,7 @@ public class SolarInstallationController {
 
     @GetMapping("/overview")
     @PreAuthorize("hasRole('ADMIN')")
-    @Operation(summary = "Get system overview", description = "Get system-wide overview of all installations")
+    @Operation(summary = "Get installations system overview", description = "Get system-wide overview of all installations")
     public ResponseEntity<SystemOverviewResponse> getSystemOverview() {
         return ResponseEntity.ok(installationService.getSystemOverview());
     }

@@ -389,8 +389,8 @@ export default function AdminPaymentsPage() {
         autoSuspendEnabled: true,
         // Set reminder frequency
         reminderFrequency: parseInt(updatedGracePeriodConfig.reminderFrequency.toString()) || 2,
-        // Make sure boolean values are properly set
-        lateFeesEnabled: updatedGracePeriodConfig.lateFeesEnabled === true,
+        // Make sure boolean values are properly set - explicitly cast to boolean
+        lateFeesEnabled: Boolean(updatedGracePeriodConfig.lateFeesEnabled),
         // Ensure numeric values for fee settings
         lateFeePercentage: parseFloat(updatedGracePeriodConfig.lateFeePercentage.toString()) || 0,
         lateFeeFixedAmount: parseFloat(updatedGracePeriodConfig.lateFeeFixedAmount.toString()) || 0
@@ -404,9 +404,9 @@ export default function AdminPaymentsPage() {
       // Update local state with new configuration - ensure we use the properly typed data
       setGracePeriodConfig({
         ...configToUpdate,
-        // Double-check boolean fields
+        // Ensure boolean fields are correctly set
         autoSuspendEnabled: true,
-        lateFeesEnabled: !!configToUpdate.lateFeesEnabled
+        lateFeesEnabled: Boolean(configToUpdate.lateFeesEnabled)
       })
 
       // Force a refresh of the config data from the server

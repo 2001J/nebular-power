@@ -26,26 +26,18 @@ public class ReminderConfigServiceImpl implements ReminderConfigService {
     @Transactional
     public ReminderConfigDTO updateConfig(ReminderConfigDTO configDTO, String username) {
         // Validate configuration
-        if (configDTO.getFirstReminderDays() >= configDTO.getSecondReminderDays() || 
-            configDTO.getSecondReminderDays() >= configDTO.getFinalReminderDays()) {
+        if (configDTO.getFirstReminderDays() >= configDTO.getSecondReminderDays() ||
+                configDTO.getSecondReminderDays() >= configDTO.getFinalReminderDays()) {
             throw new IllegalArgumentException("Reminder days must be in ascending order: first < second < final");
         }
-        
-        ReminderConfig config;
-        
-        if (configDTO.getId() != null) {
-            config = reminderConfigRepository.findById(configDTO.getId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Reminder config not found with id: " + configDTO.getId()));
-            
-            updateConfigFields(config, configDTO);
-            config.setUpdatedBy(username);
-        } else {
-            config = new ReminderConfig();
-            updateConfigFields(config, configDTO);
-            config.setCreatedBy(username);
-            config.setUpdatedBy(username);
-        }
-        
+
+        // Always update the latest config, regardless of whether ID is provided
+        ReminderConfig config = getActiveReminderConfig();
+
+        // Update the existing config
+        updateConfigFields(config, configDTO);
+        config.setUpdatedBy(username);
+
         ReminderConfig savedConfig = reminderConfigRepository.save(config);
         return mapToDTO(savedConfig);
     }
@@ -105,7 +97,7 @@ public class ReminderConfigServiceImpl implements ReminderConfigService {
     public boolean isAutoSendRemindersEnabled() {
         return getActiveReminderConfig().getAutoSendReminders();
     }
-    
+
     private ReminderConfigDTO mapToDTO(ReminderConfig config) {
         return ReminderConfigDTO.builder()
                 .id(config.getId())
@@ -120,4 +112,4 @@ public class ReminderConfigServiceImpl implements ReminderConfigService {
                 .updatedBy(config.getUpdatedBy())
                 .build();
     }
-} 
+}

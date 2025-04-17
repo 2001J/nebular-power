@@ -5,6 +5,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Data
@@ -16,8 +17,11 @@ public class GracePeriodConfigDTO {
     private Integer numberOfDays;
     private Integer reminderFrequency;
     private Boolean autoSuspendEnabled;
+    private Boolean lateFeesEnabled;
+    private BigDecimal lateFeePercentage;
+    private BigDecimal lateFeeFixedAmount;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private String createdBy;
     private String updatedBy;
-} 
+}
