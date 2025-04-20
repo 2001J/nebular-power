@@ -1,5 +1,7 @@
 package com.solar.user_management.controller;
 
+import com.solar.core_services.energy_monitoring.model.SolarInstallation;
+import com.solar.core_services.energy_monitoring.repository.SolarInstallationRepository;
 import com.solar.user_management.dto.auth.SignupRequest;
 import com.solar.user_management.dto.customer.CustomerUpdateRequest;
 import com.solar.user_management.dto.user.UserProfileResponse;
@@ -38,6 +40,7 @@ public class CustomerController {
 
     private final UserService userService;
     private final UserActivityLogService activityLogService;
+    private final SolarInstallationRepository installationRepository;
 
     @PostMapping
     @Operation(
@@ -78,7 +81,22 @@ public class CustomerController {
     )
     public ResponseEntity<List<UserProfileResponse>> getAllCustomers() {
         List<UserProfileResponse> customers = userService.getAllCustomers().stream()
-                .map(UserProfileResponse::fromUser)
+                .map(user -> {
+                    UserProfileResponse profile = UserProfileResponse.fromUser(user);
+                    
+                    // Fetch installations for this customer if they are a CUSTOMER
+                    if (user.getRole() == User.UserRole.CUSTOMER) {
+                        List<SolarInstallation> installations = installationRepository.findByUserId(user.getId());
+                        if (!installations.isEmpty()) {
+                            SolarInstallation installation = installations.get(0);
+                            profile.setInstallationDate(installation.getInstallationDate());
+                            // Convert enum to string when setting in UserProfileResponse
+                            profile.setInstallationType(installation.getType() != null ? installation.getType().name() : null);
+                        }
+                    }
+                    
+                    return profile;
+                })
                 .collect(Collectors.toList());
         return ResponseEntity.ok(customers);
     }
@@ -97,7 +115,22 @@ public class CustomerController {
             @Parameter(description = "Search query")
             @RequestParam String query) {
         List<UserProfileResponse> customers = userService.searchCustomers(query).stream()
-                .map(UserProfileResponse::fromUser)
+                .map(user -> {
+                    UserProfileResponse profile = UserProfileResponse.fromUser(user);
+                    
+                    // Fetch installations for this customer if they are a CUSTOMER
+                    if (user.getRole() == User.UserRole.CUSTOMER) {
+                        List<SolarInstallation> installations = installationRepository.findByUserId(user.getId());
+                        if (!installations.isEmpty()) {
+                            SolarInstallation installation = installations.get(0);
+                            profile.setInstallationDate(installation.getInstallationDate());
+                            // Convert enum to string when setting in UserProfileResponse
+                            profile.setInstallationType(installation.getType() != null ? installation.getType().name() : null);
+                        }
+                    }
+                    
+                    return profile;
+                })
                 .collect(Collectors.toList());
         return ResponseEntity.ok(customers);
     }
@@ -115,7 +148,21 @@ public class CustomerController {
     public ResponseEntity<UserProfileResponse> getCustomer(
             @Parameter(description = "Customer ID")
             @PathVariable Long id) {
-        return ResponseEntity.ok(UserProfileResponse.fromUser(userService.getCustomerById(id)));
+        User user = userService.getCustomerById(id);
+        UserProfileResponse profile = UserProfileResponse.fromUser(user);
+        
+        // Fetch installations for this customer
+        if (user.getRole() == User.UserRole.CUSTOMER) {
+            List<SolarInstallation> installations = installationRepository.findByUserId(user.getId());
+            if (!installations.isEmpty()) {
+                SolarInstallation installation = installations.get(0);
+                profile.setInstallationDate(installation.getInstallationDate());
+                // Convert enum to string when setting in UserProfileResponse
+                profile.setInstallationType(installation.getType() != null ? installation.getType().name() : null);
+            }
+        }
+        
+        return ResponseEntity.ok(profile);
     }
 
     @PutMapping("/{id}")
@@ -239,4 +286,4 @@ public class CustomerController {
         User user = userService.getCustomerById(id);
         return ResponseEntity.ok(activityLogService.getUserActivityLogs(user, pageable));
     }
-} 
+}

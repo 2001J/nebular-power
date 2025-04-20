@@ -35,6 +35,12 @@ public class UserProfileResponse {
 
     @Schema(description = "Account creation timestamp")
     private LocalDateTime createdAt;
+    
+    @Schema(description = "Installation date if user has a solar installation")
+    private LocalDateTime installationDate;
+    
+    @Schema(description = "Type of solar installation (Residential or Commercial)")
+    private String installationType;
 
     public static UserProfileResponse fromUser(User user) {
         UserProfileResponse response = new UserProfileResponse();
@@ -49,4 +55,4 @@ public class UserProfileResponse {
         response.setCreatedAt(user.getCreatedAt());
         return response;
     }
-} 
+}

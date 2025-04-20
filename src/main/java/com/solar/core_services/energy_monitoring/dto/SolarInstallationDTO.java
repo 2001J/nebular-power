@@ -36,4 +36,5 @@ public class SolarInstallationDTO {
     private SolarInstallation.InstallationStatus status;
     private boolean tamperDetected;
     private LocalDateTime lastTamperCheck;
+    private SolarInstallation.InstallationType type; // Updated to use enum type
 }

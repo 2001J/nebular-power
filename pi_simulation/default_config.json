@@ -1,0 +1,39 @@
+{
+  "general": {
+    "simulation_name": "Solar Installation Simulator",
+    "installation_id": "SIM-3981",
+    "server_url": "http://localhost:8080",
+    "simulation_speed": 1.0
+  },
+  "energy": {
+    "enabled": true,
+    "base_generation": 5000,
+    "peak_generation": 10000,
+    "consumption_min": 2000,
+    "consumption_max": 7000,
+    "interval": 10,
+    "simulate_weather": true
+  },
+  "heartbeat": {
+    "enabled": true,
+    "interval": 30,
+    "include_diagnostics": true,
+    "device_id": "INVERTER-1",
+    "battery_simulation": true
+  },
+  "tamper": {
+    "enabled": true,
+    "random_events": true,
+    "min_interval": 1800,
+    "max_interval": 7200,
+    "physical_tamper_prob": 0.3,
+    "voltage_tamper_prob": 0.3,
+    "connection_tamper_prob": 0.3,
+    "location_tamper_prob": 0.1
+  },
+  "command": {
+    "enabled": true,
+    "polling_interval": 10,
+    "success_rate": 0.95
+  }
+}

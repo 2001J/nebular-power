@@ -85,6 +85,14 @@ public class SolarInstallationServiceImpl implements SolarInstallationService {
         installation.setInstallationDate(
                 installationDTO.getInstallationDate() != null ? installationDTO.getInstallationDate()
                         : LocalDateTime.now());
+        
+        // Set installation type - default to RESIDENTIAL if not provided
+        if (installationDTO.getType() != null) {
+            installation.setType(installationDTO.getType());
+        } else {
+            installation.setType(SolarInstallation.InstallationType.RESIDENTIAL);
+        }
+        
         installation.setStatus(SolarInstallation.InstallationStatus.ACTIVE);
         installation.setTamperDetected(false);
         installation.setLastTamperCheck(LocalDateTime.now());
@@ -120,6 +128,11 @@ public class SolarInstallationServiceImpl implements SolarInstallationService {
 
         if (installationDTO.getStatus() != null) {
             installation.setStatus(installationDTO.getStatus());
+        }
+        
+        // Update the installation type if provided
+        if (installationDTO.getType() != null) {
+            installation.setType(installationDTO.getType());
         }
 
         // Save the installation
@@ -260,7 +273,8 @@ public class SolarInstallationServiceImpl implements SolarInstallationService {
                 .installationDate(installation.getInstallationDate())
                 .status(installation.getStatus())
                 .tamperDetected(installation.isTamperDetected())
-                .lastTamperCheck(installation.getLastTamperCheck());
+                .lastTamperCheck(installation.getLastTamperCheck())
+                .type(installation.getType() != null ? installation.getType() : SolarInstallation.InstallationType.RESIDENTIAL);
 
         // Safely handle null User reference
         if (installation.getUser() != null) {

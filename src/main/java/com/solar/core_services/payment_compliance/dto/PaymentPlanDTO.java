@@ -9,7 +9,9 @@ import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Data
@@ -29,6 +31,7 @@ public class PaymentPlanDTO {
     private Integer totalInstallments;
     private Integer remainingInstallments;
     private BigDecimal installmentAmount;
+    private BigDecimal monthlyPayment;
     private PaymentPlan.PaymentFrequency frequency;
     private LocalDateTime startDate;
     private LocalDateTime endDate;
@@ -37,6 +40,7 @@ public class PaymentPlanDTO {
     private BigDecimal lateFeeAmount;
     private Integer gracePeriodDays;
     private List<PaymentDTO> payments;
+    private LocalDateTime nextPaymentDate;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     
@@ -46,6 +50,17 @@ public class PaymentPlanDTO {
                 .count();
         
         int remainingPayments = paymentPlan.getNumberOfPayments() - paidPayments;
+        
+        LocalDateTime nextPaymentDate = null;
+        if (paymentPlan.getPayments() != null && !paymentPlan.getPayments().isEmpty()) {
+            nextPaymentDate = paymentPlan.getPayments().stream()
+                    .filter(p -> p.getStatus() == Payment.PaymentStatus.SCHEDULED || 
+                                p.getStatus() == Payment.PaymentStatus.UPCOMING || 
+                                p.getStatus() == Payment.PaymentStatus.DUE_TODAY)
+                    .min(Comparator.comparing(Payment::getDueDate))
+                    .map(Payment::getDueDate)
+                    .orElse(null);
+        }
         
         return PaymentPlanDTO.builder()
                 .id(paymentPlan.getId())
@@ -60,6 +75,7 @@ public class PaymentPlanDTO {
                 .totalInstallments(paymentPlan.getNumberOfPayments())
                 .remainingInstallments(remainingPayments)
                 .installmentAmount(paymentPlan.getInstallmentAmount())
+                .monthlyPayment(paymentPlan.getInstallmentAmount())
                 .frequency(paymentPlan.getFrequency())
                 .startDate(paymentPlan.getStartDate())
                 .endDate(paymentPlan.getEndDate())
@@ -70,6 +86,7 @@ public class PaymentPlanDTO {
                 .payments(paymentPlan.getPayments().stream()
                         .map(PaymentDTO::fromEntity)
                         .collect(Collectors.toList()))
+                .nextPaymentDate(nextPaymentDate)
                 .createdAt(paymentPlan.getCreatedAt())
                 .updatedAt(paymentPlan.getUpdatedAt())
                 .build();

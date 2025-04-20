@@ -46,3 +46,6 @@ ehthumbs.db
 .Xauthority.lock.lock.lock
 
 ### secrets ###
+
+
+venv

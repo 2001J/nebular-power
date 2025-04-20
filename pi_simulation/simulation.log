@@ -1,0 +1,132 @@
+2025-04-19 19:53:57,699 - SolarSimulator - INFO - No config file provided or file not found. Using default configuration
+2025-04-19 19:53:57,699 - SolarSimulator - INFO - Saved default configuration to default_config.json
+2025-04-19 19:53:57,699 - SolarSimulator - INFO - Loaded configuration: Solar Installation Simulator
+2025-04-19 19:53:57,699 - EnergySimulator - INFO - Energy simulator initialized for installation SIM-6621
+2025-04-19 19:53:57,699 - HeartbeatSimulator - INFO - Heartbeat simulator initialized for installation SIM-6621, device INVERTER-1
+2025-04-19 19:53:57,699 - TamperSimulator - INFO - Tamper simulator initialized for installation SIM-6621
+2025-04-19 19:53:57,699 - CommandHandler - INFO - Command handler initialized for installation SIM-6621
+2025-04-19 19:53:57,699 - EnergySimulator - INFO - Energy simulator initialized for installation SIM-6621
+2025-04-19 19:53:57,699 - HeartbeatSimulator - INFO - Heartbeat simulator initialized for installation SIM-6621, device INVERTER-1
+2025-04-19 19:53:57,699 - TamperSimulator - INFO - Tamper simulator initialized for installation SIM-6621
+2025-04-19 19:53:57,699 - CommandHandler - INFO - Command handler initialized for installation SIM-6621
+2025-04-19 19:53:57,699 - SolarSimulator - INFO - Starting simulation: Solar Installation Simulator
+2025-04-19 19:53:57,699 - SolarSimulator - INFO - Installation ID: SIM-6621
+2025-04-19 19:53:57,699 - SolarSimulator - INFO - Server URL: http://localhost:8080
+2025-04-19 19:53:57,700 - EnergySimulator - INFO - Starting energy data simulation
+2025-04-19 19:53:57,700 - SolarSimulator - INFO - Energy simulation started
+2025-04-19 19:53:57,700 - HeartbeatSimulator - INFO - Starting heartbeat simulation
+2025-04-19 19:53:57,700 - SolarSimulator - INFO - Heartbeat simulation started
+2025-04-19 19:53:57,700 - TamperSimulator - INFO - Starting tamper event simulation
+2025-04-19 19:53:57,700 - SolarSimulator - INFO - Tamper simulation started
+2025-04-19 19:53:57,701 - CommandHandler - INFO - Starting command listener
+2025-04-19 19:53:57,701 - SolarSimulator - INFO - Command handler started
+2025-04-19 19:53:57,701 - SolarSimulator - INFO - Simulation running with 4 active components
+2025-04-19 19:53:57,709 - CommandHandler - WARNING - Failed to poll for commands: 401 - 
+2025-04-19 19:53:57,709 - EnergySimulator - WARNING - Failed to send energy data: 401 - 
+2025-04-19 19:53:57,710 - HeartbeatSimulator - WARNING - Failed to send heartbeat for device INVERTER-1: 401 - 
+2025-04-19 19:54:07,724 - EnergySimulator - WARNING - Failed to send energy data: 401 - 
+2025-04-19 19:54:07,725 - CommandHandler - WARNING - Failed to poll for commands: 401 - 
+2025-04-19 19:54:17,736 - EnergySimulator - WARNING - Failed to send energy data: 401 - 
+2025-04-19 19:54:17,737 - CommandHandler - WARNING - Failed to poll for commands: 401 - 
+2025-04-19 19:54:27,725 - HeartbeatSimulator - WARNING - Failed to send heartbeat for device INVERTER-1: 401 - 
+2025-04-19 19:54:27,747 - EnergySimulator - WARNING - Failed to send energy data: 401 - 
+2025-04-19 19:54:27,748 - CommandHandler - WARNING - Failed to poll for commands: 401 - 
+2025-04-19 19:54:37,759 - CommandHandler - WARNING - Failed to poll for commands: 401 - 
+2025-04-19 19:54:37,759 - EnergySimulator - WARNING - Failed to send energy data: 401 - 
+2025-04-19 19:54:47,771 - EnergySimulator - WARNING - Failed to send energy data: 401 - 
+2025-04-19 19:54:47,771 - CommandHandler - WARNING - Failed to poll for commands: 401 - 
+2025-04-19 19:54:52,766 - SolarSimulator - INFO - Received signal 2, shutting down...
+2025-04-19 19:54:52,766 - SolarSimulator - INFO - Stopping simulation...
+2025-04-19 19:54:54,772 - SolarSimulator - WARNING - Thread EnergySimulator did not terminate gracefully
+2025-04-19 19:54:56,777 - SolarSimulator - WARNING - Thread HeartbeatSimulator did not terminate gracefully
+2025-04-19 19:54:57,776 - SolarSimulator - INFO - Simulation stopped
+2025-04-19 19:54:57,777 - SolarSimulator - WARNING - Simulation not running
+2025-04-19 19:55:08,356 - SolarSimulator - INFO - No config file provided or file not found. Using default configuration
+2025-04-19 19:55:08,357 - SolarSimulator - INFO - Saved default configuration to default_config.json
+2025-04-19 19:55:08,357 - SolarSimulator - INFO - Loaded configuration: Solar Installation Simulator
+2025-04-19 19:55:08,357 - EnergySimulator - INFO - Energy simulator initialized for installation SIM-1860
+2025-04-19 19:55:08,357 - HeartbeatSimulator - INFO - Heartbeat simulator initialized for installation SIM-1860, device INVERTER-1
+2025-04-19 19:55:08,357 - TamperSimulator - INFO - Tamper simulator initialized for installation SIM-1860
+2025-04-19 19:55:08,357 - CommandHandler - INFO - Command handler initialized for installation SIM-1860
+2025-04-19 19:55:08,357 - EnergySimulator - INFO - Energy simulator initialized for installation SIM-1860
+2025-04-19 19:55:08,357 - HeartbeatSimulator - INFO - Heartbeat simulator initialized for installation SIM-1860, device INVERTER-1
+2025-04-19 19:55:08,357 - TamperSimulator - INFO - Tamper simulator initialized for installation SIM-1860
+2025-04-19 19:55:08,357 - CommandHandler - INFO - Command handler initialized for installation SIM-1860
+2025-04-19 19:55:08,357 - SolarSimulator - INFO - Starting simulation: Solar Installation Simulator
+2025-04-19 19:55:08,357 - SolarSimulator - INFO - Installation ID: SIM-1860
+2025-04-19 19:55:08,357 - SolarSimulator - INFO - Server URL: http://localhost:8080
+2025-04-19 19:55:08,357 - EnergySimulator - INFO - Starting energy data simulation
+2025-04-19 19:55:08,357 - SolarSimulator - INFO - Energy simulation started
+2025-04-19 19:55:08,358 - HeartbeatSimulator - INFO - Starting heartbeat simulation
+2025-04-19 19:55:08,358 - SolarSimulator - INFO - Heartbeat simulation started
+2025-04-19 19:55:08,358 - TamperSimulator - INFO - Starting tamper event simulation
+2025-04-19 19:55:08,358 - SolarSimulator - INFO - Tamper simulation started
+2025-04-19 19:55:08,358 - CommandHandler - INFO - Starting command listener
+2025-04-19 19:55:08,358 - SolarSimulator - INFO - Command handler started
+2025-04-19 19:55:08,358 - SolarSimulator - INFO - Simulation running with 4 active components
+2025-04-19 19:55:08,364 - HeartbeatSimulator - WARNING - Failed to send heartbeat for device INVERTER-1: 401 - 
+2025-04-19 19:55:08,364 - EnergySimulator - WARNING - Failed to send energy data: 401 - 
+2025-04-19 19:55:08,364 - CommandHandler - WARNING - Failed to poll for commands: 401 - 
+2025-04-19 19:55:18,375 - CommandHandler - WARNING - Failed to poll for commands: 401 - 
+2025-04-19 19:55:18,376 - EnergySimulator - WARNING - Failed to send energy data: 401 - 
+2025-04-19 19:55:27,744 - SolarSimulator - INFO - Received signal 2, shutting down...
+2025-04-19 19:55:27,745 - SolarSimulator - INFO - Stopping simulation...
+2025-04-19 19:55:30,386 - SolarSimulator - WARNING - Thread HeartbeatSimulator did not terminate gracefully
+2025-04-19 19:55:30,387 - SolarSimulator - INFO - Simulation stopped
+2025-04-19 19:55:30,387 - SolarSimulator - WARNING - Simulation not running
+2025-04-19 19:55:34,936 - SolarSimulator - INFO - No config file provided or file not found. Using default configuration
+2025-04-19 19:55:34,937 - SolarSimulator - INFO - Saved default configuration to default_config.json
+2025-04-19 19:55:34,937 - SolarSimulator - INFO - Loaded configuration: Solar Installation Simulator
+2025-04-19 19:55:34,937 - EnergySimulator - INFO - Energy simulator initialized for installation SIM-3981
+2025-04-19 19:55:34,937 - HeartbeatSimulator - INFO - Heartbeat simulator initialized for installation SIM-3981, device INVERTER-1
+2025-04-19 19:55:34,937 - TamperSimulator - INFO - Tamper simulator initialized for installation SIM-3981
+2025-04-19 19:55:34,937 - CommandHandler - INFO - Command handler initialized for installation SIM-3981
+2025-04-19 19:55:34,937 - EnergySimulator - INFO - Energy simulator initialized for installation SIM-3981
+2025-04-19 19:55:34,937 - HeartbeatSimulator - INFO - Heartbeat simulator initialized for installation SIM-3981, device INVERTER-1
+2025-04-19 19:55:34,937 - TamperSimulator - INFO - Tamper simulator initialized for installation SIM-3981
+2025-04-19 19:55:34,937 - CommandHandler - INFO - Command handler initialized for installation SIM-3981
+2025-04-19 19:55:34,937 - SolarSimulator - INFO - Starting simulation: Solar Installation Simulator
+2025-04-19 19:55:34,937 - SolarSimulator - INFO - Installation ID: SIM-3981
+2025-04-19 19:55:34,937 - SolarSimulator - INFO - Server URL: http://localhost:8080
+2025-04-19 19:55:34,937 - EnergySimulator - INFO - Starting energy data simulation
+2025-04-19 19:55:34,937 - SolarSimulator - INFO - Energy simulation started
+2025-04-19 19:55:34,937 - HeartbeatSimulator - INFO - Starting heartbeat simulation
+2025-04-19 19:55:34,937 - SolarSimulator - INFO - Heartbeat simulation started
+2025-04-19 19:55:34,937 - TamperSimulator - INFO - Starting tamper event simulation
+2025-04-19 19:55:34,938 - SolarSimulator - INFO - Tamper simulation started
+2025-04-19 19:55:34,938 - CommandHandler - INFO - Starting command listener
+2025-04-19 19:55:34,938 - SolarSimulator - INFO - Command handler started
+2025-04-19 19:55:34,938 - SolarSimulator - INFO - Simulation running with 4 active components
+2025-04-19 19:55:34,944 - EnergySimulator - WARNING - Failed to send energy data: 401 - 
+2025-04-19 19:55:34,944 - HeartbeatSimulator - WARNING - Failed to send heartbeat for device INVERTER-1: 401 - 
+2025-04-19 19:55:34,944 - CommandHandler - WARNING - Failed to poll for commands: 401 - 
+2025-04-19 19:55:44,961 - EnergySimulator - WARNING - Failed to send energy data: 401 - 
+2025-04-19 19:55:44,961 - CommandHandler - WARNING - Failed to poll for commands: 401 - 
+2025-04-19 19:55:54,977 - CommandHandler - WARNING - Failed to poll for commands: 401 - 
+2025-04-19 19:55:54,978 - EnergySimulator - WARNING - Failed to send energy data: 401 - 
+2025-04-19 19:56:04,960 - HeartbeatSimulator - WARNING - Failed to send heartbeat for device INVERTER-1: 401 - 
+2025-04-19 19:56:04,984 - CommandHandler - WARNING - Failed to poll for commands: 401 - 
+2025-04-19 19:56:04,985 - EnergySimulator - WARNING - Failed to send energy data: 401 - 
+2025-04-19 19:56:15,000 - CommandHandler - WARNING - Failed to poll for commands: 401 - 
+2025-04-19 19:56:15,001 - EnergySimulator - WARNING - Failed to send energy data: 401 - 
+2025-04-19 19:56:25,017 - CommandHandler - WARNING - Failed to poll for commands: 401 - 
+2025-04-19 19:56:25,018 - EnergySimulator - WARNING - Failed to send energy data: 401 - 
+2025-04-19 19:56:34,974 - HeartbeatSimulator - WARNING - Failed to send heartbeat for device INVERTER-1: 401 - 
+2025-04-19 19:56:35,026 - EnergySimulator - WARNING - Failed to send energy data: 401 - 
+2025-04-19 19:56:35,027 - CommandHandler - WARNING - Failed to poll for commands: 401 - 
+2025-04-19 19:56:45,040 - CommandHandler - WARNING - Failed to poll for commands: 401 - 
+2025-04-19 19:56:45,041 - EnergySimulator - WARNING - Failed to send energy data: 401 - 
+2025-04-19 19:56:55,057 - EnergySimulator - WARNING - Failed to send energy data: 401 - 
+2025-04-19 19:56:55,057 - CommandHandler - WARNING - Failed to poll for commands: 401 - 
+2025-04-19 19:57:04,990 - HeartbeatSimulator - WARNING - Failed to send heartbeat for device INVERTER-1: 401 - 
+2025-04-19 19:57:05,064 - EnergySimulator - WARNING - Failed to send energy data: 401 - 
+2025-04-19 19:57:05,065 - CommandHandler - WARNING - Failed to poll for commands: 401 - 
+2025-04-19 19:57:15,082 - EnergySimulator - WARNING - Failed to send energy data: 401 - 
+2025-04-19 19:57:15,083 - CommandHandler - WARNING - Failed to poll for commands: 401 - 
+2025-04-19 19:57:18,253 - SolarSimulator - INFO - Received signal 2, shutting down...
+2025-04-19 19:57:18,254 - SolarSimulator - INFO - Stopping simulation...
+2025-04-19 19:57:20,259 - SolarSimulator - WARNING - Thread EnergySimulator did not terminate gracefully
+2025-04-19 19:57:22,264 - SolarSimulator - WARNING - Thread HeartbeatSimulator did not terminate gracefully
+2025-04-19 19:57:24,265 - SolarSimulator - WARNING - Thread CommandHandler did not terminate gracefully
+2025-04-19 19:57:24,265 - SolarSimulator - INFO - Simulation stopped
+2025-04-19 19:57:24,265 - SolarSimulator - WARNING - Simulation not running

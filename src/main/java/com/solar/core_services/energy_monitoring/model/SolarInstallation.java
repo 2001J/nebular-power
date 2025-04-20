@@ -1,4 +1,4 @@
- package com.solar.core_services.energy_monitoring.model;
+package com.solar.core_services.energy_monitoring.model;
 
 import com.solar.user_management.model.User;
 import jakarta.persistence.*;
@@ -27,6 +27,10 @@ public class SolarInstallation {
     @Column(nullable = false)
     private String location;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = true)
+    private InstallationType type = InstallationType.RESIDENTIAL; // Default to RESIDENTIAL
+
     @Column(nullable = false)
     private LocalDateTime installationDate;
 
@@ -49,4 +53,9 @@ public class SolarInstallation {
         SUSPENDED,
         MAINTENANCE
     }
-} 
+    
+    public enum InstallationType {
+        RESIDENTIAL,
+        COMMERCIAL
+    }
+}

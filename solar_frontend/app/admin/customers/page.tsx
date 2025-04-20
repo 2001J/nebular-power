@@ -653,7 +653,6 @@ export default function CustomersPage() {
                         <ArrowUpDown className="ml-2 h-4 w-4" />
                       </Button>
                     </TableHead>
-                    <TableHead>Installation Date</TableHead>
                     <TableHead>Payment Status</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
@@ -761,18 +760,21 @@ export default function CustomersPage() {
                                   customer.status === "LOCKED" ? "Locked" : customer.status || "N/A"}
                           </Badge>
                         </TableCell>
-                        <TableCell>{customer.installationDate || "None"}</TableCell>
                         <TableCell>
                           <Badge
                             variant={
-                              customer.paymentStatus === "current" || customer.paymentStatus === "CURRENT"
+                              (customer.paymentStatus || "").toLowerCase() === "current"
                                 ? "default"
-                                : customer.paymentStatus === "pending" || customer.paymentStatus === "PENDING"
+                                : (customer.paymentStatus || "").toLowerCase() === "pending"
                                   ? "outline"
-                                  : "destructive"
+                                  : (customer.paymentStatus || "").toLowerCase() === "overdue"
+                                    ? "destructive"
+                                    : "secondary"
                             }
                           >
-                            {customer.paymentStatus || "N/A"}
+                            {customer.paymentStatus 
+                              ? customer.paymentStatus.charAt(0).toUpperCase() + customer.paymentStatus.slice(1).toLowerCase()
+                              : "N/A"}
                           </Badge>
                         </TableCell>
                         <TableCell className="text-right">

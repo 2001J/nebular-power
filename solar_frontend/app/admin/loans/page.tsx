@@ -83,10 +83,25 @@ export default function LoanManagementPage() {
         try {
           // Fetch payment plans that are in ACTIVE status
           const activePlans = await paymentComplianceApi.getPaymentPlansByStatusReport("ACTIVE");
-
+          
+          // Also fetch overdue payments to count overdue loans
+          const overduePayments = await paymentComplianceApi.getOverduePaymentsReport();
+          
           if (activePlans && activePlans.length > 0) {
             // Create loan objects from active payment plans
             const loansData: Loan[] = [];
+            
+            // Keep track of overdue installations
+            const overdueInstallationIds = new Set();
+            
+            // Process overdue payments to identify which installations have overdue payments
+            if (overduePayments && Array.isArray(overduePayments) && overduePayments.length > 0) {
+              overduePayments.forEach(payment => {
+                if (payment.installationId) {
+                  overdueInstallationIds.add(payment.installationId.toString());
+                }
+              });
+            }
 
             for (const plan of activePlans) {
               try {
@@ -98,6 +113,9 @@ export default function LoanManagementPage() {
                 if (plan.customerName) {
                   customerName = plan.customerName;
                 }
+                
+                // Check if this installation has overdue payments
+                const isOverdue = overdueInstallationIds.has(plan.installationId?.toString());
 
                 // For each payment plan, create a loan
                 loansData.push({
@@ -107,7 +125,7 @@ export default function LoanManagementPage() {
                   loanAmount: plan.totalAmount || 0,
                   remainingAmount: plan.remainingAmount || 0,
                   monthlyPayment: plan.monthlyPayment || 0,
-                  status: plan.status || 'Current',
+                  status: isOverdue ? 'Late' : (plan.status || 'Current'),
                   nextPayment: plan.nextPaymentDate || new Date().toISOString(),
                   term: `${plan.termMonths || 60} months`,
                   startDate: plan.startDate || new Date().toISOString(),
@@ -218,8 +236,17 @@ export default function LoanManagementPage() {
   // Calculate loan stats
   const totalLoanVolume = loans.reduce((sum, loan) => sum + loan.loanAmount, 0)
   const totalOutstanding = loans.reduce((sum, loan) => sum + loan.remainingAmount, 0)
-  const totalCurrentLoans = loans.filter(loan => loan.status === "Current").length
+  
+  // Since we're only fetching active plans, all plans count as active unless marked as late
+  // Count active loans (all plans that aren't marked as Late)
+  const totalCurrentLoans = loans.filter(loan => loan.status !== "Late" && loan.status !== "No Data").length
+  
+  // Count overdue loans (plans marked as Late)
   const totalOverdueLoans = loans.filter(loan => loan.status === "Late").length
+  
+  // Calculate percentage of active and overdue loans for display
+  const activePercentage = loans.length > 0 ? Math.round((totalCurrentLoans / loans.length) * 100) : 0
+  const overduePercentage = loans.length > 0 ? Math.round((totalOverdueLoans / loans.length) * 100) : 0
 
   return (
     <div className="container mx-auto py-6">
@@ -281,26 +308,42 @@ export default function LoanManagementPage() {
                 </p>
               </CardContent>
             </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">Current Loans</CardTitle>
+            <Card className="border-2 border-green-400 dark:border-green-600 shadow-md">
+              <CardHeader className="pb-2 bg-green-50 dark:bg-green-900/30">
+                <CardTitle className="text-sm font-medium flex items-center">
+                  <Check className="h-4 w-4 mr-2 text-green-600 dark:text-green-400" />
+                  Active Loans
+                </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{totalCurrentLoans}</div>
+                <div className="text-2xl font-bold text-green-600 dark:text-green-400">{totalCurrentLoans}</div>
                 <p className="text-xs text-muted-foreground">
-                  In good standing
+                  {totalCurrentLoans === 1 ? "1 loan" : `${totalCurrentLoans} loans`} in good standing
                 </p>
+                {totalCurrentLoans > 0 && loans.length > 0 && (
+                  <p className="text-xs mt-2">
+                    {Math.round((totalCurrentLoans / loans.length) * 100)}% of total loans
+                  </p>
+                )}
               </CardContent>
             </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">Overdue Loans</CardTitle>
+            <Card className="border-2 border-red-400 dark:border-red-600 shadow-md">
+              <CardHeader className="pb-2 bg-red-50 dark:bg-red-900/30">
+                <CardTitle className="text-sm font-medium flex items-center">
+                  <XCircle className="h-4 w-4 mr-2 text-red-600 dark:text-red-400" />
+                  Overdue Loans
+                </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{totalOverdueLoans}</div>
+                <div className="text-2xl font-bold text-red-600 dark:text-red-400">{totalOverdueLoans}</div>
                 <p className="text-xs text-muted-foreground">
-                  Requiring attention
+                  {totalOverdueLoans === 1 ? "1 loan requires" : `${totalOverdueLoans} loans require`} attention
                 </p>
+                {totalOverdueLoans > 0 && loans.length > 0 && (
+                  <p className="text-xs mt-2 text-red-600 dark:text-red-400">
+                    {Math.round((totalOverdueLoans / loans.length) * 100)}% of total loans
+                  </p>
+                )}
               </CardContent>
             </Card>
           </div>

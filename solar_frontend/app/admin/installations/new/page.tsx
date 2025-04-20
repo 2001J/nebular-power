@@ -54,6 +54,7 @@ const formSchema = z.object({
   installedCapacityKW: z.string().min(1, "Capacity is required"),
   location: z.string().min(1, "Location is required"),
   installDate: z.string().min(1, "Installation date is required"),
+  type: z.string().min(1, "Installation type is required"),
   notes: z.string().optional(),
 })
 
@@ -72,6 +73,7 @@ export default function NewInstallationPage() {
       installedCapacityKW: "",
       location: "",
       installDate: new Date().toISOString().split('T')[0],
+      type: "Residential", // Default to Residential
       notes: "",
     },
   })
@@ -123,6 +125,7 @@ export default function NewInstallationPage() {
         location: values.location,
         installationDate: new Date(values.installDate).toISOString(), // Format date properly
         status: "ACTIVE", // Use enum value from backend
+        type: values.type, // Include the installation type
         notes: values.notes || ""
       }
 
@@ -289,6 +292,34 @@ export default function NewInstallationPage() {
 
                 <FormField
                   control={form.control}
+                  name="type"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Installation Type</FormLabel>
+                      <FormControl>
+                        <div className="relative">
+                          <Tag className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                          <Select
+                            value={field.value}
+                            onValueChange={field.onChange}
+                          >
+                            <SelectTrigger className="pl-9">
+                              <SelectValue placeholder="Select installation type" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="Residential">Residential</SelectItem>
+                              <SelectItem value="Commercial">Commercial</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
                   name="installDate"
                   render={({ field }) => (
                     <FormItem>
@@ -352,4 +383,4 @@ export default function NewInstallationPage() {
       </Form>
     </div>
   )
-} 
+}
