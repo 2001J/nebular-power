@@ -61,6 +61,14 @@ class CommandHandler:
                     if not is_running():
                         break
                     
+                    # If command is a string, try to parse it as JSON
+                    if isinstance(command, str):
+                        try:
+                            command = json.loads(command)
+                        except json.JSONDecodeError:
+                            logger.error(f"Failed to parse command as JSON: {command}")
+                            continue
+                    
                     # Process the command
                     success = self._process_command(command)
                     
@@ -77,17 +85,33 @@ class CommandHandler:
     def _poll_for_commands(self):
         """Poll the server for new commands."""
         try:
+            # Get authentication headers
+            from auth_helper import get_auth_helper
+            headers = get_auth_helper().get_auth_headers()
+            
             response = requests.get(
                 self.command_endpoint,
                 params={"status": "PENDING"},
+                headers=headers,
                 timeout=10
             )
             
             if response.status_code == 200:
-                commands = response.json()
-                if commands:
-                    logger.info(f"Received {len(commands)} new commands")
-                return commands
+                # Parse the response data
+                response_data = response.json()
+                
+                # Check if the response is paginated
+                if isinstance(response_data, dict) and "content" in response_data:
+                    # Extract the content (list of commands) from paginated response
+                    commands = response_data.get("content", [])
+                    if commands:
+                        logger.info(f"Received {len(commands)} new commands")
+                    return commands
+                else:
+                    # Handle case where the response is a direct list of commands
+                    if response_data:
+                        logger.info(f"Received {len(response_data)} new commands")
+                    return response_data
             else:
                 logger.warning(f"Failed to poll for commands: {response.status_code} - {response.text}")
                 return []
@@ -176,7 +200,9 @@ class CommandHandler:
         logger.debug(f"Sending response for command {command_id}: success={success}")
         
         try:
-            headers = {"Content-Type": "application/json"}
+            # Get authentication headers
+            from auth_helper import get_auth_helper
+            headers = get_auth_helper().get_auth_headers()
             
             response = requests.post(
                 self.response_endpoint,
@@ -286,4 +312,4 @@ class CommandHandler:
             result["powerRestored"] = random.choice([True, False])
             result["resumedDevices"] = random.randint(1, 5)
         
-        return result 
+        return result

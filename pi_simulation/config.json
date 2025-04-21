@@ -1,9 +1,17 @@
 {
   "general": {
     "simulation_name": "Raspberry Pi Solar Installation Demo",
-    "installation_id": "RPi-DEMO-1234",
+    "installation_id": "1",
     "server_url": "http://localhost:8080",
-    "simulation_speed": 1.0
+    "simulation_speed": 1.0,
+    "auth": {
+      "enabled": true,
+      "type": "jwt",
+      "username": "customer1@solar.com",
+      "password": "password123",
+      "token": "",
+      "token_url": "http://localhost:8080/api/auth/login"
+    }
   },
   "energy": {
     "enabled": true,

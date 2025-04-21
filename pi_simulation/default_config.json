@@ -1,7 +1,7 @@
 {
   "general": {
     "simulation_name": "Solar Installation Simulator",
-    "installation_id": "SIM-3981",
+    "installation_id": "SIM-8831",
     "server_url": "http://localhost:8080",
     "simulation_speed": 1.0
   },

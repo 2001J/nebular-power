@@ -169,7 +169,9 @@ class HeartbeatSimulator:
         
         # Send the heartbeat
         try:
-            headers = {"Content-Type": "application/json"}
+            # Get authentication headers
+            from auth_helper import get_auth_helper
+            headers = get_auth_helper().get_auth_headers()
             
             response = requests.post(
                 self.heartbeat_endpoint,
@@ -178,11 +180,11 @@ class HeartbeatSimulator:
                 timeout=10
             )
             
-            if response.status_code == 200:
+            if response.status_code == 200 or response.status_code == 201:
                 logger.debug(f"Heartbeat sent successfully for device {self.device_id}")
             else:
                 logger.warning(f"Failed to send heartbeat for device {self.device_id}: "
                              f"{response.status_code} - {response.text}")
         
         except RequestException as e:
-            logger.error(f"Error sending heartbeat for device {self.device_id}: {e}") 
+            logger.error(f"Error sending heartbeat for device {self.device_id}: {e}")

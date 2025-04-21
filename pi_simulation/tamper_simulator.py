@@ -142,7 +142,11 @@ class TamperSimulator:
         logger.info(f"Triggering {event_type} tamper event: {params}")
         
         try:
-            response = requests.post(full_url, params=params)
+            # Get authentication headers
+            from auth_helper import get_auth_helper
+            headers = get_auth_helper().get_auth_headers()
+            
+            response = requests.post(full_url, params=params, headers=headers)
             
             if response.status_code == 200:
                 logger.info(f"Successfully sent {event_type} tamper event. Response: {response.json()}")
@@ -226,4 +230,4 @@ class TamperSimulator:
                 "distanceMoved": random.uniform(10, 1000)
             }
         
-        return None 
+        return None

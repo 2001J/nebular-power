@@ -25,6 +25,7 @@ from energy_simulator import EnergySimulator
 from heartbeat_simulator import HeartbeatSimulator
 from tamper_simulator import TamperSimulator
 from command_handler import CommandHandler
+from auth_helper import init_auth_helper, get_auth_helper
 
 # Set up logging
 logging.basicConfig(
@@ -136,6 +137,12 @@ class SolarSimulator:
         config = self.config
         server_url = config["general"]["server_url"]
         installation_id = config["general"]["installation_id"]
+        
+        # Initialize authentication helper
+        auth_helper = init_auth_helper(config)
+        logger.info(f"Authentication enabled: {auth_helper.enabled}")
+        if auth_helper.enabled:
+            auth_helper.authenticate()
         
         # Initialize Energy Simulator
         if config["energy"]["enabled"]:
@@ -389,4 +396,4 @@ def main():
         simulator.stop()
 
 if __name__ == "__main__":
-    main() 
+    main()

@@ -93,16 +93,19 @@ class EnergySimulator:
         # Realistic solar curve (bell-shaped peaking at noon)
         hour = now.hour + now.minute / 60.0  # Decimal hour
         
-        # Solar generation - bell curve from 6AM to 6PM
-        if 6 <= hour <= 18:
-            # Create a bell curve centered at noon (12)
-            hour_factor = 1.0 - abs(hour - 12.0) / 6.0
+        # Solar generation - bell curve from sunrise to sunset
+        # For April, approximate sunrise at 6AM and sunset at 7PM
+        if 6 <= hour <= 19:  # Daylight hours
+            # Create a bell curve centered at 1PM (solar noon in April)
+            hour_factor = 1.0 - abs(hour - 13.0) / 7.0
             generation_factor = math.sin(hour_factor * math.pi)
             
-            # Base generation calculation
-            power_generation = self.base_generation + (
-                (self.peak_generation - self.base_generation) * generation_factor
-            )
+            # Calculate base generation - more realistic values for a 5.5kW system
+            # Peak capacity is typically 80-90% of rated capacity in optimal conditions
+            max_realistic_output = self.peak_generation * 0.85  # ~85% of rated peak is realistic
+            
+            # Base generation calculation with more realistic curve
+            power_generation = max_realistic_output * generation_factor
             
             # Apply weather effects if enabled
             if self.simulate_weather:
@@ -110,22 +113,33 @@ class EnergySimulator:
                 power_generation *= weather_factor
             
             # Add some random noise to make the curve look more natural
-            power_generation *= random.uniform(0.95, 1.05)
+            power_generation *= random.uniform(0.92, 1.08)
+            
+            # Ensure morning/evening ramp-up/down is more gradual
+            if hour < 7:  # Early morning
+                power_generation *= (hour - 6) / 1.0  # Gradual ramp-up
+            elif hour > 18:  # Evening
+                power_generation *= (19 - hour) / 1.0  # Gradual ramp-down
         else:
-            # Minimal generation during night hours (could be zero, but setting to a small value)
-            power_generation = random.uniform(0, self.base_generation * 0.01)
+            # Near-zero generation during night hours (occasional tiny values for sensor noise)
+            power_generation = random.uniform(0, 5)  # 0-5 watts representing noise/minimal moonlight
         
-        # Calculate consumption - more in the morning and evening, less during the day
-        if hour < 7 or hour > 20:  # Night: low consumption
-            base_consumption = self.consumption_min * 0.8
-            variation = self.consumption_min * 0.4
-        elif 7 <= hour < 9 or 17 <= hour <= 20:  # Morning/evening peaks
-            base_consumption = self.consumption_max * 0.9
-            variation = self.consumption_max * 0.2
-        else:  # Daytime: medium consumption
-            base_consumption = (self.consumption_min + self.consumption_max) / 2
-            variation = self.consumption_min * 0.3
+        # Calculate consumption - more realistic pattern for a residential home
+        # Average home uses 1-2kW as base load, with peaks in morning and evening
+        if 5 <= hour < 9:  # Morning peak (getting ready for work/school)
+            base_consumption = 3000  # ~3kW
+            variation = 800
+        elif 17 <= hour < 22:  # Evening peak (dinner, TV, etc.)
+            base_consumption = 3500  # ~3.5kW
+            variation = 1000
+        elif 22 <= hour or hour < 5:  # Night (sleeping)
+            base_consumption = 800  # ~0.8kW base load (refrigerator, standby devices)
+            variation = 200
+        else:  # Daytime (most people at work/school)
+            base_consumption = 1200  # ~1.2kW
+            variation = 300
         
+        # Add randomization to consumption
         power_consumption = base_consumption + random.uniform(-variation, variation)
         
         # Calculate yield in kWh for this interval (power in watts * hours)
@@ -136,18 +150,40 @@ class EnergySimulator:
         self.daily_yield_kwh += interval_kwh
         self.total_yield_kwh += interval_kwh
         
+        # Generate battery level between 10% and 100%
+        # Make battery level correlate with solar production (higher during day)
+        if 10 <= hour <= 16:  # Peak solar hours
+            battery_level = random.uniform(70.0, 100.0)
+        elif (7 <= hour < 10) or (16 < hour <= 19):  # Morning/afternoon
+            battery_level = random.uniform(50.0, 85.0)
+        else:  # Night
+            battery_level = random.uniform(30.0, 60.0)
+        
+        # Generate voltage around nominal values with small variations
+        # 110V in US, 220-240V in most other countries
+        voltage = random.uniform(235.0, 245.0)  # Assuming European standard
+        
+        # Generate current based on power and voltage (P = VI)
+        current_amps = power_consumption / voltage if voltage > 0 else 0
+        
         # Create the energy data payload
         energy_data = {
             "installationId": self.installation_id,
+            "deviceToken": f"SIM-TOKEN-{self.installation_id}",
             "timestamp": now.isoformat(),
             "powerGenerationWatts": round(power_generation, 2),
             "powerConsumptionWatts": round(power_consumption, 2),
             "dailyYieldKWh": round(self.daily_yield_kwh, 3),
             "totalYieldKWh": round(self.total_yield_kwh, 3),
+            "batteryLevel": round(battery_level, 1),
+            "voltage": round(voltage, 1),
+            "currentAmps": round(current_amps, 2),
             "isSimulated": True
         }
         
-        logger.debug(f"Generated energy data: {energy_data}")
+        if power_generation > 100:  # Only log significant generation
+            logger.debug(f"Generated energy data: {energy_data['timestamp']} - Generation: {round(power_generation, 2)}W, Consumption: {round(power_consumption, 2)}W")
+        
         return energy_data
     
     def _update_weather(self):
@@ -186,7 +222,9 @@ class EnergySimulator:
     def _send_energy_data(self, energy_data):
         """Send energy data to the server."""
         try:
-            headers = {"Content-Type": "application/json"}
+            # Get authentication headers
+            from auth_helper import get_auth_helper
+            headers = get_auth_helper().get_auth_headers()
             
             response = requests.post(
                 self.energy_endpoint,
@@ -195,10 +233,10 @@ class EnergySimulator:
                 timeout=10
             )
             
-            if response.status_code == 200:
+            if response.status_code == 200 or response.status_code == 201:
                 logger.debug(f"Energy data sent successfully: {energy_data['timestamp']}")
             else:
                 logger.warning(f"Failed to send energy data: {response.status_code} - {response.text}")
         
         except RequestException as e:
-            logger.error(f"Error sending energy data: {e}") 
+            logger.error(f"Error sending energy data: {e}")
