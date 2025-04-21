@@ -32,7 +32,7 @@ A comprehensive simulation framework for generating realistic solar installation
 
 Run the simulator with default settings:
 ```
-python main.py
+python3 main.py
 ```
 
 This will:

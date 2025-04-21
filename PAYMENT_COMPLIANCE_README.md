@@ -1,96 +1,652 @@
-# Payment Compliance System
+# Payment Compliance Service API Documentation
 
-## Overview
-The Payment Compliance System is a comprehensive solution for managing customer payments, loan arrangements, and payment reporting. This document outlines the key components and functionality of the system.
+This document provides sample request/response examples for all endpoints in the Payment Compliance Service, making it easier to test the API.
 
-## Core Components
+## Table of Contents
+- [Admin Endpoints](#admin-endpoints)
+  - [Get Overdue Payments](#get-overdue-payments)
+  - [Get Customer Payment Plans](#get-customer-payment-plans)
+  - [Update Payment Plan](#update-payment-plan)
+  - [Create Payment Plan](#create-payment-plan)
+  - [Record Manual Payment](#record-manual-payment)
+  - [Get Installation Payments](#get-installation-payments)
+  - [Send Manual Reminder](#send-manual-reminder)
+  - [Grace Period Configuration](#grace-period-configuration)
+  - [Reminder Configuration](#reminder-configuration)
+- [Customer Endpoints](#customer-endpoints)
+  - [Get Customer Payments](#get-customer-payments)
+  - [Make Payment](#make-payment)
+  - [Get Payment Details](#get-payment-details)
 
-### 1. Payment Operations
-**Path:** `/admin/payments`
-- Management of overdue payments
-- Manual payment recording
-- Payment reminder sending
-- Configuration of grace periods and late fees
+## Admin Endpoints
 
-### 2. Payment Reports
-**Path:** `/admin/payments/reports`
-- Compliance analytics (on-time payment rates)
-- Revenue reporting and collection metrics
-- Upcoming and overdue payment listings
-- Custom date range payment analysis
+### Get Overdue Payments
 
-### 3. Loan Management
-**Path:** `/admin/loans`
-- View of active payment plans as financing arrangements
-- Loan status tracking
-- Payment schedule monitoring
-- Customer loan details
+**Endpoint:** `GET /api/admin/payments/overdue`
 
-## API Structure
-The system uses a comprehensive API located in `lib/api.ts` under the `paymentComplianceApi` namespace:
+**Query Parameters:**
+- `page` (default: 0)
+- `size` (default: 10)
+- `sortBy` (default: "dueDate")
+- `direction` (default: "asc")
 
-### Payment Management Methods
-- `getOverduePayments`: Fetches paginated list of overdue payments
-- `recordManualPayment`: Records payments made outside the system
-- `sendManualReminder`: Sends payment reminders via email or SMS
-- `getCustomerPayments`: Retrieves payment history for a specific installation
-- `getPaymentReminders`: Fetches reminder history for a payment
+**Sample Request:**
+```
+GET /api/admin/payments/overdue?page=0&size=10&sortBy=dueDate&direction=desc
+```
 
-### Configuration Methods
-- `getGracePeriodConfig`/`updateGracePeriodConfig`: Grace period settings
-- `getReminderConfig`/`updateReminderConfig`: Reminder automation settings
+**Sample Response:**
+```json
+{
+  "content": [
+    {
+      "id": 1,
+      "installationId": 1,
+      "customerName": "John Doe",
+      "customerEmail": "john.doe@example.com",
+      "paymentPlanId": 1,
+      "paymentPlanName": "Standard Monthly Plan",
+      "amount": 250.00,
+      "dueDate": "2025-03-15T00:00:00",
+      "status": "OVERDUE",
+      "statusReason": "Payment not received",
+      "daysOverdue": 31,
+      "paymentDate": null,
+      "paymentMethod": null,
+      "transactionId": null
+    }
+  ],
+  "pageable": {
+    "pageNumber": 0,
+    "pageSize": 10,
+    "sort": {
+      "empty": false,
+      "sorted": true,
+      "unsorted": false
+    },
+    "offset": 0,
+    "paged": true,
+    "unpaged": false
+  },
+  "totalElements": 1,
+  "totalPages": 1,
+  "last": true,
+  "size": 10,
+  "number": 0,
+  "sort": {
+    "empty": false,
+    "sorted": true,
+    "unsorted": false
+  },
+  "numberOfElements": 1,
+  "first": true,
+  "empty": false
+}
+```
 
-### Payment Plan Methods
-- `getCustomerPaymentPlans`: Retrieves payment plans for a customer
-- `createPaymentPlan`: Establishes a new payment plan
-- `updatePaymentPlan`: Modifies an existing payment plan
+### Get Customer Payment Plans
 
-### Reporting Methods
-- `generatePaymentReport`: Creates various analytical reports
-- `getUpcomingPaymentsReport`: Lists payments due soon
-- `getOverduePaymentsReport`: Details on late payments
-- `getPaymentPlansByStatusReport`: Lists payment plans by status
-- `getPaymentHistoryReport`: Historical payment data for an installation
+**Endpoint:** `GET /api/admin/payments/customers/{customerId}/plan`
 
-## Key Features
+**Path Parameters:**
+- `customerId`: ID of the customer
 
-1. **Automated Payment Tracking**
-   - Monitors due dates and payment status
-   - Flags overdue payments automatically
-   - Maintains payment history
+**Sample Request:**
+```
+GET /api/admin/payments/customers/1/plan
+```
 
-2. **Reminder System**
-   - Configurable multi-stage reminder schedule
-   - Support for email and SMS channels
-   - Manual and automated reminder options
+**Sample Response:**
+```json
+[
+  {
+    "id": 1,
+    "installationId": 1,
+    "customerName": "John Doe",
+    "customerEmail": "john.doe@example.com",
+    "name": "Standard Monthly Plan",
+    "description": "Regular monthly payments for solar installation",
+    "totalAmount": 12000.00,
+    "remainingAmount": 10500.00,
+    "numberOfPayments": 48,
+    "installmentAmount": 250.00,
+    "frequency": "MONTHLY",
+    "startDate": "2025-01-01T00:00:00",
+    "endDate": "2029-01-01T00:00:00",
+    "status": "ACTIVE",
+    "createdAt": "2025-01-01T10:30:00",
+    "updatedAt": "2025-01-01T10:30:00"
+  }
+]
+```
 
-3. **Late Fee Management**
-   - Configurable grace periods
-   - Percentage-based and fixed amount late fees
-   - Automatic fee calculation
+### Update Payment Plan
 
-4. **Service Control Integration**
-   - Optional service suspension for non-payment
-   - Automated or manual suspension workflow
-   - Service restoration tracking
+**Endpoint:** `PUT /api/admin/payments/customers/{customerId}/plan/{planId}`
 
-5. **Comprehensive Reporting**
-   - Payment compliance metrics
-   - Revenue collection analytics
-   - Customer payment behavior analysis
+**Path Parameters:**
+- `customerId`: ID of the customer
+- `planId`: ID of the payment plan
 
-## UI Components
-The system includes dedicated interfaces for:
-- Overdue payment management
-- Payment settings configuration
-- Comprehensive payment reporting
-- Loan/financing arrangement tracking
+**Request Body:**
+```json
+{
+  "installationId": 1,
+  "installmentAmount": 300.00,
+  "frequency": "MONTHLY",
+  "startDate": "2025-05-01",
+  "endDate": "2029-05-01",
+  "totalAmount": 12000.00,
+  "name": "Updated Monthly Plan",
+  "description": "Updated payment plan with higher installments"
+}
+```
 
-## Error Handling
-- Proper API error management
-- Minimal placeholder data when API calls fail
-- Clear user notifications for system status
+**Sample Response:**
+```json
+{
+  "id": 1,
+  "installationId": 1,
+  "customerName": "John Doe",
+  "customerEmail": "john.doe@example.com",
+  "name": "Updated Monthly Plan",
+  "description": "Updated payment plan with higher installments",
+  "totalAmount": 12000.00,
+  "remainingAmount": 10500.00,
+  "numberOfPayments": 40,
+  "installmentAmount": 300.00,
+  "frequency": "MONTHLY",
+  "startDate": "2025-05-01T00:00:00",
+  "endDate": "2029-05-01T00:00:00",
+  "status": "ACTIVE",
+  "createdAt": "2025-01-01T10:30:00",
+  "updatedAt": "2025-04-15T14:25:00"
+}
+```
 
----
+### Create Payment Plan
 
-*Note: This document will be updated as additional packages and components are scanned for a more complete system overview.* 
+**Endpoint:** `POST /api/admin/payments/customers/{customerId}/plan`
+
+**Path Parameters:**
+- `customerId`: ID of the customer
+
+**Request Body:**
+```json
+{
+  "installationId": 1,
+  "installmentAmount": 250.00,
+  "frequency": "MONTHLY",
+  "startDate": "2025-05-01",
+  "endDate": "2029-05-01",
+  "totalAmount": 12000.00,
+  "name": "New Monthly Plan",
+  "description": "Standard payment plan for new customer"
+}
+```
+
+**Sample Response:**
+```json
+{
+  "id": 2,
+  "installationId": 1,
+  "customerName": "John Doe",
+  "customerEmail": "john.doe@example.com",
+  "name": "New Monthly Plan",
+  "description": "Standard payment plan for new customer",
+  "totalAmount": 12000.00,
+  "remainingAmount": 12000.00,
+  "numberOfPayments": 48,
+  "installmentAmount": 250.00,
+  "frequency": "MONTHLY",
+  "startDate": "2025-05-01T00:00:00",
+  "endDate": "2029-05-01T00:00:00",
+  "status": "ACTIVE",
+  "createdAt": "2025-04-15T14:30:00",
+  "updatedAt": "2025-04-15T14:30:00"
+}
+```
+
+### Record Manual Payment
+
+**Endpoint:** `POST /api/admin/payments/customers/{customerId}/manual-payment`
+
+**Path Parameters:**
+- `customerId`: ID of the customer
+
+**Request Body:**
+```json
+{
+  "paymentId": 1,
+  "amount": 250.00,
+  "paymentMethod": "BANK_TRANSFER",
+  "transactionId": "TR12345678",
+  "notes": "Payment received via bank transfer"
+}
+```
+
+**Sample Response:**
+```json
+{
+  "id": 1,
+  "installationId": 1,
+  "customerName": "John Doe",
+  "customerEmail": "john.doe@example.com",
+  "paymentPlanId": 1,
+  "paymentPlanName": "Standard Monthly Plan",
+  "amount": 250.00,
+  "dueDate": "2025-03-15T00:00:00",
+  "status": "PAID",
+  "statusReason": "Manual payment recorded",
+  "daysOverdue": 31,
+  "paymentDate": "2025-04-15T14:35:00",
+  "paymentMethod": "BANK_TRANSFER",
+  "transactionId": "TR12345678",
+  "notes": "Payment received via bank transfer"
+}
+```
+
+### Get Installation Payments
+
+**Endpoint:** `GET /api/admin/payments/installations/{installationId}/payments`
+
+**Path Parameters:**
+- `installationId`: ID of the installation
+
+**Query Parameters:**
+- `page` (default: 0)
+- `size` (default: 10)
+- `sortBy` (default: "dueDate")
+- `direction` (default: "desc")
+
+**Sample Request:**
+```
+GET /api/admin/payments/installations/1/payments?page=0&size=10&sortBy=dueDate&direction=desc
+```
+
+**Sample Response:**
+```json
+{
+  "content": [
+    {
+      "id": 3,
+      "installationId": 1,
+      "customerName": "John Doe",
+      "customerEmail": "john.doe@example.com",
+      "paymentPlanId": 1,
+      "paymentPlanName": "Standard Monthly Plan",
+      "amount": 250.00,
+      "dueDate": "2025-05-15T00:00:00",
+      "status": "UPCOMING",
+      "statusReason": null,
+      "daysOverdue": 0,
+      "paymentDate": null,
+      "paymentMethod": null,
+      "transactionId": null
+    },
+    {
+      "id": 2,
+      "installationId": 1,
+      "customerName": "John Doe",
+      "customerEmail": "john.doe@example.com",
+      "paymentPlanId": 1,
+      "paymentPlanName": "Standard Monthly Plan",
+      "amount": 250.00,
+      "dueDate": "2025-04-15T00:00:00",
+      "status": "DUE",
+      "statusReason": null,
+      "daysOverdue": 0,
+      "paymentDate": null,
+      "paymentMethod": null,
+      "transactionId": null
+    },
+    {
+      "id": 1,
+      "installationId": 1,
+      "customerName": "John Doe",
+      "customerEmail": "john.doe@example.com",
+      "paymentPlanId": 1,
+      "paymentPlanName": "Standard Monthly Plan",
+      "amount": 250.00,
+      "dueDate": "2025-03-15T00:00:00",
+      "status": "PAID",
+      "statusReason": "Manual payment recorded",
+      "daysOverdue": 31,
+      "paymentDate": "2025-04-15T14:35:00",
+      "paymentMethod": "BANK_TRANSFER",
+      "transactionId": "TR12345678",
+      "notes": "Payment received via bank transfer"
+    }
+  ],
+  "pageable": {
+    "pageNumber": 0,
+    "pageSize": 10,
+    "sort": {
+      "empty": false,
+      "sorted": true,
+      "unsorted": false
+    },
+    "offset": 0,
+    "paged": true,
+    "unpaged": false
+  },
+  "totalElements": 3,
+  "totalPages": 1,
+  "last": true,
+  "size": 10,
+  "number": 0,
+  "sort": {
+    "empty": false,
+    "sorted": true,
+    "unsorted": false
+  },
+  "numberOfElements": 3,
+  "first": true,
+  "empty": false
+}
+```
+
+### Send Manual Reminder
+
+**Endpoint:** `POST /api/admin/payments/reminders/send`
+
+**Query Parameters:**
+- `paymentId`: ID of the payment to send reminder for
+- `reminderType`: Type of reminder (FIRST_REMINDER, SECOND_REMINDER, FINAL_REMINDER, EMAIL, SMS)
+
+**Sample Request:**
+```
+POST /api/admin/payments/reminders/send?paymentId=2&reminderType=FIRST_REMINDER
+```
+
+**Sample Response:**
+```
+200 OK
+```
+
+### Grace Period Configuration
+
+#### Get Grace Period Configuration
+
+**Endpoint:** `GET /api/admin/payments/grace-period-config`
+
+**Sample Response:**
+```json
+{
+  "id": 1,
+  "numberOfDays": 10,
+  "reminderFrequency": 3,
+  "autoSuspendEnabled": true,
+  "createdBy": "admin",
+  "createdAt": "2025-01-01T00:00:00",
+  "updatedBy": "admin",
+  "updatedAt": "2025-01-01T00:00:00"
+}
+```
+
+#### Update Grace Period Configuration
+
+**Endpoint:** `PUT /api/admin/payments/grace-period-config`
+
+**Request Body:**
+```json
+{
+  "numberOfDays": 15,
+  "reminderFrequency": 5,
+  "autoSuspendEnabled": true
+}
+```
+
+**Sample Response:**
+```json
+{
+  "id": 1,
+  "numberOfDays": 15,
+  "reminderFrequency": 5,
+  "autoSuspendEnabled": true,
+  "createdBy": "admin",
+  "createdAt": "2025-01-01T00:00:00",
+  "updatedBy": "admin",
+  "updatedAt": "2025-04-15T14:40:00"
+}
+```
+
+### Reminder Configuration
+
+#### Get Reminder Configuration
+
+**Endpoint:** `GET /api/admin/payments/reminder-config`
+
+**Sample Response:**
+```json
+{
+  "id": 1,
+  "autoSendReminders": true,
+  "firstReminderDays": 1,
+  "secondReminderDays": 3,
+  "finalReminderDays": 7,
+  "reminderMethod": "EMAIL",
+  "createdBy": "admin",
+  "createdAt": "2025-01-01T00:00:00",
+  "updatedBy": "admin",
+  "updatedAt": "2025-01-01T00:00:00"
+}
+```
+
+#### Update Reminder Configuration
+
+**Endpoint:** `PUT /api/admin/payments/reminder-config`
+
+**Request Body:**
+```json
+{
+  "autoSendReminders": true,
+  "firstReminderDays": 2,
+  "secondReminderDays": 5,
+  "finalReminderDays": 10,
+  "reminderMethod": "EMAIL_AND_SMS"
+}
+```
+
+**Sample Response:**
+```json
+{
+  "id": 1,
+  "autoSendReminders": true,
+  "firstReminderDays": 2,
+  "secondReminderDays": 5,
+  "finalReminderDays": 10,
+  "reminderMethod": "EMAIL_AND_SMS",
+  "createdBy": "admin",
+  "createdAt": "2025-01-01T00:00:00",
+  "updatedBy": "admin",
+  "updatedAt": "2025-04-15T14:45:00"
+}
+```
+
+## Customer Endpoints
+
+### Get Customer Payments
+
+**Endpoint:** `GET /api/customer/payments`
+
+**Query Parameters:**
+- `page` (default: 0)
+- `size` (default: 10)
+- `sortBy` (default: "dueDate")
+- `direction` (default: "desc")
+
+**Sample Request:**
+``GET /api/customer/payments?page=0&size=10&sortBy=dueDate&direction=desc
+```
+
+**Sample Response:**
+```json
+{
+  "content": [
+    {
+      "id": 3,
+      "installationId": 1,
+      "installationName": "Home Solar System",
+      "paymentPlanId": 1,
+      "paymentPlanName": "Standard Monthly Plan",
+      "amount": 250.00,
+      "dueDate": "2025-05-15T00:00:00",
+      "status": "UPCOMING",
+      "daysOverdue": 0,
+      "paymentDate": null,
+      "paymentMethod": null
+    },
+    {
+      "id": 2,
+      "installationId": 1,
+      "installationName": "Home Solar System",
+      "paymentPlanId": 1,
+      "paymentPlanName": "Standard Monthly Plan",
+      "amount": 250.00,
+      "dueDate": "2025-04-15T00:00:00",
+      "status": "DUE",
+      "daysOverdue": 0,
+      "paymentDate": null,
+      "paymentMethod": null
+    },
+    {
+      "id": 1,
+      "installationId": 1,
+      "installationName": "Home Solar System",
+      "paymentPlanId": 1,
+      "paymentPlanName": "Standard Monthly Plan",
+      "amount": 250.00,
+      "dueDate": "2025-03-15T00:00:00",
+      "status": "PAID",
+      "daysOverdue": 31,
+      "paymentDate": "2025-04-15T14:35:00",
+      "paymentMethod": "BANK_TRANSFER"
+    }
+  ],
+  "pageable": {
+    "pageNumber": 0,
+    "pageSize": 10,
+    "sort": {
+      "empty": false,
+      "sorted": true,
+      "unsorted": false
+    },
+    "offset": 0,
+    "paged": true,
+    "unpaged": false
+  },
+  "totalElements": 3,
+  "totalPages": 1,
+  "last": true,
+  "size": 10,
+  "number": 0,
+  "sort": {
+    "empty": false,
+    "sorted": true,
+    "unsorted": false
+  },
+  "numberOfElements": 3,
+  "first": true,
+  "empty": false
+}
+```
+
+### Make Payment
+
+**Endpoint:** `POST /api/customer/payments/{paymentId}/pay`
+
+**Path Parameters:**
+- `paymentId`: ID of the payment to be made
+
+**Request Body:**
+```json
+{
+  "paymentMethod": "CREDIT_CARD",
+  "cardNumber": "4111111111111111",
+  "expiryMonth": 12,
+  "expiryYear": 2028,
+  "cvv": "123",
+  "cardholderName": "John Doe"
+}
+```
+
+**Sample Response:**
+```json
+{
+  "id": 2,
+  "installationId": 1,
+  "installationName": "Home Solar System",
+  "paymentPlanId": 1,
+  "paymentPlanName": "Standard Monthly Plan",
+  "amount": 250.00,
+  "dueDate": "2025-04-15T00:00:00",
+  "status": "PAID",
+  "daysOverdue": 0,
+  "paymentDate": "2025-04-15T15:00:00",
+  "paymentMethod": "CREDIT_CARD",
+  "transactionId": "TXN78901234"
+}
+```
+
+### Get Payment Details
+
+**Endpoint:** `GET /api/customer/payments/{paymentId}`
+
+**Path Parameters:**
+- `paymentId`: ID of the payment
+
+**Sample Request:**
+```
+GET /api/customer/payments/2
+```
+
+**Sample Response:**
+```json
+{
+  "id": 2,
+  "installationId": 1,
+  "installationName": "Home Solar System",
+  "paymentPlanId": 1,
+  "paymentPlanName": "Standard Monthly Plan",
+  "amount": 250.00,
+  "dueDate": "2025-04-15T00:00:00",
+  "status": "PAID",
+  "statusReason": "Online payment",
+  "daysOverdue": 0,
+  "paymentDate": "2025-04-15T15:00:00",
+  "paymentMethod": "CREDIT_CARD",
+  "transactionId": "TXN78901234",
+  "previousPaymentDate": "2025-04-15T14:35:00",
+  "nextPaymentDate": "2025-05-15T00:00:00"
+}
+```
+
+## Testing Tips
+
+1. **Customer IDs vs Installation IDs**: 
+   - For endpoints that specify "customer" in the path, use customer IDs
+   - For endpoints that specify "installation" in the path, use installation IDs
+
+2. **Test Data Setup**:
+   - Create users with role "CUSTOMER" first
+   - Create solar installations associated with those customers
+   - Create payment plans for those installations
+   - Payments will be automatically generated based on payment plans
+
+3. **Authentication**:
+   - Admin endpoints require a user with the "ADMIN" role
+   - Customer endpoints authenticate the current user and only return their own data
+
+4. **Common HTTP Status Codes**:
+   - 200: Success
+   - 201: Created (for POST requests that create new resources)
+   - 400: Bad Request (invalid input)
+   - 401: Unauthorized (not logged in)
+   - 403: Forbidden (insufficient permissions)
+   - 404: Not Found (resource doesn't exist)
+   - 500: Server Error
+
+5. **Date Formats**:
+   - All date fields use ISO-8601 format: "YYYY-MM-DDThh:mm:ss"
+   - Date-only fields (like startDate, endDate in requests) can use "YYYY-MM-DD"
