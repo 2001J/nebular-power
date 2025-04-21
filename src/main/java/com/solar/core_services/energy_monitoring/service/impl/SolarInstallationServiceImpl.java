@@ -3,6 +3,7 @@ package com.solar.core_services.energy_monitoring.service.impl;
 import com.solar.core_services.energy_monitoring.dto.DeviceStatusRequest;
 import com.solar.core_services.energy_monitoring.dto.SolarInstallationDTO;
 import com.solar.core_services.energy_monitoring.dto.SystemOverviewResponse;
+import com.solar.core_services.energy_monitoring.model.EnergyData;
 import com.solar.core_services.energy_monitoring.model.SolarInstallation;
 import com.solar.core_services.energy_monitoring.repository.EnergyDataRepository;
 import com.solar.core_services.energy_monitoring.repository.SolarInstallationRepository;
@@ -18,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -214,13 +216,79 @@ public class SolarInstallationServiceImpl implements SolarInstallationService {
         // Get month-to-date data
         LocalDateTime startOfMonth = LocalDateTime.of(LocalDate.now().withDayOfMonth(1), LocalTime.MIDNIGHT);
 
-        // Calculate system-wide values (placeholder calculations for now)
+        // Calculate system-wide values from actual data
         double currentSystemGeneration = 0;
         double todayTotalGeneration = 0;
         double todayTotalConsumption = 0;
         double monthToDateGeneration = 0;
         double monthToDateConsumption = 0;
         double averageEfficiency = 0;
+        
+        // Get all active installations
+        List<SolarInstallation> activeInstallations = allInstallations.stream()
+                .filter(i -> i.getStatus() == SolarInstallation.InstallationStatus.ACTIVE)
+                .collect(Collectors.toList());
+        
+        // Sum up today's generation and consumption for all active installations
+        for (SolarInstallation installation : activeInstallations) {
+            // Get most recent reading for current generation
+            List<EnergyData> recentReadings = energyDataRepository.findByInstallationOrderByTimestampDesc(installation);
+            if (!recentReadings.isEmpty()) {
+                // Instead of just using the most recent reading, calculate a more stable value
+                // Take up to 10 most recent readings for smoothing
+                int readingsToConsider = Math.min(10, recentReadings.size());
+                List<EnergyData> recentSubset = recentReadings.subList(0, readingsToConsider);
+                
+                // Calculate average generation, but filter out extreme outliers
+                double sum = 0;
+                int count = 0;
+                
+                // First pass - calculate median value
+                double[] values = recentSubset.stream()
+                    .mapToDouble(EnergyData::getPowerGenerationWatts)
+                    .toArray();
+                Arrays.sort(values);
+                double median = values.length % 2 == 0 ? 
+                    (values[values.length/2] + values[values.length/2 - 1]) / 2 : 
+                    values[values.length/2];
+                
+                // Second pass - use values within reasonable range of median
+                for (EnergyData reading : recentSubset) {
+                    double value = reading.getPowerGenerationWatts();
+                    // Include only if within 3x the median (to filter extreme outliers)
+                    if (median == 0 || (value <= median * 3 && value >= median / 3)) {
+                        sum += value;
+                        count++;
+                    }
+                }
+                
+                double avgGeneration = count > 0 ? sum / count : 0;
+                currentSystemGeneration += avgGeneration;
+            }
+            
+            // Get today's generation and consumption
+            Double installationTodayGeneration = energyDataRepository.sumPowerGenerationForPeriod(
+                    installation, startOfDay, endOfDay);
+            Double installationTodayConsumption = energyDataRepository.sumPowerConsumptionForPeriod(
+                    installation, startOfDay, endOfDay);
+            
+            // Get month-to-date generation and consumption
+            Double installationMonthGeneration = energyDataRepository.sumPowerGenerationForPeriod(
+                    installation, startOfMonth, endOfDay);
+            Double installationMonthConsumption = energyDataRepository.sumPowerConsumptionForPeriod(
+                    installation, startOfMonth, endOfDay);
+            
+            // Add to totals (convert from Watt-seconds to kWh)
+            todayTotalGeneration += (installationTodayGeneration != null ? installationTodayGeneration : 0) / 1000.0 / 3600.0;
+            todayTotalConsumption += (installationTodayConsumption != null ? installationTodayConsumption : 0) / 1000.0 / 3600.0;
+            monthToDateGeneration += (installationMonthGeneration != null ? installationMonthGeneration : 0) / 1000.0 / 3600.0;
+            monthToDateConsumption += (installationMonthConsumption != null ? installationMonthConsumption : 0) / 1000.0 / 3600.0;
+        }
+        
+        // Calculate average efficiency
+        if (todayTotalConsumption > 0) {
+            averageEfficiency = (todayTotalGeneration / todayTotalConsumption) * 100;
+        }
 
         // Build the system overview response
         SystemOverviewResponse response = SystemOverviewResponse.builder()
