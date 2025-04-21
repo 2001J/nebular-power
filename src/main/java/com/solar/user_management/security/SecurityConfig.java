@@ -94,6 +94,9 @@ public class SecurityConfig {
                                                                 "/api/swagger-ui/**",
                                                                 "/api/swagger-ui.html")
                                                 .permitAll()
+                                                
+                                                // WebSocket endpoints - allow initial HTTP handshake
+                                                .requestMatchers("/ws/**").permitAll()
 
                                                 // Admin only endpoints - URL-pattern based security
                                                 .requestMatchers("/api/customers/**").hasRole("ADMIN")

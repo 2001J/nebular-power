@@ -1,208 +1,167 @@
-// WebSocket utility for energy monitoring
+"use client"
+
+import { Client } from '@stomp/stompjs';
+import SockJS from 'sockjs-client';
 
 // Configuration for WebSocket behavior
 const WS_CONFIG = {
   // How long to wait before attempting to reconnect (starts at min, increases with backoff)
   reconnectTimeMin: 1000, // 1 second
-  reconnectTimeMax: 15000, // 15 seconds (reduced from 30)
+  reconnectTimeMax: 15000, // 15 seconds
   // Backoff multiplier - each reconnection attempt will wait longer
-  backoffMultiplier: 1.3, // Reduced from 1.5
+  backoffMultiplier: 1.3,
   // Maximum number of reconnection attempts before giving up
-  maxReconnectAttempts: 3, // Reduced from 10
+  maxReconnectAttempts: 5,
   // Heartbeat interval to check connection status (ms)
-  heartbeatInterval: 60000, // 60 seconds (increased from 30)
+  heartbeatInterval: 30000, // 30 seconds
+  // Debug mode (set to false in production)
+  debug: process.env.NODE_ENV === 'development'
 };
 
-// Helper function to create a WebSocket with reconnection functionality
-const createReconnectingWebSocket = (
-  url: string,
-  onMessage: (data: any) => void,
-  onError?: (error: any) => void,
-  onConnected?: () => void,
-  onDisconnected?: () => void
-) => {
-  let ws: WebSocket | null = null;
-  let reconnectAttempts = 0;
-  let reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
-  let isIntentionallyClosed = false;
-  let heartbeatInterval: ReturnType<typeof setInterval> | null = null;
-  let messageQueue: string[] = [];
+/**
+ * Create a STOMP client for reliable WebSocket communication
+ * with properly authenticated SockJS transport
+ */
+const createStompClient = (onConnect?: () => void, onDisconnect?: () => void) => {
+  // Only create client in browser environment
+  if (typeof window === 'undefined') return null;
 
-  // Calculate delay with exponential backoff
-  const getReconnectDelay = () => {
-    const delay = Math.min(
-      WS_CONFIG.reconnectTimeMin * Math.pow(WS_CONFIG.backoffMultiplier, reconnectAttempts),
-      WS_CONFIG.reconnectTimeMax
-    );
-    return delay;
+  // Get the authentication token from localStorage or sessionStorage
+  const token = typeof window !== 'undefined' 
+    ? localStorage.getItem("token") || sessionStorage.getItem("token") 
+    : null;
+
+  if (!token) {
+    console.warn('No authentication token found for WebSocket connection');
+  }
+
+  const wsUrl = process.env.NEXT_PUBLIC_WS_URL || 'http://localhost:8080';
+  
+  console.log(`Connecting to WebSocket at ${wsUrl}/ws with auth token: ${token ? 'Present' : 'Not found'}`);
+  
+  // Create custom SockJS instance with authentication
+  const createWebSocket = () => {
+    let wsEndpoint = `${wsUrl}/ws`;
+    
+    // Using SockJS without query parameters for the initial connection
+    console.log(`Creating SockJS connection to: ${wsEndpoint}`);
+    
+    // Create SockJS instance
+    const socket = new SockJS(wsEndpoint, null, {
+      transports: ['websocket', 'xhr-polling'],
+      timeout: 10000 // Increase timeout for slower networks
+    });
+    
+    // Add debug listeners
+    socket.onopen = () => {
+      console.log('SockJS transport connection opened');
+    };
+    
+    socket.onerror = (error) => {
+      console.error('SockJS transport error:', error);
+    };
+    
+    socket.onclose = (event) => {
+      console.log(`SockJS transport closed with code ${event.code}, reason: ${event.reason}`);
+    };
+    
+    return socket;
   };
-
-  // Handle connection status check
-  const heartbeat = () => {
-    if (ws && ws.readyState === WebSocket.OPEN) {
-      // Connection is still good - don't log anything to reduce console noise
-    } else if (!isIntentionallyClosed) {
-      // Connection lost but not by user action - attempt to reconnect
-      console.warn('WebSocket heartbeat detected connection loss, reconnecting...');
-      connect();
-    }
-  };
-
-  // Connect or reconnect to the WebSocket
-  const connect = () => {
-    if (isIntentionallyClosed) {
-      return;
-    }
-
-    // Clear any existing connection
-    if (ws) {
-      try {
-        ws.onclose = null; // Remove the event handler to prevent infinite loops
-        ws.onerror = null;
-        ws.close();
-      } catch (e) {
-        // Ignore errors during cleanup
-      }
-    }
-
-    try {
-      ws = new WebSocket(url);
-
-      ws.onopen = () => {
-        // Reduced logging - only log for the first connection or after failures
-        if (reconnectAttempts > 0) {
-          console.log(`WebSocket reconnected to ${url} after ${reconnectAttempts} attempts`);
-        } else {
-          console.log(`WebSocket connection established to ${url}`);
-        }
-
-        reconnectAttempts = 0; // Reset reconnect counter
-        if (onConnected) onConnected();
-
-        // Start heartbeat to keep connection alive and check status
-        if (heartbeatInterval) clearInterval(heartbeatInterval);
-        heartbeatInterval = setInterval(heartbeat, WS_CONFIG.heartbeatInterval);
-
-        // Process any queued messages
-        while (messageQueue.length > 0) {
-          const message = messageQueue.shift();
-          if (message && ws && ws.readyState === WebSocket.OPEN) {
-            ws.send(message);
-          }
-        }
-      };
-
-      ws.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          onMessage(data);
-        } catch (error) {
-          console.error('Error processing WebSocket message:', error);
-          if (onError) onError(error);
-        }
-      };
-
-      ws.onerror = (error) => {
-        console.error('WebSocket error:', error);
-        if (onError) onError(error);
-      };
-
-      ws.onclose = (event) => {
-        console.log(`WebSocket connection closed with code ${event.code}: ${event.reason}`);
-
-        if (heartbeatInterval) {
-          clearInterval(heartbeatInterval);
-          heartbeatInterval = null;
-        }
-
-        if (!isIntentionallyClosed) {
-          // Attempt to reconnect if not intentionally closed
-          reconnectAttempts++;
-
-          if (reconnectAttempts <= WS_CONFIG.maxReconnectAttempts) {
-            const delay = getReconnectDelay();
-            console.log(`Attempting to reconnect in ${Math.round(delay / 1000)} seconds (attempt ${reconnectAttempts}/${WS_CONFIG.maxReconnectAttempts})...`);
-
-            if (reconnectTimeout) clearTimeout(reconnectTimeout);
-            reconnectTimeout = setTimeout(connect, delay);
-
-            if (onDisconnected) onDisconnected();
-          } else {
-            console.error(`Max reconnection attempts (${WS_CONFIG.maxReconnectAttempts}) reached. Giving up.`);
-          }
-        }
-      };
-    } catch (error) {
-      console.error('Error setting up WebSocket:', error);
-      if (onError) onError(error);
-
-      // Still try to reconnect on setup error
-      if (!isIntentionallyClosed && reconnectAttempts <= WS_CONFIG.maxReconnectAttempts) {
-        reconnectAttempts++;
-        const delay = getReconnectDelay();
-        console.log(`Error during setup. Retrying in ${Math.round(delay / 1000)} seconds (attempt ${reconnectAttempts}/${WS_CONFIG.maxReconnectAttempts})...`);
-
-        if (reconnectTimeout) clearTimeout(reconnectTimeout);
-        reconnectTimeout = setTimeout(connect, delay);
-      }
-    }
-  };
-
-  // Initial connection
-  connect();
-
-  // Return interface
-  return {
-    close: () => {
-      isIntentionallyClosed = true;
-      if (reconnectTimeout) {
-        clearTimeout(reconnectTimeout);
-        reconnectTimeout = null;
-      }
-      if (heartbeatInterval) {
-        clearInterval(heartbeatInterval);
-        heartbeatInterval = null;
-      }
-      if (ws) {
-        ws.close();
-      }
+  
+  // Create STOMP client with custom sockjs and auth headers
+  const client = new Client({
+    // Custom websocket factory
+    webSocketFactory: createWebSocket,
+    
+    // Connection headers for STOMP protocol - use the token here
+    connectHeaders: {
+      Authorization: `Bearer ${token}`
     },
-    send: (data: any) => {
-      const message = typeof data === 'string' ? data : JSON.stringify(data);
+    
+    // Debug settings
+    debug: WS_CONFIG.debug ? console.log : () => {},
+    
+    // Reconnection settings
+    reconnectDelay: WS_CONFIG.reconnectTimeMin,
+    heartbeatIncoming: WS_CONFIG.heartbeatInterval,
+    heartbeatOutgoing: WS_CONFIG.heartbeatInterval
+  });
 
-      if (ws && ws.readyState === WebSocket.OPEN) {
-        ws.send(message);
-      } else {
-        // Queue message for later if not connected
-        messageQueue.push(message);
-        console.warn('WebSocket not connected. Message queued for later delivery.');
-      }
-    },
-    isConnected: () => !!(ws && ws.readyState === WebSocket.OPEN),
-    reconnect: () => {
-      reconnectAttempts = 0; // Reset attempts on manual reconnect
-      connect();
-    }
+  // Connection established
+  client.onConnect = (frame) => {
+    console.log('STOMP connection established successfully!', frame);
+    if (onConnect) onConnect();
   };
+
+  // Connection error
+  client.onStompError = (frame) => {
+    console.error('STOMP protocol error:', frame.headers, frame.body);
+  };
+
+  // Connection lost
+  client.onWebSocketClose = (event) => {
+    console.log(`WebSocket connection closed: code=${event.code}, reason=${event.reason}`);
+    if (onDisconnect) onDisconnect();
+  };
+
+  return client;
 };
 
 export const energyWebSocket = {
+  /**
+   * Create a system-wide energy monitoring connection for admins
+   */
   createSystemMonitor: (
     onMessage: (data: any) => void,
     onError?: (error: any) => void,
     onConnected?: () => void,
     onDisconnected?: () => void
   ) => {
-    const wsUrl = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:8080/ws';
-    return createReconnectingWebSocket(
-      `${wsUrl}/energy-monitoring`,
-      onMessage,
-      onError,
-      onConnected,
-      onDisconnected
-    );
+    try {
+      // Create STOMP client
+      const client = createStompClient(onConnected, onDisconnected);
+      if (!client) return { close: () => {}, isConnected: () => false };
+      
+      // Subscribe to the admin system update topic
+      client.onConnect = () => {
+        // Subscribe to admin system-wide updates
+        client.subscribe('/topic/admin/system-update', (message) => {
+          try {
+            const data = JSON.parse(message.body);
+            onMessage(data);
+          } catch (error) {
+            console.error('Error processing WebSocket message:', error);
+            if (onError) onError(error);
+          }
+        });
+        
+        // Notify connected callback
+        if (onConnected) onConnected();
+      };
+
+      // Activate the client
+      client.activate();
+
+      // Return interface for controlling the connection
+      return {
+        close: () => {
+          client.deactivate();
+        },
+        isConnected: () => client.connected,
+      };
+    } catch (error) {
+      console.error('Error setting up WebSocket:', error);
+      if (onError) onError(error);
+      return {
+        close: () => {},
+        isConnected: () => false,
+      };
+    }
   },
 
+  /**
+   * Create an installation-specific monitoring connection
+   */
   createInstallationMonitor: (
     installationId: string,
     onMessage: (data: any) => void,
@@ -210,29 +169,117 @@ export const energyWebSocket = {
     onConnected?: () => void,
     onDisconnected?: () => void
   ) => {
-    const wsUrl = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:8080/ws';
-    return createReconnectingWebSocket(
-      `${wsUrl}/installation/${installationId}`,
-      onMessage,
-      onError,
-      onConnected,
-      onDisconnected
-    );
+    try {
+      // Create STOMP client
+      const client = createStompClient(onConnected, onDisconnected);
+      if (!client) return { close: () => {}, isConnected: () => false };
+      
+      // Subscribe to the specific installation's topics
+      client.onConnect = () => {
+        // Energy data updates
+        client.subscribe(`/topic/installation/${installationId}/energy-data`, (message) => {
+          try {
+            const data = JSON.parse(message.body);
+            onMessage({ type: 'energy-data', data });
+          } catch (error) {
+            console.error('Error processing energy data message:', error);
+            if (onError) onError(error);
+          }
+        });
+        
+        // Status updates
+        client.subscribe(`/topic/installation/${installationId}/status`, (message) => {
+          try {
+            const data = JSON.parse(message.body);
+            onMessage({ type: 'status', data });
+          } catch (error) {
+            console.error('Error processing status message:', error);
+            if (onError) onError(error);
+          }
+        });
+        
+        // Tamper alerts
+        client.subscribe(`/topic/installation/${installationId}/tamper-alert`, (message) => {
+          try {
+            const data = JSON.parse(message.body);
+            onMessage({ type: 'tamper-alert', data });
+          } catch (error) {
+            console.error('Error processing tamper alert message:', error);
+            if (onError) onError(error);
+          }
+        });
+        
+        // Notify connected callback
+        if (onConnected) onConnected();
+      };
+
+      // Activate the client
+      client.activate();
+
+      // Return interface for controlling the connection
+      return {
+        close: () => {
+          client.deactivate();
+        },
+        isConnected: () => client.connected,
+      };
+    } catch (error) {
+      console.error('Error setting up WebSocket:', error);
+      if (onError) onError(error);
+      return {
+        close: () => {},
+        isConnected: () => false,
+      };
+    }
   },
 
+  /**
+   * Create a security alerts monitoring connection
+   */
   createAlertsMonitor: (
     onMessage: (data: any) => void,
     onError?: (error: any) => void,
     onConnected?: () => void,
     onDisconnected?: () => void
   ) => {
-    const wsUrl = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:8080/ws';
-    return createReconnectingWebSocket(
-      `${wsUrl}/alerts`,
-      onMessage,
-      onError,
-      onConnected,
-      onDisconnected
-    );
+    try {
+      // Create STOMP client
+      const client = createStompClient(onConnected, onDisconnected);
+      if (!client) return { close: () => {}, isConnected: () => false };
+      
+      // Subscribe to the admin tamper alerts topic
+      client.onConnect = () => {
+        client.subscribe('/topic/admin/tamper-alerts', (message) => {
+          try {
+            const data = JSON.parse(message.body);
+            onMessage(data);
+          } catch (error) {
+            console.error('Error processing tamper alert message:', error);
+            if (onError) onError(error);
+          }
+        });
+        
+        // Notify connected callback
+        if (onConnected) onConnected();
+      };
+
+      // Activate the client
+      client.activate();
+
+      // Return interface for controlling the connection
+      return {
+        close: () => {
+          client.deactivate();
+        },
+        isConnected: () => client.connected,
+      };
+    } catch (error) {
+      console.error('Error setting up WebSocket:', error);
+      if (onError) onError(error);
+      return {
+        close: () => {},
+        isConnected: () => false,
+      };
+    }
   }
-}; 
+};

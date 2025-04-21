@@ -829,6 +829,16 @@ export const energyApi = {
     }
   },
 
+  getSystemOverview: async () => {
+    try {
+      const response = await apiClient.get('/monitoring/installations/overview');
+      return response.data;
+    } catch (error: any) {
+      console.error("Error fetching system overview:", error.message);
+      return null;
+    }
+  },
+
   getCustomerDashboard: async (customerId: string) => {
     try {
       const response = await apiClient.get(`/monitoring/dashboard/customer/${customerId}`);

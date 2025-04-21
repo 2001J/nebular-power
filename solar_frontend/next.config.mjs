@@ -21,6 +21,21 @@ const nextConfig = {
     parallelServerBuildTraces: true,
     parallelServerCompiles: true,
   },
+  webpack: (config, { isServer }) => {
+    // Fix for NodeJS modules used in browser context
+    if (!isServer) {
+      config.resolve.fallback = {
+        ...config.resolve.fallback,
+        fs: false,
+        net: false,
+        tls: false,
+        "supports-color": false,
+        child_process: false,
+      };
+    }
+
+    return config;
+  },
 }
 
 if (userConfig) {

@@ -89,7 +89,7 @@ export default function EnergyMonitoringPage() {
         setLoading(true)
 
         // Get system overview data
-        const systemResponse = await installationApi.getSystemOverview()
+        const systemResponse = await energyApi.getSystemOverview()
 
         if (systemResponse) {
           setSystemOverview(systemResponse)
@@ -101,39 +101,29 @@ export default function EnergyMonitoringPage() {
           setTotalProductionYear(systemResponse.yearToDateGenerationKWh || 0)
           setAverageEfficiency(systemResponse.averageSystemEfficiency || 0)
 
-          // Get energy data for the selected time range
-          let energyResponse
-          switch (timeRange) {
-            case 'day':
-              energyResponse = await energyApi.getSystemEnergyData('day')
-              break
-            case 'week':
-              energyResponse = await energyApi.getSystemEnergyData('week')
-              break
-            case 'month':
-              energyResponse = await energyApi.getSystemEnergyData('month')
-              break
-            case 'year':
-              energyResponse = await energyApi.getSystemEnergyData('year')
-              break
-            default:
-              energyResponse = await energyApi.getSystemEnergyData('week')
-          }
-
-          if (energyResponse && Array.isArray(energyResponse)) {
-            setEnergyData(energyResponse)
+          // Extract energy data from the system overview
+          // This uses the data already available in the system overview response
+          // instead of making a separate call to getSystemEnergyData
+          if (systemResponse.energyData && systemResponse.energyData[timeRange]) {
+            setEnergyData(systemResponse.energyData[timeRange])
+          } else if (systemResponse.energyDataByTimeRange && systemResponse.energyDataByTimeRange[timeRange]) {
+            // Alternative property name
+            setEnergyData(systemResponse.energyDataByTimeRange[timeRange])
           } else {
-            // Set empty array if no data is available
+            // If no specific time range data is available, use a default empty array
             setEnergyData([])
           }
 
           // Get top producing installations
-          const topProducersResponse = await installationApi.getTopProducers()
-          if (topProducersResponse && Array.isArray(topProducersResponse)) {
-            setTopProducers(topProducersResponse.slice(0, 5))
+          // Use data from the system overview instead of making a separate call
+          if (systemResponse.topProducingInstallations && Array.isArray(systemResponse.topProducingInstallations)) {
+            setTopProducers(systemResponse.topProducingInstallations.slice(0, 5))
           } else {
-            // Set empty array if no top producers data is available
-            setTopProducers([])
+            // If no top producers in the overview, use the active installations as fallback
+            const sortedInstallations = [...(systemResponse.recentlyActiveInstallations || [])]
+              .sort((a, b) => (b.totalProduction || 0) - (a.totalProduction || 0))
+              .slice(0, 5)
+            setTopProducers(sortedInstallations)
           }
         } else {
           setSystemOverview(null)
@@ -306,7 +296,7 @@ export default function EnergyMonitoringPage() {
             setTimeout(async () => {
               try {
                 // Get system overview data
-                const systemResponse = await installationApi.getSystemOverview();
+                const systemResponse = await energyApi.getSystemOverview();
                 if (systemResponse) {
                   setSystemOverview(systemResponse);
                   setInstallations(systemResponse.recentlyActiveInstallations || []);
@@ -314,35 +304,25 @@ export default function EnergyMonitoringPage() {
                   setTotalProductionMonth(systemResponse.monthToDateGenerationKWh || 0);
                   setTotalProductionYear(systemResponse.yearToDateGenerationKWh || 0);
                   setAverageEfficiency(systemResponse.averageSystemEfficiency || 0);
-                }
 
-                // Get energy data for the selected time range
-                let energyResponse;
-                switch (timeRange) {
-                  case 'day':
-                    energyResponse = await energyApi.getSystemEnergyData('day');
-                    break;
-                  case 'week':
-                    energyResponse = await energyApi.getSystemEnergyData('week');
-                    break;
-                  case 'month':
-                    energyResponse = await energyApi.getSystemEnergyData('month');
-                    break;
-                  case 'year':
-                    energyResponse = await energyApi.getSystemEnergyData('year');
-                    break;
-                  default:
-                    energyResponse = await energyApi.getSystemEnergyData('week');
-                }
+                  // Extract energy data from the system overview
+                  if (systemResponse.energyData && systemResponse.energyData[timeRange]) {
+                    setEnergyData(systemResponse.energyData[timeRange]);
+                  } else if (systemResponse.energyDataByTimeRange && systemResponse.energyDataByTimeRange[timeRange]) {
+                    setEnergyData(systemResponse.energyDataByTimeRange[timeRange]);
+                  } else {
+                    setEnergyData([]);
+                  }
 
-                if (energyResponse && Array.isArray(energyResponse)) {
-                  setEnergyData(energyResponse);
-                }
-
-                // Get top producing installations
-                const topProducersResponse = await installationApi.getTopProducers();
-                if (topProducersResponse && Array.isArray(topProducersResponse)) {
-                  setTopProducers(topProducersResponse.slice(0, 5));
+                  // Get top producing installations from system overview
+                  if (systemResponse.topProducingInstallations && Array.isArray(systemResponse.topProducingInstallations)) {
+                    setTopProducers(systemResponse.topProducingInstallations.slice(0, 5));
+                  } else {
+                    const sortedInstallations = [...(systemResponse.recentlyActiveInstallations || [])]
+                      .sort((a, b) => (b.totalProduction || 0) - (a.totalProduction || 0))
+                      .slice(0, 5);
+                    setTopProducers(sortedInstallations);
+                  }
                 }
 
                 toast({
@@ -686,4 +666,4 @@ export default function EnergyMonitoringPage() {
       </Card>
     </div>
   )
-} 
+}

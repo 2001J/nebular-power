@@ -129,11 +129,11 @@ export default function DashboardPage() {
   // Process energy readings for chart display
   const processedEnergyData = energyReadings.map((reading) => ({
     time: new Date(reading.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-    production: reading.energyProduction || 0, // Ensure non-null value
-    consumption: reading.energyConsumption || 0, // Ensure non-null value
-    selfConsumption: Math.min(reading.energyProduction || 0, reading.energyConsumption || 0),
-    export: Math.max(0, (reading.energyProduction || 0) - (reading.energyConsumption || 0)),
-    import: Math.max(0, (reading.energyConsumption || 0) - (reading.energyProduction || 0)),
+    production: reading.powerGenerationWatts / 1000 || 0, // Convert watts to kW
+    consumption: reading.powerConsumptionWatts / 1000 || 0, // Convert watts to kW
+    selfConsumption: Math.min(reading.powerGenerationWatts / 1000 || 0, reading.powerConsumptionWatts / 1000 || 0),
+    export: Math.max(0, (reading.powerGenerationWatts / 1000 || 0) - (reading.powerConsumptionWatts / 1000 || 0)),
+    import: Math.max(0, (reading.powerConsumptionWatts / 1000 || 0) - (reading.powerGenerationWatts / 1000 || 0)),
     batteryLevel: reading.batteryLevel || 0,
   }))
 
