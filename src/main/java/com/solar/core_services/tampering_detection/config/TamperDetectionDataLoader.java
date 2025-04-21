@@ -62,6 +62,7 @@ public class TamperDetectionDataLoader implements CommandLineRunner {
         installation1.setLocation("123 Main St, Anytown, USA");
         installation1.setCapacity(5.5);
         installation1.setInstalledCapacityKW(5.5);
+        installation1.setType(SolarInstallation.InstallationType.RESIDENTIAL);
         installation1.setInstallationDate(LocalDateTime.now().minusMonths(6));
         installation1.setStatus(SolarInstallation.InstallationStatus.ACTIVE);
         installation1.setUser(customer1); // Associate with customer1
@@ -71,6 +72,7 @@ public class TamperDetectionDataLoader implements CommandLineRunner {
         installation2.setLocation("456 Business Ave, Anytown, USA");
         installation2.setCapacity(25.0);
         installation2.setInstalledCapacityKW(25.0);
+        installation2.setType(SolarInstallation.InstallationType.COMMERCIAL);
         installation2.setInstallationDate(LocalDateTime.now().minusMonths(3));
         installation2.setStatus(SolarInstallation.InstallationStatus.ACTIVE);
         installation2.setUser(customer2); // Associate with customer2
@@ -83,6 +85,11 @@ public class TamperDetectionDataLoader implements CommandLineRunner {
             tamperDetectionService.startMonitoring(installation.getId());
         }
 
+        /* 
+         * COMMENTED OUT: Sample tamper events creation
+         * These events will now be generated through the Pi simulation for more realistic data
+         */
+        /*
         // Create sample tamper events
         TamperEvent event1 = new TamperEvent();
         event1.setInstallation(installation1);
@@ -121,6 +128,7 @@ public class TamperDetectionDataLoader implements CommandLineRunner {
         event3.setStatus(TamperEvent.TamperEventStatus.NEW);
 
         tamperEventRepository.saveAll(Arrays.asList(event1, event2, event3));
+        */
 
         // Update alert configurations with custom settings
         Optional<AlertConfig> config1Opt = alertConfigRepository.findByInstallation(installation1);
