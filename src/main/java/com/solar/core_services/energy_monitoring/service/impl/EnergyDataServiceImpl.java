@@ -223,13 +223,14 @@ public class EnergyDataServiceImpl implements EnergyDataService {
                 .id(installation.getId())
                 .userId(installation.getUser().getId())
                 .username(installation.getUser().getEmail())
-                .name(installation.getName()) // Fixed: Add the installation name
+                .name(installation.getName())
                 .installedCapacityKW(installation.getInstalledCapacityKW())
                 .location(installation.getLocation())
                 .installationDate(installation.getInstallationDate())
                 .status(installation.getStatus())
                 .tamperDetected(installation.isTamperDetected())
                 .lastTamperCheck(installation.getLastTamperCheck())
+                .type(installation.getType()) // Added the installation type here
                 .build();
     }
 }
