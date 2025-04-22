@@ -20,10 +20,12 @@ public class DashboardResponse {
     private double todayConsumptionKWh;
     private double monthToDateGenerationKWh;
     private double monthToDateConsumptionKWh;
+    private double yearToDateGenerationKWh;
+    private double yearToDateConsumptionKWh;
     private double lifetimeGenerationKWh;
     private double lifetimeConsumptionKWh;
     private double currentEfficiencyPercentage;
     private LocalDateTime lastUpdated;
     private List<EnergyDataDTO> recentReadings;
     private SolarInstallationDTO installationDetails;
-} 
+}

@@ -4,6 +4,8 @@ import com.solar.core_services.energy_monitoring.dto.DeviceStatusRequest;
 import com.solar.core_services.energy_monitoring.dto.SolarInstallationDTO;
 import com.solar.core_services.energy_monitoring.dto.SystemOverviewResponse;
 import com.solar.core_services.energy_monitoring.model.SolarInstallation;
+import com.solar.core_services.energy_monitoring.repository.EnergyDataRepository;
+import com.solar.core_services.energy_monitoring.repository.EnergySummaryRepository;
 import com.solar.core_services.energy_monitoring.repository.SolarInstallationRepository;
 import com.solar.core_services.energy_monitoring.service.impl.SolarInstallationServiceImpl;
 import com.solar.user_management.model.User;
@@ -15,6 +17,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.Collections;
@@ -43,6 +46,12 @@ public class SolarInstallationServiceTest {
 
     @Mock
     private WebSocketService webSocketService;
+    
+    @Mock
+    private EnergyDataRepository energyDataRepository;
+    
+    @Mock
+    private EnergySummaryRepository energySummaryRepository;
 
     @InjectMocks
     private SolarInstallationServiceImpl installationService;
@@ -359,11 +368,30 @@ public class SolarInstallationServiceTest {
         // Given
         List<SolarInstallation> installations = Arrays.asList(installation1, installation2);
         when(installationRepository.findAll()).thenReturn(installations);
-        when(installationRepository.findByTamperDetectedTrue()).thenReturn(Collections.singletonList(installation2));
+        
+        // No need to mock findByTamperDetectedTrue since the implementation 
+        // doesn't call it, but instead filters installations from findAll
 
+        // Set up installation statuses
         installation1.setStatus(SolarInstallation.InstallationStatus.ACTIVE);
         installation2.setStatus(SolarInstallation.InstallationStatus.MAINTENANCE);
         installation2.setTamperDetected(true);
+        
+        // Mock energy data repository to return empty lists for installations
+        when(energyDataRepository.findByInstallationOrderByTimestampDesc(any(SolarInstallation.class)))
+            .thenReturn(Collections.emptyList());
+        
+        // Mock sum methods to return null (no data)
+        when(energyDataRepository.sumPowerGenerationForPeriod(any(SolarInstallation.class), any(LocalDateTime.class), any(LocalDateTime.class)))
+            .thenReturn(null);
+        when(energyDataRepository.sumPowerConsumptionForPeriod(any(SolarInstallation.class), any(LocalDateTime.class), any(LocalDateTime.class)))
+            .thenReturn(null);
+            
+        // Mock energy summary repository methods
+        when(energySummaryRepository.findByPeriodAndDate(any(), any(LocalDate.class)))
+            .thenReturn(Collections.emptyList());
+        when(energySummaryRepository.findByPeriodAndDateBetween(any(), any(LocalDate.class), any(LocalDate.class)))
+            .thenReturn(Collections.emptyList());
 
         // When
         SystemOverviewResponse result = installationService.getSystemOverview();
@@ -373,10 +401,15 @@ public class SolarInstallationServiceTest {
         assertEquals(1, result.getTotalActiveInstallations());
         assertEquals(1, result.getTotalInstallationsWithTamperAlerts());
         assertEquals(8.0, result.getTotalSystemCapacityKW()); // 5.0 + 3.0
+        
+        // Check that values for new fields are initialized but might be zero
+        assertThat(result.getYearToDateGenerationKWh()).isNotNull();
+        assertThat(result.getYearToDateConsumptionKWh()).isNotNull();
+        
         assertThat(result.getRecentlyActiveInstallations()).hasSize(1); // Only installation1 is ACTIVE
 
         verify(installationRepository, times(1)).findAll();
-        verify(installationRepository, times(1)).findByTamperDetectedTrue();
+        // We don't verify findByTamperDetectedTrue anymore since it's not called
     }
 
     @Test

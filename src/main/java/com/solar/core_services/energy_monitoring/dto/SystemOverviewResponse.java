@@ -22,7 +22,12 @@ public class SystemOverviewResponse {
     private double todayTotalConsumptionKWh;
     private double monthToDateGenerationKWh;
     private double monthToDateConsumptionKWh;
+    private double yearToDateGenerationKWh;
+    private double yearToDateConsumptionKWh;
     private double averageSystemEfficiency;
     private LocalDateTime lastUpdated;
     private List<SolarInstallationDTO> recentlyActiveInstallations;
-} 
+    
+    // New field to hold recent readings from all installations with timestamps preserved
+    private List<EnergyReadingDTO> recentInstallationReadings;
+}

@@ -3,6 +3,7 @@ package com.solar.core_services.energy_monitoring.controller;
 import com.solar.core_services.energy_monitoring.dto.DashboardResponse;
 import com.solar.core_services.energy_monitoring.dto.EnergyDataDTO;
 import com.solar.core_services.energy_monitoring.dto.EnergyDataRequest;
+import com.solar.core_services.energy_monitoring.dto.EnergyReadingBatchDTO;
 import com.solar.core_services.energy_monitoring.service.EnergyDataService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -28,6 +29,12 @@ public class EnergyDataController {
     @Operation(summary = "Submit energy reading data", description = "Endpoint for devices to submit energy readings")
     public ResponseEntity<EnergyDataDTO> submitEnergyReading(@Valid @RequestBody EnergyDataRequest request) {
         return ResponseEntity.ok(energyDataService.processEnergyData(request));
+    }
+
+    @PostMapping("/readings/batch")
+    @Operation(summary = "Submit batch of energy readings", description = "Endpoint for devices to submit multiple timestamped readings at once")
+    public ResponseEntity<List<EnergyDataDTO>> submitEnergyReadingBatch(@Valid @RequestBody EnergyReadingBatchDTO batchRequest) {
+        return ResponseEntity.ok(energyDataService.processEnergyDataBatch(batchRequest));
     }
 
     @GetMapping("/dashboard/customer/{customerId}")

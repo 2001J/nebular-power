@@ -112,6 +112,8 @@ public class SolarInstallationControllerTest {
                                 .todayTotalConsumptionKWh(20.0)
                                 .monthToDateGenerationKWh(750.0)
                                 .monthToDateConsumptionKWh(600.0)
+                                .yearToDateGenerationKWh(9000.0)
+                                .yearToDateConsumptionKWh(7500.0)
                                 .averageSystemEfficiency(0.85)
                                 .lastUpdated(now)
                                 .recentlyActiveInstallations(Arrays.asList(installationDTO1, installationDTO2))

@@ -3,6 +3,7 @@ package com.solar.core_services.energy_monitoring.service;
 import com.solar.core_services.energy_monitoring.dto.DashboardResponse;
 import com.solar.core_services.energy_monitoring.dto.EnergyDataDTO;
 import com.solar.core_services.energy_monitoring.dto.EnergyDataRequest;
+import com.solar.core_services.energy_monitoring.dto.EnergyReadingBatchDTO;
 import com.solar.core_services.energy_monitoring.model.EnergyData;
 
 import java.time.LocalDateTime;
@@ -15,6 +16,13 @@ public interface EnergyDataService {
      * @return The stored energy data
      */
     EnergyDataDTO processEnergyData(EnergyDataRequest request);
+    
+    /**
+     * Process and store a batch of energy readings with their original timestamps
+     * @param batchRequest The batch of readings from the device
+     * @return List of processed and stored energy data
+     */
+    List<EnergyDataDTO> processEnergyDataBatch(EnergyReadingBatchDTO batchRequest);
     
     /**
      * Get recent energy readings for a specific installation
@@ -53,4 +61,4 @@ public interface EnergyDataService {
      * @return The energy data with calculated metrics
      */
     EnergyData calculateDerivedMetrics(EnergyData energyData);
-} 
+}

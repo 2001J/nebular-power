@@ -52,4 +52,16 @@ public interface EnergySummaryRepository extends JpaRepository<EnergySummary, Lo
         LocalDate startDate, 
         LocalDate endDate
     );
-} 
+    
+    // New methods to support system overview
+    List<EnergySummary> findByPeriodAndDate(
+        EnergySummary.SummaryPeriod period,
+        LocalDate date
+    );
+    
+    List<EnergySummary> findByPeriodAndDateBetween(
+        EnergySummary.SummaryPeriod period,
+        LocalDate startDate,
+        LocalDate endDate
+    );
+}

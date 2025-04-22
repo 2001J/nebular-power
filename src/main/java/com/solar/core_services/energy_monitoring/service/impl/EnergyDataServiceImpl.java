@@ -3,6 +3,7 @@ package com.solar.core_services.energy_monitoring.service.impl;
 import com.solar.core_services.energy_monitoring.dto.DashboardResponse;
 import com.solar.core_services.energy_monitoring.dto.EnergyDataDTO;
 import com.solar.core_services.energy_monitoring.dto.EnergyDataRequest;
+import com.solar.core_services.energy_monitoring.dto.EnergyReadingBatchDTO;
 import com.solar.core_services.energy_monitoring.dto.SolarInstallationDTO;
 import com.solar.core_services.energy_monitoring.model.EnergyData;
 import com.solar.core_services.energy_monitoring.model.SolarInstallation;
@@ -65,6 +66,54 @@ public class EnergyDataServiceImpl implements EnergyDataService {
         webSocketService.sendEnergyDataUpdate(installation.getId(), energyDataDTO);
 
         return energyDataDTO;
+    }
+
+    @Override
+    @Transactional
+    public List<EnergyDataDTO> processEnergyDataBatch(EnergyReadingBatchDTO batchRequest) {
+        // Verify the installation exists
+        SolarInstallation installation = installationRepository.findById(batchRequest.getInstallationId())
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Solar installation not found with ID: " + batchRequest.getInstallationId()));
+        
+        // Process each reading in the batch
+        List<EnergyData> processedReadings = batchRequest.getReadings().stream()
+                .map(reading -> {
+                    // Create energy data from reading
+                    EnergyData energyData = new EnergyData();
+                    energyData.setInstallation(installation);
+                    energyData.setPowerGenerationWatts(reading.getEnergyProduced());
+                    energyData.setPowerConsumptionWatts(reading.getEnergyConsumed());
+                    energyData.setTimestamp(reading.getTimestamp());
+                    
+                    // Set other fields if available
+                    // Note: Battery level is not currently supported in the EnergyData entity
+                    // if (reading.getBatteryLevel() != null) {
+                    //     energyData.setBatteryLevelPercentage(reading.getBatteryLevel());
+                    // }
+                    
+                    // Flag as simulated for now
+                    energyData.setSimulated(true);
+                    
+                    // Calculate derived metrics
+                    return calculateDerivedMetrics(energyData);
+                })
+                .collect(Collectors.toList());
+        
+        // Save all readings in batch
+        List<EnergyData> savedReadings = energyDataRepository.saveAll(processedReadings);
+        
+        // Convert to DTOs and send WebSocket updates
+        List<EnergyDataDTO> responseList = savedReadings.stream()
+                .map(data -> {
+                    EnergyDataDTO dto = convertToDTO(data);
+                    // Send real-time update via WebSocket for each reading
+                    webSocketService.sendEnergyDataUpdate(installation.getId(), dto);
+                    return dto;
+                })
+                .collect(Collectors.toList());
+        
+        return responseList;
     }
 
     @Override
@@ -144,6 +193,9 @@ public class EnergyDataServiceImpl implements EnergyDataService {
         // Get month-to-date data
         LocalDateTime startOfMonth = LocalDateTime.of(LocalDate.now().withDayOfMonth(1), LocalTime.MIDNIGHT);
 
+        // Get year-to-date data
+        LocalDateTime startOfYear = LocalDateTime.of(LocalDate.now().withDayOfYear(1), LocalTime.MIDNIGHT);
+
         // Calculate current values
         double currentPowerGeneration = recentReadings.isEmpty() ? 0 : recentReadings.get(0).getPowerGenerationWatts();
         double currentPowerConsumption = recentReadings.isEmpty() ? 0
@@ -159,6 +211,10 @@ public class EnergyDataServiceImpl implements EnergyDataService {
         Double monthToDateConsumption = energyDataRepository.sumPowerConsumptionForPeriod(installation, startOfMonth,
                 endOfDay);
 
+        // Calculate year-to-date generation and consumption
+        Double yearToDateGeneration = energyDataRepository.sumPowerGenerationForPeriod(installation, startOfYear, endOfDay);
+        Double yearToDateConsumption = energyDataRepository.sumPowerConsumptionForPeriod(installation, startOfYear, endOfDay);
+
         // Convert kWh values (assuming readings are in watts and timestamps are in
         // seconds)
         double todayGenerationKWh = (todayGeneration != null ? todayGeneration : 0) / 1000.0 / 3600.0;
@@ -166,6 +222,8 @@ public class EnergyDataServiceImpl implements EnergyDataService {
         double monthToDateGenerationKWh = (monthToDateGeneration != null ? monthToDateGeneration : 0) / 1000.0 / 3600.0;
         double monthToDateConsumptionKWh = (monthToDateConsumption != null ? monthToDateConsumption : 0) / 1000.0
                 / 3600.0;
+        double yearToDateGenerationKWh = (yearToDateGeneration != null ? yearToDateGeneration : 0) / 1000.0 / 3600.0;
+        double yearToDateConsumptionKWh = (yearToDateConsumption != null ? yearToDateConsumption : 0) / 1000.0 / 3600.0;
 
         // Calculate efficiency
         double currentEfficiency = 0;
@@ -182,9 +240,10 @@ public class EnergyDataServiceImpl implements EnergyDataService {
                 .todayConsumptionKWh(todayConsumptionKWh)
                 .monthToDateGenerationKWh(monthToDateGenerationKWh)
                 .monthToDateConsumptionKWh(monthToDateConsumptionKWh)
+                .yearToDateGenerationKWh(yearToDateGenerationKWh)
+                .yearToDateConsumptionKWh(yearToDateConsumptionKWh)
                 .lifetimeGenerationKWh(installation.getInstalledCapacityKW() * 24 * 30 * 12) // Placeholder calculation
-                .lifetimeConsumptionKWh(installation.getInstalledCapacityKW() * 24 * 30 * 12 * 0.8) // Placeholder
-                                                                                                    // calculation
+                .lifetimeConsumptionKWh(installation.getInstalledCapacityKW() * 24 * 30 * 12 * 0.8) // Placeholder calculation
                 .currentEfficiencyPercentage(currentEfficiency)
                 .lastUpdated(recentReadings.isEmpty() ? LocalDateTime.now() : recentReadings.get(0).getTimestamp())
                 .recentReadings(recentReadings.stream()
