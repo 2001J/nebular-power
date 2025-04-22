@@ -26,6 +26,40 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox"
 import { energyApi, installationApi } from "@/lib/api"
 
+// Define types for our dashboard data to match the actual API response format
+interface InstallationDetails {
+  id: number;
+  userId: number;
+  username: string;
+  name: string;
+  installedCapacityKW: number;
+  location: string;
+  installationDate: string;
+  status: string;
+  tamperDetected: boolean;
+  lastTamperCheck: string;
+  type: string;
+}
+
+interface InstallationDashboard {
+  installationId: number;
+  currentPowerGenerationWatts: number;
+  currentPowerConsumptionWatts: number;
+  todayGenerationKWh: number;
+  todayConsumptionKWh: number;
+  monthToDateGenerationKWh: number;
+  monthToDateConsumptionKWh: number;
+  lifetimeGenerationKWh: number;
+  lifetimeConsumptionKWh: number;
+  currentEfficiencyPercentage: number;
+  lastUpdated: string;
+  recentReadings: any[];
+  installationDetails: InstallationDetails;
+  
+  // We'll add computed properties for metrics that aren't directly in the API
+  // These will be calculated based on the available data
+}
+
 export default function DashboardPage() {
   const { user } = useAuth()
   const { toast } = useToast()
@@ -94,7 +128,24 @@ export default function DashboardPage() {
 
         // Fetch installation dashboard data
         const dashboardResponse = await energyApi.getInstallationDashboard(selectedInstallation)
-        setDashboardData(dashboardResponse)
+        
+        // Add calculated environmental impact values
+        const calculatedDashboard = {
+          ...dashboardResponse,
+          environmentalImpact: {
+            // Standard calculation: 0.85kg of CO2 saved per kWh of solar energy
+            co2Saved: dashboardResponse.lifetimeGenerationKWh * 0.85,
+            // Approximately 21kg of CO2 per year per tree
+            treesEquivalent: (dashboardResponse.lifetimeGenerationKWh * 0.85) / 21,
+            // Estimate carbon footprint reduction (varies by household size)
+            carbonFootprintReduction: 
+              dashboardResponse.installationDetails.type === "RESIDENTIAL" 
+                ? Math.min(100, (dashboardResponse.monthToDateGenerationKWh / 600) * 100) // Average home uses ~600 kWh/month
+                : Math.min(100, (dashboardResponse.monthToDateGenerationKWh / 2000) * 100) // Commercial estimate
+          }
+        }
+        
+        setDashboardData(calculatedDashboard)
 
         // Fetch recent energy readings
         const readingsResponse = await energyApi.getRecentReadings(selectedInstallation, 24) // Last 24 readings
@@ -233,7 +284,7 @@ export default function DashboardPage() {
               <CardContent className="p-4">
                 <div className="text-sm text-gray-500">Energy today</div>
                 <div className="text-3xl font-bold text-green-500">
-                  {dashboardData?.dailyEnergy || totalProduction} kWh
+                  {dashboardData?.todayGenerationKWh?.toFixed(2) || '0.00'} kWh
                 </div>
               </CardContent>
             </Card>
@@ -241,7 +292,7 @@ export default function DashboardPage() {
               <CardContent className="p-4">
                 <div className="text-sm text-gray-500">Energy this month</div>
                 <div className="text-3xl font-bold text-green-500">
-                  {dashboardData?.monthlyEnergy || '0.00'} kWh
+                  {dashboardData?.monthToDateGenerationKWh?.toFixed(2) || '0.00'} kWh
                 </div>
               </CardContent>
             </Card>
@@ -249,10 +300,10 @@ export default function DashboardPage() {
               <CardContent className="p-4">
                 <div className="text-sm text-gray-500">Lifetime energy</div>
                 <div className="text-3xl font-bold text-green-500">
-                  {dashboardData?.lifetimeEnergy ?
-                    (dashboardData.lifetimeEnergy >= 1000 ?
-                      (dashboardData.lifetimeEnergy / 1000).toFixed(2) + ' MWh' :
-                      dashboardData.lifetimeEnergy.toFixed(2) + ' kWh') :
+                  {dashboardData?.lifetimeGenerationKWh ?
+                    (dashboardData.lifetimeGenerationKWh >= 1000 ?
+                      (dashboardData.lifetimeGenerationKWh / 1000).toFixed(2) + ' MWh' :
+                      dashboardData.lifetimeGenerationKWh.toFixed(2) + ' kWh') :
                     '0.00 kWh'}
                 </div>
               </CardContent>
@@ -263,7 +314,9 @@ export default function DashboardPage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <Card className="border">
               <CardContent className="p-4 flex flex-col items-center">
-                <div className="text-xl font-bold">{currentProduction.toFixed(2)} kW</div>
+                <div className="text-xl font-bold">
+                  {(dashboardData?.currentPowerGenerationWatts / 1000 || 0).toFixed(2)} kW
+                </div>
                 <div className="my-4">
                   <Sun className="h-16 w-16 text-green-500" />
                 </div>
@@ -273,7 +326,9 @@ export default function DashboardPage() {
 
             <Card className="border">
               <CardContent className="p-4 flex flex-col items-center">
-                <div className="text-xl font-bold">{currentConsumption.toFixed(2)} kW</div>
+                <div className="text-xl font-bold">
+                  {(dashboardData?.currentPowerConsumptionWatts / 1000 || 0).toFixed(2)} kW
+                </div>
                 <div className="my-4 flex items-center">
                   <ArrowRight className="h-8 w-8 text-green-500 mr-2" />
                   <Home className="h-16 w-16 text-gray-700" />
@@ -284,7 +339,11 @@ export default function DashboardPage() {
 
             <Card className="border">
               <CardContent className="p-4 flex flex-col items-center">
-                <div className="text-xl font-bold">{currentExport.toFixed(2)} kW</div>
+                <div className="text-xl font-bold">
+                  {Math.max(0, 
+                    (dashboardData?.currentPowerGenerationWatts - dashboardData?.currentPowerConsumptionWatts) / 1000 || 0
+                  ).toFixed(2)} kW
+                </div>
                 <div className="my-4 flex items-center">
                   <ArrowRight className="h-8 w-8 text-green-500 mr-2" />
                   <Zap className="h-16 w-16 text-blue-500" />

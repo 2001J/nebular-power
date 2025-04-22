@@ -8,6 +8,37 @@ import { energyWebSocket } from "@/lib/energyWebSocket"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
+interface InstallationDetails {
+  id: number;
+  userId: number;
+  username: string;
+  name: string;
+  installedCapacityKW: number;
+  location: string;
+  installationDate: string;
+  status: string;
+  tamperDetected: boolean;
+  lastTamperCheck: string;
+  type: string;
+}
+
+interface SystemOverview {
+  totalActiveInstallations: number;
+  totalSuspendedInstallations: number;
+  totalInstallationsWithTamperAlerts: number;
+  totalSystemCapacityKW: number;
+  currentSystemGenerationWatts: number;
+  todayTotalGenerationKWh: number;
+  todayTotalConsumptionKWh: number;
+  monthToDateGenerationKWh: number;
+  monthToDateConsumptionKWh: number;
+  yearToDateGenerationKWh: number;
+  yearToDateConsumptionKWh: number;
+  averageSystemEfficiency: number;
+  lastUpdated: string;
+  recentlyActiveInstallations: InstallationDetails[];
+}
+
 interface AdminEnergyChartProps {
   type?: "production" | "consumption" | "revenue"
 }
@@ -214,7 +245,76 @@ export function AdminEnergyChart({ type = "production" }: AdminEnergyChartProps)
           </div>
         </div>
       )}
+
+      {/* Year-to-date metrics */}
+      {systemOverview && systemOverview.yearToDateGenerationKWh !== undefined && (
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6 p-4 border rounded-lg bg-card">
+          <div>
+            <div className="text-sm text-muted-foreground">Year-to-Date Generation</div>
+            <div className="text-2xl font-bold mt-1">
+              {systemOverview.yearToDateGenerationKWh >= 1000 
+                ? (systemOverview.yearToDateGenerationKWh / 1000).toFixed(2) + ' MWh' 
+                : systemOverview.yearToDateGenerationKWh.toFixed(1) + ' kWh'}
+            </div>
+          </div>
+          
+          <div>
+            <div className="text-sm text-muted-foreground">Year-to-Date Consumption</div>
+            <div className="text-2xl font-bold mt-1">
+              {systemOverview.yearToDateConsumptionKWh >= 1000 
+                ? (systemOverview.yearToDateConsumptionKWh / 1000).toFixed(2) + ' MWh' 
+                : systemOverview.yearToDateConsumptionKWh.toFixed(1) + ' kWh'}
+            </div>
+          </div>
+          
+          <div>
+            <div className="text-sm text-muted-foreground">System Efficiency</div>
+            <div className="text-2xl font-bold mt-1">
+              {systemOverview.averageSystemEfficiency?.toFixed(1) || '0.0'}%
+            </div>
+          </div>
+        </div>
+      )}
       
+      {/* Recently active installations */}
+      {systemOverview && systemOverview.recentlyActiveInstallations && systemOverview.recentlyActiveInstallations.length > 0 && (
+        <div className="mb-6 p-4 border rounded-lg bg-card">
+          <h3 className="text-base font-medium mb-3">Recently Active Installations</h3>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b">
+                  <th className="py-2 px-3 text-left">Name</th>
+                  <th className="py-2 px-3 text-left">Customer</th>
+                  <th className="py-2 px-3 text-left">Capacity</th>
+                  <th className="py-2 px-3 text-left">Type</th>
+                  <th className="py-2 px-3 text-left">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {systemOverview.recentlyActiveInstallations.map((installation) => (
+                  <tr key={installation.id} className="border-b hover:bg-muted/50">
+                    <td className="py-2 px-3">{installation.name}</td>
+                    <td className="py-2 px-3">{installation.username}</td>
+                    <td className="py-2 px-3">{installation.installedCapacityKW} kW</td>
+                    <td className="py-2 px-3">{installation.type}</td>
+                    <td className="py-2 px-3">
+                      <span className={`px-2 py-1 rounded-full text-xs ${
+                        installation.status === 'ACTIVE' 
+                          ? 'bg-green-100 text-green-800' 
+                          : 'bg-amber-100 text-amber-800'
+                      }`}>
+                        {installation.status}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
       <Chart>
         <ChartContainer>
           <ResponsiveContainer width="100%" height={350}>
