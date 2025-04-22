@@ -30,6 +30,8 @@ interface SystemOverview {
   currentSystemGenerationWatts: number;
   todayTotalGenerationKWh: number;
   todayTotalConsumptionKWh: number;
+  weekToDateGenerationKWh: number;
+  weekToDateConsumptionKWh: number;
   monthToDateGenerationKWh: number;
   monthToDateConsumptionKWh: number;
   yearToDateGenerationKWh: number;
@@ -37,6 +39,7 @@ interface SystemOverview {
   averageSystemEfficiency: number;
   lastUpdated: string;
   recentlyActiveInstallations: InstallationDetails[];
+  topProducers: InstallationDetails[];
 }
 
 interface AdminEnergyChartProps {
@@ -242,6 +245,29 @@ export function AdminEnergyChart({ type = "production" }: AdminEnergyChartProps)
           <div className="p-4 border rounded-lg bg-card">
             <div className="text-sm text-muted-foreground">Today's Consumption</div>
             <div className="text-2xl font-bold mt-1">{systemOverview.todayTotalConsumptionKWh?.toFixed(1) || 0} kWh</div>
+          </div>
+        </div>
+      )}
+
+      {/* Weekly metrics */}
+      {systemOverview && systemOverview.weekToDateGenerationKWh !== undefined && (
+        <div className="grid grid-cols-2 gap-4 mb-6 p-4 border rounded-lg bg-card">
+          <div>
+            <div className="text-sm text-muted-foreground">Week-to-Date Generation</div>
+            <div className="text-2xl font-bold mt-1">
+              {systemOverview.weekToDateGenerationKWh >= 1000 
+                ? (systemOverview.weekToDateGenerationKWh / 1000).toFixed(2) + ' MWh' 
+                : systemOverview.weekToDateGenerationKWh.toFixed(1) + ' kWh'}
+            </div>
+          </div>
+          
+          <div>
+            <div className="text-sm text-muted-foreground">Week-to-Date Consumption</div>
+            <div className="text-2xl font-bold mt-1">
+              {systemOverview.weekToDateConsumptionKWh >= 1000 
+                ? (systemOverview.weekToDateConsumptionKWh / 1000).toFixed(2) + ' MWh' 
+                : systemOverview.weekToDateConsumptionKWh.toFixed(1) + ' kWh'}
+            </div>
           </div>
         </div>
       )}
