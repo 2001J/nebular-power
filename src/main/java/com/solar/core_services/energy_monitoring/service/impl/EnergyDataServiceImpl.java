@@ -190,6 +190,9 @@ public class EnergyDataServiceImpl implements EnergyDataService {
         LocalDateTime startOfDay = LocalDateTime.of(LocalDate.now(), LocalTime.MIDNIGHT);
         LocalDateTime endOfDay = LocalDateTime.of(LocalDate.now(), LocalTime.MAX);
 
+        // Get week-to-date data
+        LocalDateTime startOfWeek = LocalDateTime.of(LocalDate.now().minusDays(LocalDate.now().getDayOfWeek().getValue() - 1), LocalTime.MIDNIGHT);
+
         // Get month-to-date data
         LocalDateTime startOfMonth = LocalDateTime.of(LocalDate.now().withDayOfMonth(1), LocalTime.MIDNIGHT);
 
@@ -205,6 +208,10 @@ public class EnergyDataServiceImpl implements EnergyDataService {
         Double todayGeneration = energyDataRepository.sumPowerGenerationForPeriod(installation, startOfDay, endOfDay);
         Double todayConsumption = energyDataRepository.sumPowerConsumptionForPeriod(installation, startOfDay, endOfDay);
 
+        // Calculate week-to-date generation and consumption
+        Double weekToDateGeneration = energyDataRepository.sumPowerGenerationForPeriod(installation, startOfWeek, endOfDay);
+        Double weekToDateConsumption = energyDataRepository.sumPowerConsumptionForPeriod(installation, startOfWeek, endOfDay);
+
         // Calculate month-to-date generation and consumption
         Double monthToDateGeneration = energyDataRepository.sumPowerGenerationForPeriod(installation, startOfMonth,
                 endOfDay);
@@ -215,10 +222,11 @@ public class EnergyDataServiceImpl implements EnergyDataService {
         Double yearToDateGeneration = energyDataRepository.sumPowerGenerationForPeriod(installation, startOfYear, endOfDay);
         Double yearToDateConsumption = energyDataRepository.sumPowerConsumptionForPeriod(installation, startOfYear, endOfDay);
 
-        // Convert kWh values (assuming readings are in watts and timestamps are in
-        // seconds)
+        // Convert kWh values (assuming readings are in watts and timestamps are in seconds)
         double todayGenerationKWh = (todayGeneration != null ? todayGeneration : 0) / 1000.0 / 3600.0;
         double todayConsumptionKWh = (todayConsumption != null ? todayConsumption : 0) / 1000.0 / 3600.0;
+        double weekToDateGenerationKWh = (weekToDateGeneration != null ? weekToDateGeneration : 0) / 1000.0 / 3600.0;
+        double weekToDateConsumptionKWh = (weekToDateConsumption != null ? weekToDateConsumption : 0) / 1000.0 / 3600.0;
         double monthToDateGenerationKWh = (monthToDateGeneration != null ? monthToDateGeneration : 0) / 1000.0 / 3600.0;
         double monthToDateConsumptionKWh = (monthToDateConsumption != null ? monthToDateConsumption : 0) / 1000.0
                 / 3600.0;
@@ -238,6 +246,8 @@ public class EnergyDataServiceImpl implements EnergyDataService {
                 .currentPowerConsumptionWatts(currentPowerConsumption)
                 .todayGenerationKWh(todayGenerationKWh)
                 .todayConsumptionKWh(todayConsumptionKWh)
+                .weekToDateGenerationKWh(weekToDateGenerationKWh)
+                .weekToDateConsumptionKWh(weekToDateConsumptionKWh)
                 .monthToDateGenerationKWh(monthToDateGenerationKWh)
                 .monthToDateConsumptionKWh(monthToDateConsumptionKWh)
                 .yearToDateGenerationKWh(yearToDateGenerationKWh)

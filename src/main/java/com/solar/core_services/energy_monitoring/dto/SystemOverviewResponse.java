@@ -7,6 +7,7 @@ import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 
 @Data
 @Builder
@@ -20,6 +21,8 @@ public class SystemOverviewResponse {
     private double currentSystemGenerationWatts;
     private double todayTotalGenerationKWh;
     private double todayTotalConsumptionKWh;
+    private double weekToDateGenerationKWh;
+    private double weekToDateConsumptionKWh;
     private double monthToDateGenerationKWh;
     private double monthToDateConsumptionKWh;
     private double yearToDateGenerationKWh;
@@ -27,7 +30,9 @@ public class SystemOverviewResponse {
     private double averageSystemEfficiency;
     private LocalDateTime lastUpdated;
     private List<SolarInstallationDTO> recentlyActiveInstallations;
+    private List<SolarInstallationDTO> topProducers;
     
     // New field to hold recent readings from all installations with timestamps preserved
     private List<EnergyReadingDTO> recentInstallationReadings;
+    private Map<String, Long> installationsByStatus;
 }

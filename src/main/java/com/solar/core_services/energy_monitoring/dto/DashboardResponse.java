@@ -18,6 +18,8 @@ public class DashboardResponse {
     private double currentPowerConsumptionWatts;
     private double todayGenerationKWh;
     private double todayConsumptionKWh;
+    private double weekToDateGenerationKWh;
+    private double weekToDateConsumptionKWh;
     private double monthToDateGenerationKWh;
     private double monthToDateConsumptionKWh;
     private double yearToDateGenerationKWh;

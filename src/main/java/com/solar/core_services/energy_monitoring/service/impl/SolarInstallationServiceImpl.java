@@ -219,6 +219,9 @@ public class SolarInstallationServiceImpl implements SolarInstallationService {
         LocalDateTime startOfDay = LocalDateTime.of(LocalDate.now(), LocalTime.MIDNIGHT);
         LocalDateTime endOfDay = LocalDateTime.of(LocalDate.now(), LocalTime.MAX);
 
+        // Get week-to-date data
+        LocalDateTime startOfWeek = LocalDateTime.of(LocalDate.now().minusDays(LocalDate.now().getDayOfWeek().getValue() - 1), LocalTime.MIDNIGHT);
+
         // Get month-to-date data
         LocalDateTime startOfMonth = LocalDateTime.of(LocalDate.now().withDayOfMonth(1), LocalTime.MIDNIGHT);
         
@@ -229,6 +232,8 @@ public class SolarInstallationServiceImpl implements SolarInstallationService {
         double currentSystemGeneration = 0;
         double todayTotalGeneration = 0;
         double todayTotalConsumption = 0;
+        double weekToDateGeneration = 0;
+        double weekToDateConsumption = 0;
         double monthToDateGeneration = 0;
         double monthToDateConsumption = 0;
         double yearToDateGeneration = 0;
@@ -283,6 +288,12 @@ public class SolarInstallationServiceImpl implements SolarInstallationService {
             Double installationTodayConsumption = energyDataRepository.sumPowerConsumptionForPeriod(
                     installation, startOfDay, endOfDay);
             
+            // Get week-to-date generation and consumption
+            Double installationWeekGeneration = energyDataRepository.sumPowerGenerationForPeriod(
+                    installation, startOfWeek, endOfDay);
+            Double installationWeekConsumption = energyDataRepository.sumPowerConsumptionForPeriod(
+                    installation, startOfWeek, endOfDay);
+            
             // Get month-to-date generation and consumption
             Double installationMonthGeneration = energyDataRepository.sumPowerGenerationForPeriod(
                     installation, startOfMonth, endOfDay);
@@ -298,6 +309,8 @@ public class SolarInstallationServiceImpl implements SolarInstallationService {
             // Add to totals (convert from Watt-seconds to kWh)
             todayTotalGeneration += (installationTodayGeneration != null ? installationTodayGeneration : 0) / 1000.0 / 3600.0;
             todayTotalConsumption += (installationTodayConsumption != null ? installationTodayConsumption : 0) / 1000.0 / 3600.0;
+            weekToDateGeneration += (installationWeekGeneration != null ? installationWeekGeneration : 0) / 1000.0 / 3600.0;
+            weekToDateConsumption += (installationWeekConsumption != null ? installationWeekConsumption : 0) / 1000.0 / 3600.0;
             monthToDateGeneration += (installationMonthGeneration != null ? installationMonthGeneration : 0) / 1000.0 / 3600.0;
             monthToDateConsumption += (installationMonthConsumption != null ? installationMonthConsumption : 0) / 1000.0 / 3600.0;
             yearToDateGeneration += (installationYearGeneration != null ? installationYearGeneration : 0) / 1000.0 / 3600.0;
@@ -321,6 +334,23 @@ public class SolarInstallationServiceImpl implements SolarInstallationService {
                         .mapToDouble(EnergySummary::getTotalGenerationKWh)
                         .sum();
                 todayTotalConsumption = dailySummaries.stream()
+                        .mapToDouble(EnergySummary::getTotalConsumptionKWh)
+                        .sum();
+            }
+        }
+        
+        // Fall back to summaries for week-to-date if raw data isn't sufficient
+        if (weekToDateGeneration == 0) {
+            // Try to get weekly summaries for this week
+            LocalDate startOfWeekDate = LocalDate.now().minusDays(LocalDate.now().getDayOfWeek().getValue() - 1);
+            List<EnergySummary> weeklySummaries = energySummaryRepository.findByPeriodAndDate(
+                    EnergySummary.SummaryPeriod.WEEKLY, startOfWeekDate);
+            
+            if (!weeklySummaries.isEmpty()) {
+                weekToDateGeneration = weeklySummaries.stream()
+                        .mapToDouble(EnergySummary::getTotalGenerationKWh)
+                        .sum();
+                weekToDateConsumption = weeklySummaries.stream()
                         .mapToDouble(EnergySummary::getTotalConsumptionKWh)
                         .sum();
             }
@@ -377,6 +407,20 @@ public class SolarInstallationServiceImpl implements SolarInstallationService {
             }
         }
         
+        // Get top producers
+        List<SolarInstallationDTO> topProducers = activeInstallations.stream()
+                .sorted((i1, i2) -> {
+                    Double i1Gen = energyDataRepository.sumPowerGenerationForPeriod(i1, startOfDay, endOfDay);
+                    Double i2Gen = energyDataRepository.sumPowerGenerationForPeriod(i2, startOfDay, endOfDay);
+                    return Double.compare(
+                            i2Gen != null ? i2Gen : 0,
+                            i1Gen != null ? i1Gen : 0
+                    );
+                })
+                .limit(5)
+                .map(this::convertToDTO)
+                .collect(Collectors.toList());
+        
         // Build the system overview response
         SystemOverviewResponse response = SystemOverviewResponse.builder()
                 .totalActiveInstallations((int) activeCount)
@@ -386,6 +430,8 @@ public class SolarInstallationServiceImpl implements SolarInstallationService {
                 .currentSystemGenerationWatts(currentSystemGeneration)
                 .todayTotalGenerationKWh(todayTotalGeneration)
                 .todayTotalConsumptionKWh(todayTotalConsumption)
+                .weekToDateGenerationKWh(weekToDateGeneration)
+                .weekToDateConsumptionKWh(weekToDateConsumption)
                 .monthToDateGenerationKWh(monthToDateGeneration)
                 .monthToDateConsumptionKWh(monthToDateConsumption)
                 .yearToDateGenerationKWh(yearToDateGeneration)
@@ -397,6 +443,7 @@ public class SolarInstallationServiceImpl implements SolarInstallationService {
                         .limit(5)
                         .map(this::convertToDTO)
                         .collect(Collectors.toList()))
+                .topProducers(topProducers)
                 .build();
         
         return response;
