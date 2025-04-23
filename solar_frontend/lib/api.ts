@@ -1882,7 +1882,7 @@ export const securityApi = {
   getTamperEvents: async () => {
     try {
       console.log("Fetching security alerts from API");
-      const response = await apiClient.get('/api/security/alerts');
+      const response = await apiClient.get('/api/security/admin/alerts');
 
       if (response && response.data) {
         console.log("Security alerts response:", response.data);
