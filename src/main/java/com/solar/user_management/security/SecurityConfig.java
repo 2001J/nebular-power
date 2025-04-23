@@ -55,7 +55,7 @@ public class SecurityConfig {
                 configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
                 configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "X-Requested-With",
                                 "Accept", "Origin", "Access-Control-Request-Method", "Access-Control-Request-Headers",
-                                "x-retry-count"));
+                                "x-retry-count", "Cache-Control", "Pragma"));
                 configuration.setExposedHeaders(
                                 Arrays.asList("Access-Control-Allow-Origin", "Access-Control-Allow-Credentials"));
                 configuration.setAllowCredentials(true);
