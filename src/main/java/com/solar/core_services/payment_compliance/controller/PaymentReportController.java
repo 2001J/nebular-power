@@ -25,6 +25,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
@@ -59,26 +60,33 @@ public class PaymentReportController {
             @Parameter(description = "Type of report to generate (compliance, revenue, defaulters, collection, summary)", required = true)
             @PathVariable String reportType,
             
-            @Parameter(description = "Start date for the report period (ISO format)")
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime startDate,
+            @Parameter(description = "Start date for the report period (ISO date format: yyyy-MM-dd)")
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             
-            @Parameter(description = "End date for the report period (ISO format)")
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime endDate) {
+            @Parameter(description = "End date for the report period (ISO date format: yyyy-MM-dd)")
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+        
+        // Add debugging information
+        System.out.println("Generating " + reportType + " report with startDate=" + startDate + ", endDate=" + endDate);
+        
+        // Convert LocalDate to LocalDateTime if needed for service methods
+        LocalDateTime startDateTime = startDate != null ? startDate.atStartOfDay() : null;
+        LocalDateTime endDateTime = endDate != null ? endDate.atTime(23, 59, 59) : null;
         
         Map<String, Object> report = new HashMap<>();
         
         switch (reportType.toLowerCase()) {
             case "compliance":
-                report = generateComplianceReport(startDate, endDate);
+                report = generateComplianceReport(startDateTime, endDateTime);
                 break;
             case "revenue":
-                report = generateRevenueReport(startDate, endDate);
+                report = generateRevenueReport(startDateTime, endDateTime);
                 break;
             case "defaulters":
                 report = generateDefaultersReport();
                 break;
             case "collection":
-                report = generateCollectionReport(startDate, endDate);
+                report = generateCollectionReport(startDateTime, endDateTime);
                 break;
             case "summary":
                 report = paymentReportService.generatePaymentSummaryReport();
@@ -142,12 +150,17 @@ public class PaymentReportController {
         @ApiResponse(responseCode = "403", description = "Forbidden - requires ADMIN role", content = @Content)
     })
     public ResponseEntity<List<PaymentDTO>> getPaymentsDueReport(
-            @Parameter(description = "Start date of the range (ISO format)", required = true)
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime startDate,
+            @Parameter(description = "Start date of the range (ISO date format: yyyy-MM-dd)", required = true)
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             
-            @Parameter(description = "End date of the range (ISO format)", required = true)
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime endDate) {
-        List<Payment> payments = paymentReportService.generatePaymentsDueReport(startDate, endDate);
+            @Parameter(description = "End date of the range (ISO date format: yyyy-MM-dd)", required = true)
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+            
+        // Convert to LocalDateTime for backward compatibility with service methods
+        LocalDateTime startDateTime = startDate.atStartOfDay();
+        LocalDateTime endDateTime = endDate.atTime(23, 59, 59);
+        
+        List<Payment> payments = paymentReportService.generatePaymentsDueReport(startDateTime, endDateTime);
         return ResponseEntity.ok(payments.stream()
                 .map(PaymentDTO::fromEntity)
                 .collect(Collectors.toList()));
@@ -225,12 +238,17 @@ public class PaymentReportController {
             @Parameter(description = "ID of the installation to generate history report for", required = true)
             @PathVariable Long installationId,
             
-            @Parameter(description = "Start date of the history period (ISO format)", required = true)
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime startDate,
+            @Parameter(description = "Start date of the history period (ISO date format: yyyy-MM-dd)", required = true)
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             
-            @Parameter(description = "End date of the history period (ISO format)", required = true)
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime endDate) {
-        List<Payment> payments = paymentReportService.generatePaymentHistoryReport(installationId, startDate, endDate);
+            @Parameter(description = "End date of the history period (ISO date format: yyyy-MM-dd)", required = true)
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+        
+        // Convert to LocalDateTime for service methods
+        LocalDateTime startDateTime = startDate.atStartOfDay();
+        LocalDateTime endDateTime = endDate.atTime(23, 59, 59);
+        
+        List<Payment> payments = paymentReportService.generatePaymentHistoryReport(installationId, startDateTime, endDateTime);
         return ResponseEntity.ok(payments.stream()
                 .map(PaymentDTO::fromEntity)
                 .collect(Collectors.toList()));
@@ -477,4 +495,4 @@ public class PaymentReportController {
         
         return report;
     }
-} 
+}

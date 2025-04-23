@@ -271,15 +271,54 @@ export default function AdminDashboardPage() {
         try {
           console.log("Fetching payment data");
           const paymentsResponse = await paymentApi.getAdminPayments();
-          if (Array.isArray(paymentsResponse)) {
+          
+          // Handle different response formats - the function can return either an object with graphData
+          // or it could return an array of payment records
+          if (paymentsResponse && typeof paymentsResponse === 'object') {
+            // This is the new format with graphData
             setPayments(paymentsResponse);
+            console.log("Received payments data with graph data structure");
+          } else if (Array.isArray(paymentsResponse)) {
+            // Handle the legacy array format by transforming it to the expected format
+            console.log("Received array payments data, transforming to expected format");
+            setPayments({
+              content: paymentsResponse,
+              totalPages: 1,
+              totalElements: paymentsResponse.length,
+              size: paymentsResponse.length,
+              number: 0,
+              summary: { 
+                totalRevenue: paymentsResponse.reduce((sum, p) => sum + (p.amount || 0), 0),
+                expectedRevenue: 0,
+                collectionRate: 0
+              },
+              graphData: { timeRange: 'week', data: [] }
+            });
           } else {
             console.error("Invalid payments data format");
-            setPayments([]);
+            // Create an empty object with the expected structure
+            setPayments({
+              content: [],
+              totalPages: 0,
+              totalElements: 0,
+              size: 0,
+              number: 0,
+              summary: { totalRevenue: 0, expectedRevenue: 0, collectionRate: 0 },
+              graphData: { timeRange: 'week', data: [] }
+            });
           }
         } catch (error) {
           console.error("Error fetching payments:", error);
-          setPayments([]);
+          // Create an empty object with the expected structure
+          setPayments({
+            content: [],
+            totalPages: 0,
+            totalElements: 0,
+            size: 0,
+            number: 0,
+            summary: { totalRevenue: 0, expectedRevenue: 0, collectionRate: 0 },
+            graphData: { timeRange: 'week', data: [] }
+          });
         }
 
       } catch (generalError) {
@@ -336,8 +375,24 @@ export default function AdminDashboardPage() {
   });
 
   // Calculate overdue payments data
-  const overduePayments = payments.filter(payment => payment.status === 'OVERDUE' || payment.status === 'overdue');
-  const overduePaymentRanges = overduePayments.reduce((acc, payment) => {
+  let overduePayments = [];
+  let overduePaymentRanges = {};
+  
+  // Check if payments has content array (new structure) or is an array itself (old structure)
+  if (payments && payments.content && Array.isArray(payments.content)) {
+    // New structure - use content array
+    overduePayments = payments.content.filter(payment => 
+      payment.status === 'OVERDUE' || payment.status === 'overdue'
+    );
+  } else if (Array.isArray(payments)) {
+    // Old structure - use payments directly
+    overduePayments = payments.filter(payment => 
+      payment.status === 'OVERDUE' || payment.status === 'overdue'
+    );
+  }
+  
+  // Process the filtered overdue payments
+  overduePaymentRanges = overduePayments.reduce((acc, payment) => {
     const daysOverdue = payment.daysOverdue || 0;
     if (daysOverdue < 30) {
       acc["0-30 days"] = (acc["0-30 days"] || 0) + 1;
@@ -530,7 +585,7 @@ export default function AdminDashboardPage() {
                   <div className="flex justify-center py-12">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
                   </div>
-                ) : energyData.length === 0 ? (
+                ) : !payments || !payments.graphData || !payments.graphData.data || payments.graphData.data.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-12 text-center">
                     <BarChart3 className="h-16 w-16 text-muted-foreground mb-4" />
                     <h3 className="text-lg font-medium">No Revenue Data Available</h3>
@@ -543,7 +598,7 @@ export default function AdminDashboardPage() {
                     <ChartContainer>
                       <ResponsiveContainer width="100%" height={350}>
                         <AreaChart
-                          data={energyData}
+                          data={payments.graphData.data}
                           margin={{ top: 10, right: 10, left: 10, bottom: 40 }}
                         >
                           <defs>
