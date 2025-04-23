@@ -84,6 +84,19 @@ interface Installation {
   type: string;
   efficiency?: number;
   totalYield?: number;
+  currentPowerGenerationWatts?: number;
+  currentPowerConsumptionWatts?: number;
+  efficiencyPercentage?: number;
+  todayGenerationKWh?: number;
+  todayConsumptionKWh?: number;
+  weekToDateGenerationKWh?: number;
+  weekToDateConsumptionKWh?: number;
+  monthToDateGenerationKWh?: number;
+  monthToDateConsumptionKWh?: number;
+  yearToDateGenerationKWh?: number;
+  yearToDateConsumptionKWh?: number;
+  lifetimeGenerationKWh?: number;
+  lifetimeConsumptionKWh?: number;
 }
 
 interface ReadingData {
@@ -145,86 +158,50 @@ export default function InstallationDetailPage() {
     uptimePercent: 0
   })
 
-  // Calculate performance metrics based on actual installation data
-  const calculateActualPerformanceMetrics = (readings: ReadingData[], installation: Installation) => {
-    // Default values
-    let efficiency = installation.efficiency || 0
-    let dailyYield = 0
-    let monthlyYield = 0
-    let yearlyYield = 0
-    let totalYield = installation.totalYield || 0
-    let uptimePercent = 98
-    
-    if (readings && readings.length > 0) {
-      // Calculate average efficiency
-      const totalGeneration = readings.reduce((sum, r) => sum + (r.powerGenerationWatts || 0), 0)
-      const totalConsumption = readings.reduce((sum, r) => sum + (r.powerConsumptionWatts || 0), 0)
-      
-      if (totalConsumption > 0) {
-        efficiency = (totalGeneration / totalConsumption) * 100
-        efficiency = Math.min(100, Math.max(0, efficiency))
-      }
-      
-      // Calculate daily yield (kWh)
-      const todayReadings = readings.filter(r => {
-        const readingDate = new Date(r.timestamp)
-        const today = new Date()
-        return readingDate.toDateString() === today.toDateString()
-      })
-      
-      if (todayReadings.length > 0) {
-        const avgGeneration = todayReadings.reduce((sum, r) => sum + (r.powerGenerationWatts || 0), 0) / todayReadings.length
-        dailyYield = (avgGeneration * 24) / 1000 // Convert Wh to kWh
-      }
-      
-      // Calculate monthly yield from readings
-      const monthlyReadings = readings.filter(r => {
-        const readingDate = new Date(r.timestamp)
-        const today = new Date()
-        return readingDate.getMonth() === today.getMonth() && 
-               readingDate.getFullYear() === today.getFullYear()
-      })
-      
-      if (monthlyReadings.length > 0) {
-        const avgMonthlyGeneration = monthlyReadings.reduce((sum, r) => sum + (r.powerGenerationWatts || 0), 0) / monthlyReadings.length
-        monthlyYield = (avgMonthlyGeneration * 24 * 30) / 1000 // Convert Wh to kWh for 30 days
-      } else {
-        monthlyYield = dailyYield * 30 // Estimate based on daily
-      }
-      
-      // Calculate yearly yield from readings or estimate from monthly
-      yearlyYield = monthlyYield * 12
-      
-      // Use total yield from installation data if available
-      if (installation.totalYield) {
-        totalYield = installation.totalYield
-      }
-    }
-    
-    return {
-      efficiency: Math.round(efficiency),
-      dailyYield: Math.round(dailyYield * 100) / 100,
-      monthlyYield: Math.round(monthlyYield * 100) / 100,
-      yearlyYield: Math.round(yearlyYield * 100) / 100,
-      totalYield: Math.round(totalYield * 100) / 100,
-      uptimePercent: uptimePercent
-    }
-  }
-
   // Load installation data
   useEffect(() => {
     const fetchInstallationData = async () => {
       try {
         setLoading(true)
         
-        // Fetch installation details using the API
+        // First fetch installation dashboard data (contains all the most accurate metrics)
+        const dashboardData = await energyApi.getInstallationDashboard(id)
+        
+        console.log('Installation dashboard data:', dashboardData)
+        
+        // Calculate the average efficiency for this installation
+        const averageEfficiency = await energyApi.calculateInstallationAverageEfficiency(id)
+        console.log('Average efficiency for installation:', averageEfficiency)
+        
+        // Then get additional installation details if needed
         const installationData = await installationApi.getInstallationDetails(id)
         
-        if (installationData) {
-          console.log('Installation data:', installationData)
+        if (dashboardData && installationData) {
+          console.log('Installation details:', installationData)
           
-          // Set installation with all properties from the API response
-          setInstallation(installationData)
+          // Combine dashboard data with installation details
+          const combinedData = {
+            ...installationData,
+            // Add metrics from dashboard that might not be in the installation details
+            currentPowerGenerationWatts: dashboardData.currentPowerGenerationWatts,
+            currentPowerConsumptionWatts: dashboardData.currentPowerConsumptionWatts,
+            efficiencyPercentage: dashboardData.currentEfficiencyPercentage,
+            totalYield: dashboardData.lifetimeGenerationKWh,
+            // Also include specific period data
+            todayGenerationKWh: dashboardData.todayGenerationKWh,
+            todayConsumptionKWh: dashboardData.todayConsumptionKWh,
+            weekToDateGenerationKWh: dashboardData.weekToDateGenerationKWh,
+            weekToDateConsumptionKWh: dashboardData.weekToDateConsumptionKWh,
+            monthToDateGenerationKWh: dashboardData.monthToDateGenerationKWh,
+            monthToDateConsumptionKWh: dashboardData.monthToDateConsumptionKWh,
+            yearToDateGenerationKWh: dashboardData.yearToDateGenerationKWh,
+            yearToDateConsumptionKWh: dashboardData.yearToDateConsumptionKWh,
+            lifetimeGenerationKWh: dashboardData.lifetimeGenerationKWh,
+            lifetimeConsumptionKWh: dashboardData.lifetimeConsumptionKWh
+          }
+          
+          // Set the combined installation data
+          setInstallation(combinedData)
           
           // Store customer info separately if available
           if (installationData.username) {
@@ -234,30 +211,29 @@ export default function InstallationDetailPage() {
             })
           }
           
-          // Fetch installation energy readings
-          let readings: ReadingData[] = []
-          try {
-            // Try to get recent readings first
-            const recentReadings = await energyApi.getRecentReadings(id, 100)
-            
-            if (Array.isArray(recentReadings) && recentReadings.length > 0) {
-              readings = recentReadings
-            } else {
-              // Fall back to readings history with a date range if recent readings fail
-              const now = new Date()
-              const oneMonthAgo = new Date()
-              oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1)
-              
-              const startDate = oneMonthAgo.toISOString().split('T')[0]
-              const endDate = now.toISOString().split('T')[0]
-              
-              const historyReadings = await energyApi.getReadingsHistory(id, startDate, endDate)
-              if (Array.isArray(historyReadings)) {
-                readings = historyReadings
-              }
-            }
-          } catch (readingsError) {
-            console.error('Error fetching installation readings:', readingsError)
+          // Use readings from the dashboard if available
+          setRecentReadings(dashboardData.recentReadings || [])
+          
+          // Calculate performance metrics from dashboard data
+          // Use the dashboard data for more accurate performance metrics
+          const perfMetrics = {
+            efficiency: averageEfficiency || dashboardData.currentEfficiencyPercentage || 0,
+            dailyYield: dashboardData.todayGenerationKWh || 0,
+            monthlyYield: dashboardData.monthToDateGenerationKWh || 0,
+            yearlyYield: dashboardData.yearToDateGenerationKWh || 0,
+            totalYield: dashboardData.lifetimeGenerationKWh || 0,
+            uptimePercent: 98 // Default value
+          }
+          
+          setPerformance(perfMetrics)
+          
+          // Transform readings to chart data if available
+          if (dashboardData.recentReadings && dashboardData.recentReadings.length > 0) {
+            const chartData = transformReadingsToChartData(dashboardData.recentReadings, timeRange)
+            setEnergyData(chartData)
+          } else {
+            // Set empty chart data
+            setEnergyData([])
           }
           
           // Fetch recent security events
@@ -276,22 +252,6 @@ export default function InstallationDetailPage() {
           } catch (eventsError) {
             console.error('Error fetching security events:', eventsError)
           }
-          
-          // Always use actual readings data, even if empty
-          setRecentReadings(readings.slice(0, 10))
-          
-          // Transform readings to chart data
-          if (readings.length > 0) {
-            const chartData = transformReadingsToChartData(readings, timeRange)
-            setEnergyData(chartData)
-          } else {
-            // Set empty chart data instead of generating sample data
-            setEnergyData([])
-          }
-          
-          // Always use actual installation data for performance metrics
-          const perfMetrics = calculateActualPerformanceMetrics(readings, installationData)
-          setPerformance(perfMetrics)
           
           // Use actual security events or empty array
           if (Array.isArray(recentEvents) && recentEvents.length > 0) {
@@ -407,6 +367,74 @@ export default function InstallationDetailPage() {
         }));
       } else {
         // Return 12 empty month slots for a year
+        const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        return monthNames.map(month => ({
+          name: month,
+          generation: 0,
+          consumption: 0
+        }));
+      }
+    }
+    
+    // Get reference values from the installation object for the selected time period
+    const todayGeneration = installation?.todayGenerationKWh || 0;
+    const todayConsumption = installation?.todayConsumptionKWh || 0;
+    const weekGeneration = installation?.weekToDateGenerationKWh || 0;
+    const weekConsumption = installation?.weekToDateConsumptionKWh || 0;
+    const monthGeneration = installation?.monthToDateGenerationKWh || 0;
+    const monthConsumption = installation?.monthToDateConsumptionKWh || 0;
+    const yearGeneration = installation?.yearToDateGenerationKWh || 0;
+    const yearConsumption = installation?.yearToDateConsumptionKWh || 0;
+    
+    // For very small values (below threshold), treat them as zero to prevent misleading visualizations
+    const isVerySmallToday = todayGeneration < 0.001;
+    const isVerySmallWeek = weekGeneration < 0.001;
+    const isVerySmallMonth = monthGeneration < 0.001;
+    const isVerySmallYear = yearGeneration < 0.001;
+    
+    // Determine if we should show zero values based on timeRange
+    const shouldUseZeroValues = 
+      (timeRangeType === 'day' && isVerySmallToday) ||
+      (timeRangeType === 'week' && isVerySmallWeek) ||
+      (timeRangeType === 'month' && isVerySmallMonth) ||
+      (timeRangeType === 'year' && isVerySmallYear);
+    
+    console.log(`Installation ${id} energy metrics:`, {
+      timeRangeType,
+      todayGeneration,
+      todayConsumption,
+      weekGeneration,
+      weekConsumption,
+      monthGeneration,
+      monthConsumption,
+      yearGeneration,
+      yearConsumption,
+      shouldUseZeroValues
+    });
+    
+    // If values are extremely small, return zeros to prevent misleading charts
+    if (shouldUseZeroValues) {
+      // Return zero-valued data for the selected time range with the correct structure
+      if (timeRangeType === 'day') {
+        return Array.from({ length: 24 }, (_, i) => ({
+          name: `${i}:00`,
+          generation: 0,
+          consumption: 0
+        }));
+      } else if (timeRangeType === 'week') {
+        const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+        return dayNames.map(day => ({
+          name: day,
+          generation: 0,
+          consumption: 0
+        }));
+      } else if (timeRangeType === 'month') {
+        return Array.from({ length: 30 }, (_, i) => ({
+          name: (i + 1).toString(),
+          generation: 0,
+          consumption: 0
+        }));
+      } else {
         const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
         return monthNames.map(month => ({
           name: month,
@@ -780,17 +808,6 @@ export default function InstallationDetailPage() {
                         <p className="text-base">{installation?.lastTamperCheck ? new Date(installation.lastTamperCheck).toLocaleString() : "N/A"}</p>
                       )}
                     </div>
-                  </div>
-                </div>
-                <div className="pt-2">
-                  <h3 className="text-sm font-medium text-muted-foreground">Current Output</h3>
-                  <div className="flex items-center gap-2 mt-1">
-                    <Zap className="h-5 w-5 text-amber-500" />
-                    <p className="text-xl font-bold">
-                      {recentReadings.length > 0 
-                        ? `${(recentReadings[0].powerGenerationWatts / 1000).toFixed(2)} kW` 
-                        : "0.00 kW"}
-                    </p>
                   </div>
                 </div>
               </div>

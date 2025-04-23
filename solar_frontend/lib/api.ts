@@ -833,8 +833,8 @@ export const energyApi = {
     try {
       const response = await apiClient.get('/monitoring/installations/overview');
       return response.data;
-    } catch (error: any) {
-      console.error("Error fetching system overview:", error.message);
+    } catch (error) {
+      console.error('Error fetching system overview:', error);
       return null;
     }
   },
@@ -965,7 +965,51 @@ export const energyApi = {
       console.error(`Error fetching monthly summaries for installation ${installationId}:`, error.message);
       return [];
     }
-  }
+  },
+
+  // Calculate average efficiency for an installation
+  calculateInstallationAverageEfficiency: async (installationId: string) => {
+    try {
+      // First fetch the installation dashboard data which has current efficiency
+      const dashboardData = await energyApi.getInstallationDashboard(installationId);
+      
+      if (!dashboardData) {
+        return 0; // Return zero if no dashboard data
+      }
+      
+      // Get recent readings to calculate average efficiency
+      const recentReadings = await energyApi.getRecentReadings(installationId, 30);
+      
+      // If we have readings, calculate average efficiency from them
+      if (recentReadings && recentReadings.length > 0) {
+        // Calculate efficiency from power generation vs consumption ratio
+        let efficiencySum = 0;
+        let validReadingsCount = 0;
+        
+        recentReadings.forEach(reading => {
+          if (reading.powerGenerationWatts > 0 && reading.powerConsumptionWatts > 0) {
+            // Calculate efficiency as a percentage 
+            const readingEfficiency = Math.min(100, (reading.powerGenerationWatts / reading.powerConsumptionWatts) * 100);
+            efficiencySum += readingEfficiency;
+            validReadingsCount++;
+          }
+        });
+        
+        // Return average if we have valid readings, otherwise use current efficiency
+        if (validReadingsCount > 0) {
+          const averageEfficiency = efficiencySum / validReadingsCount;
+          return Math.round(averageEfficiency * 100) / 100; // Round to 2 decimal places
+        }
+      }
+      
+      // If we don't have enough readings with both generation and consumption,
+      // return the current efficiency from the dashboard
+      return dashboardData.currentEfficiencyPercentage || 0;
+    } catch (error: any) {
+      console.error(`Error calculating average efficiency for installation ${installationId}:`, error.message);
+      return 0;
+    }
+  },
 };
 
 // Solar Installations API

@@ -85,6 +85,7 @@ export default function EnergyMonitoringPage() {
   const [topProducers, setTopProducers] = useState<Array<any>>([])
   const [systemOverview, setSystemOverview] = useState<any>(null)
   const [totalProductionToday, setTotalProductionToday] = useState(0)
+  const [totalProductionWeek, setTotalProductionWeek] = useState(0)
   const [totalProductionMonth, setTotalProductionMonth] = useState(0)
   const [totalProductionYear, setTotalProductionYear] = useState(0)
   const [averageEfficiency, setAverageEfficiency] = useState(0)
@@ -109,6 +110,7 @@ export default function EnergyMonitoringPage() {
 
           // Set dashboard metrics consistently
           const todayTotal = systemResponse.todayTotalGenerationKWh || 0
+          const weekTotal = systemResponse.weekToDateGenerationKWh || 0
           const monthTotal = systemResponse.monthToDateGenerationKWh || 0
           const yearTotal = systemResponse.yearToDateGenerationKWh || 0
           const efficiency = systemResponse.averageSystemEfficiency || 0
@@ -116,6 +118,7 @@ export default function EnergyMonitoringPage() {
           // Log metrics for debugging
           console.log('Energy metrics received from backend:', {
             todayTotal,
+            weekTotal,
             monthTotal,
             yearTotal,
             efficiency,
@@ -123,6 +126,7 @@ export default function EnergyMonitoringPage() {
           })
           
           setTotalProductionToday(todayTotal)
+          setTotalProductionWeek(weekTotal)
           setTotalProductionMonth(monthTotal)
           setTotalProductionYear(yearTotal)
           setAverageEfficiency(efficiency)
@@ -194,16 +198,94 @@ export default function EnergyMonitoringPage() {
             setEnergyData([])
           }
 
-          // Get top producing installations
-          if (systemResponse.topProducingInstallations && Array.isArray(systemResponse.topProducingInstallations)) {
-            // Use the actual data without modifications
-            setTopProducers(systemResponse.topProducingInstallations.slice(0, 5))
+          // Get active installations to use as top producers if needed
+          const activeInstallations = systemResponse.recentlyActiveInstallations || [];
+          
+          // Get and fetch dashboard data for each installation 
+          // First get the IDs of installations to check (either from topProducers or active installations)
+          let installationIdsToFetch = [];
+          
+          // Use top producers from system overview if available
+          if (systemResponse.topProducers && Array.isArray(systemResponse.topProducers) && systemResponse.topProducers.length > 0) {
+            installationIdsToFetch = systemResponse.topProducers.slice(0, 5).map(prod => prod.id);
+          } 
+          // Otherwise use active installations 
+          else if (activeInstallations.length > 0) {
+            installationIdsToFetch = activeInstallations.slice(0, 5).map(inst => inst.id);
+          }
+          
+          // If we have IDs to fetch, get dashboard data for each
+          if (installationIdsToFetch.length > 0) {
+            try {
+              // Fetch dashboard data for each installation and calculate their average efficiency
+              const dashboardPromises = installationIdsToFetch.map(async id => {
+                try {
+                  // Get dashboard data
+                  const dashboard = await energyApi.getInstallationDashboard(id);
+                  
+                  // Also calculate average efficiency
+                  const averageEfficiency = await energyApi.calculateInstallationAverageEfficiency(id);
+                  
+                  return {
+                    ...dashboard,
+                    averageEfficiencyPercentage: averageEfficiency
+                  };
+                } catch (error) {
+                  console.error(`Error fetching dashboard for installation ${id}:`, error);
+                  return null;
+                }
+              });
+              
+              // Wait for all dashboards to be fetched
+              const dashboardResults = await Promise.all(dashboardPromises);
+              
+              // Filter out null results and create enriched top producers
+              const enrichedProducers = dashboardResults
+                .filter(dashboard => dashboard !== null)
+                .map(dashboard => {
+                  // Find matching installation from active installations to get additional metadata
+                  const matchingInstallation = activeInstallations.find(
+                    inst => inst.id === dashboard.installationId
+                  );
+                  
+                  // Return combined data with dashboard values - prioritizing stable daily metrics over fluctuating real-time values
+                  return {
+                    id: dashboard.installationId,
+                    name: dashboard.installationDetails?.name || 
+                          matchingInstallation?.name || 
+                          `Installation ${dashboard.installationId}`,
+                    username: dashboard.installationDetails?.username || 
+                            matchingInstallation?.username || 
+                            dashboard.installationDetails?.customer?.email || "N/A",
+                    location: dashboard.installationDetails?.location || 
+                            matchingInstallation?.location || "N/A",
+                    type: dashboard.installationDetails?.type || 
+                          matchingInstallation?.type || "RESIDENTIAL",
+                    // Use more stable daily metrics instead of real-time values that change every 15 seconds
+                    todayGenerationKWh: dashboard.todayGenerationKWh,
+                    currentPowerGenerationWatts: dashboard.currentPowerGenerationWatts, // Keep as fallback
+                    currentEfficiencyPercentage: dashboard.currentEfficiencyPercentage,
+                    // Add average efficiency for more stable metric
+                    averageEfficiencyPercentage: dashboard.averageEfficiencyPercentage || dashboard.currentEfficiencyPercentage
+                  };
+                });
+              
+              // Set the enriched producers as top producers
+              if (enrichedProducers.length > 0) {
+                setTopProducers(enrichedProducers);
+                console.log("Fetched dashboard data with average efficiency for top producers:", enrichedProducers);
+              } else {
+                // Fall back to active installations if no dashboard data
+                setTopProducers(activeInstallations.slice(0, 5));
+              }
+            } catch (error) {
+              console.error("Error fetching installation dashboards:", error);
+              // Fall back to active installations
+              setTopProducers(activeInstallations.slice(0, 5));
+            }
           } else {
-            // If no top producers in the overview, use the active installations without adding estimates
-            const sortedInstallations = [...(systemResponse.recentlyActiveInstallations || [])]
-              .sort((a, b) => (b.totalProduction || 0) - (a.totalProduction || 0))
-              .slice(0, 5)
-            setTopProducers(sortedInstallations)
+            // No installations to fetch, use what we have
+            setTopProducers(activeInstallations.slice(0, 5));
           }
         } else {
           setSystemOverview(null)
@@ -331,16 +413,54 @@ export default function EnergyMonitoringPage() {
       new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
     )
     
+    // Handle the case when systemOverview is null
+    if (!systemOverview) {
+      console.warn('systemOverview is null in transformReadingsToChartData, using empty chart structure');
+      // Return empty data with the correct structure for each time range
+      return createBasicChartData(null, timeRangeType);
+    }
+    
+    // Get exact values from the system overview to use as reference
+    const todayTotal = systemOverview.todayTotalGenerationKWh || 0;
+    const weekTotal = systemOverview.weekToDateGenerationKWh || 0;
+    const monthTotal = systemOverview.monthToDateGenerationKWh || 0;
+    const yearTotal = systemOverview.yearToDateGenerationKWh || 0;
+    
+    // For very small values (below threshold), treat them as zero to prevent misleading visualizations
+    const isVerySmallToday = todayTotal < 0.001;
+    const isVerySmallWeek = weekTotal < 0.001;
+    const isVerySmallMonth = monthTotal < 0.001;
+    const isVerySmallYear = yearTotal < 0.001;
+    
+    // Determine if we should show zero values based on timeRange
+    const shouldUseZeroValues = 
+      (timeRangeType === 'day' && isVerySmallToday) ||
+      (timeRangeType === 'week' && isVerySmallWeek) ||
+      (timeRangeType === 'month' && isVerySmallMonth) ||
+      (timeRangeType === 'year' && isVerySmallYear);
+    
+    if (shouldUseZeroValues) {
+      console.log(`Using zero values for ${timeRangeType} due to very small official totals:`, {
+        timeRangeType,
+        todayTotal, 
+        weekTotal,
+        monthTotal,
+        yearTotal
+      });
+      // Return empty data with the correct structure for each time range
+      return createBasicChartData(systemOverview, timeRangeType);
+    }
+    
     // Calculate the total energy from all readings to normalize later
     const totalEnergyFromReadings = sortedReadings.reduce((sum, reading) => 
       sum + (reading.powerGenerationWatts / 1000), 0);
     
     // Get expected totals from the system overview
     const totalEnergyExpected: Record<string, number> = {
-      day: systemOverview?.todayTotalGenerationKWh || 0,
-      week: systemOverview?.todayTotalGenerationKWh * 7 || 0, // Approximate for week
-      month: systemOverview?.monthToDateGenerationKWh || 0,
-      year: systemOverview?.yearToDateGenerationKWh || 0
+      day: systemOverview.todayTotalGenerationKWh || 0,
+      week: systemOverview.weekToDateGenerationKWh || 0,
+      month: systemOverview.monthToDateGenerationKWh || 0,
+      year: systemOverview.yearToDateGenerationKWh || 0
     };
     
     // Calculate normalization factor if readings have values
@@ -606,48 +726,143 @@ export default function EnergyMonitoringPage() {
       consumption: number;
     }> = [];
     
+    // Handle null systemResponse to prevent TypeError
+    if (!systemResponse) {
+      console.warn('System response is null, generating empty chart data');
+      
+      // Create empty chart structure based on time range
+      if (timeRangeType === 'day') {
+        // Return 24 empty hour slots for a day
+        for (let hour = 0; hour < 24; hour++) {
+          basicChartData.push({
+            name: `${hour}:00`,
+            total: 0,
+            residential: 0,
+            commercial: 0,
+            industrial: 0,
+            consumption: 0
+          });
+        }
+      } else if (timeRangeType === 'week') {
+        // Return 7 empty day slots
+        const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+        for (let day = 0; day < 7; day++) {
+          basicChartData.push({
+            name: dayNames[day],
+            total: 0,
+            residential: 0,
+            commercial: 0,
+            industrial: 0,
+            consumption: 0
+          });
+        }
+      } else if (timeRangeType === 'month') {
+        // Return ~30 empty day slots for a month
+        for (let day = 1; day <= 30; day++) {
+          basicChartData.push({
+            name: `${day}`,
+            total: 0,
+            residential: 0,
+            commercial: 0,
+            industrial: 0,
+            consumption: 0
+          });
+        }
+      } else { // year
+        // Return 12 empty month slots for a year
+        const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        for (let month = 0; month < 12; month++) {
+          basicChartData.push({
+            name: monthNames[month],
+            total: 0,
+            residential: 0,
+            commercial: 0,
+            industrial: 0,
+            consumption: 0
+          });
+        }
+      }
+      
+      return basicChartData;
+    }
+    
+    // Continue with the existing function for non-null system response
+    // Get exact values from the system overview
+    const todayTotal = systemResponse.todayTotalGenerationKWh || 0;
+    const weekTotal = systemResponse.weekToDateGenerationKWh || 0;
+    const monthTotal = systemResponse.monthToDateGenerationKWh || 0;
+    const yearTotal = systemResponse.yearToDateGenerationKWh || 0;
+    
+    // For very small values (below certain threshold, e.g., 0.001), 
+    // treat them as zero to prevent misleading visualizations
+    const isVerySmallToday = todayTotal < 0.001;
+    const isVerySmallWeek = weekTotal < 0.001;
+    const isVerySmallMonth = monthTotal < 0.001;
+    const isVerySmallYear = yearTotal < 0.001;
+    
+    // Get consumption totals if available, or estimate them
+    const todayConsumption = systemResponse.todayTotalConsumptionKWh || todayTotal * 0.7;
+    const weekConsumption = systemResponse.weekToDateConsumptionKWh || weekTotal * 0.7;
+    const monthConsumption = systemResponse.monthToDateConsumptionKWh || monthTotal * 0.7;
+    const yearConsumption = systemResponse.yearToDateConsumptionKWh || yearTotal * 0.7;
+    
+    console.log('Chart data metrics:', {
+      timeRangeType,
+      todayTotal,
+      weekTotal,
+      monthTotal,
+      yearTotal,
+      isVerySmallToday,
+      isVerySmallWeek,
+      isVerySmallMonth,
+      isVerySmallYear
+    });
+    
     if (timeRangeType === 'day') {
       // Use the actual daily total from summary metrics
-      const todayTotal = systemResponse.todayTotalGenerationKWh || 0
       // Create simple hourly data - spread the day's total over daylight hours
-      const hourCount = 12 // Assume 12 hours of activity
-      const hourlyValue = todayTotal / hourCount
+      const hourCount = 12; // Assume 12 hours of activity
+      const hourlyValue = isVerySmallToday ? 0 : todayTotal / hourCount;
+      const hourlyConsumption = isVerySmallToday ? 0 : todayConsumption / hourCount;
       
       for (let hour = 0; hour < 24; hour++) {
         // More generation during daylight hours (6am-6pm)
-        const isDaylight = hour >= 6 && hour <= 18
+        const isDaylight = hour >= 6 && hour <= 18;
         basicChartData.push({
           name: `${hour}:00`,
           total: isDaylight ? hourlyValue : 0,
           residential: isDaylight ? hourlyValue * 0.6 : 0, 
           commercial: isDaylight ? hourlyValue * 0.3 : 0,
           industrial: isDaylight ? hourlyValue * 0.1 : 0,
-          consumption: isDaylight ? hourlyValue * 0.8 : 0
-        })
+          consumption: isDaylight ? hourlyConsumption : 0
+        });
       }
     } else if (timeRangeType === 'week') {
-      // Use the actual daily total and extrapolate for week
-      const todayTotal = systemResponse.todayTotalGenerationKWh || 0
-      const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+      // Use the actual weekly total
+      const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+      const weeklyPerDay = isVerySmallWeek ? 0 : weekTotal / 7;
+      const consumptionPerDay = isVerySmallWeek ? 0 : weekConsumption / 7;
       
       for (let day = 0; day < 7; day++) {
-        // Weekend days slightly lower, weekdays similar to today
-        const factor = day >= 5 ? 0.8 : 1.0
-        const dailyValue = todayTotal * factor
+        // Weekend days slightly lower, weekdays similar
+        const factor = day >= 5 ? 0.8 : 1.0;
+        const dailyValue = weeklyPerDay * factor;
+        const dailyConsumption = consumptionPerDay * factor;
+        
         basicChartData.push({
           name: dayNames[day],
           total: dailyValue,
           residential: dailyValue * 0.6,
           commercial: dailyValue * 0.3,
           industrial: dailyValue * 0.1,
-          consumption: dailyValue * 0.8
-        })
+          consumption: dailyConsumption
+        });
       }
     } else if (timeRangeType === 'month') {
       // Use the actual monthly total and distribute it evenly
-      const monthTotal = systemResponse.monthToDateGenerationKWh || 0
-      const daysInMonth = 30
-      const dailyValue = monthTotal / daysInMonth
+      const daysInMonth = 30;
+      const dailyValue = isVerySmallMonth ? 0 : monthTotal / daysInMonth;
+      const dailyConsumption = isVerySmallMonth ? 0 : monthConsumption / daysInMonth;
       
       for (let day = 1; day <= daysInMonth; day++) {
         basicChartData.push({
@@ -656,32 +871,34 @@ export default function EnergyMonitoringPage() {
           residential: dailyValue * 0.6,
           commercial: dailyValue * 0.3,
           industrial: dailyValue * 0.1,
-          consumption: dailyValue * 0.8
-        })
+          consumption: dailyConsumption
+        });
       }
-    } else {
-      // Use the actual yearly total or extrapolate from month
-      const yearTotal = systemResponse.yearToDateGenerationKWh || systemResponse.monthToDateGenerationKWh * 12 || 0
-      const monthlyValue = yearTotal / 12
-      const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+    } else { // year
+      // Use the actual yearly total
+      const monthlyValue = isVerySmallYear ? 0 : yearTotal / 12;
+      const monthlyConsumption = isVerySmallYear ? 0 : yearConsumption / 12;
+      const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
       
       for (let month = 0; month < 12; month++) {
         // Summer months produce more
-        const isSummer = month >= 4 && month <= 8
-        const factor = isSummer ? 1.3 : 0.8
-        const adjustedMonthlyValue = monthlyValue * factor / (isSummer ? 1.3 : 0.8) * 12 // Normalize to ensure total matches yearTotal
+        const isSummer = month >= 4 && month <= 8;
+        const factor = isSummer ? 1.3 : 0.8;
+        const adjustedMonthlyValue = monthlyValue * factor;
+        const adjustedMonthlyConsumption = monthlyConsumption * factor;
+        
         basicChartData.push({
           name: monthNames[month],
           total: adjustedMonthlyValue,
           residential: adjustedMonthlyValue * 0.6,
           commercial: adjustedMonthlyValue * 0.3,
           industrial: adjustedMonthlyValue * 0.1,
-          consumption: adjustedMonthlyValue * 0.8
-        })
+          consumption: adjustedMonthlyConsumption
+        });
       }
     }
     
-    return basicChartData
+    return basicChartData;
   }
 
   // Handle export data
@@ -834,14 +1051,93 @@ export default function EnergyMonitoringPage() {
                     setEnergyData([])
                   }
 
-                  // Get top producing installations from system overview
-                  if (systemResponse.topProducingInstallations && Array.isArray(systemResponse.topProducingInstallations)) {
-                    setTopProducers(systemResponse.topProducingInstallations.slice(0, 5));
+                  // Get active installations to use as top producers if needed
+                  const activeInstallations = systemResponse.recentlyActiveInstallations || [];
+                  
+                  // Get and fetch dashboard data for each installation 
+                  // First get the IDs of installations to check (either from topProducers or active installations)
+                  let installationIdsToFetch = [];
+                  
+                  // Use top producers from system overview if available
+                  if (systemResponse.topProducers && Array.isArray(systemResponse.topProducers) && systemResponse.topProducers.length > 0) {
+                    installationIdsToFetch = systemResponse.topProducers.slice(0, 5).map(prod => prod.id);
+                  } 
+                  // Otherwise use active installations 
+                  else if (activeInstallations.length > 0) {
+                    installationIdsToFetch = activeInstallations.slice(0, 5).map(inst => inst.id);
+                  }
+                  
+                  // If we have IDs to fetch, get dashboard data for each
+                  if (installationIdsToFetch.length > 0) {
+                    try {
+                      // Fetch dashboard data for each installation and calculate their average efficiency
+                      const dashboardPromises = installationIdsToFetch.map(async id => {
+                        try {
+                          // Get dashboard data
+                          const dashboard = await energyApi.getInstallationDashboard(id);
+                          
+                          // Also calculate average efficiency
+                          const averageEfficiency = await energyApi.calculateInstallationAverageEfficiency(id);
+                          
+                          return {
+                            ...dashboard,
+                            averageEfficiencyPercentage: averageEfficiency
+                          };
+                        } catch (error) {
+                          console.error(`Error fetching dashboard for installation ${id}:`, error);
+                          return null;
+                        }
+                      });
+                      
+                      // Wait for all dashboards to be fetched
+                      const dashboardResults = await Promise.all(dashboardPromises);
+                      
+                      // Filter out null results and create enriched top producers
+                      const enrichedProducers = dashboardResults
+                        .filter(dashboard => dashboard !== null)
+                        .map(dashboard => {
+                          // Find matching installation from active installations to get additional metadata
+                          const matchingInstallation = activeInstallations.find(
+                            inst => inst.id === dashboard.installationId
+                          );
+                          
+                          // Return combined data with dashboard values
+                          return {
+                            id: dashboard.installationId,
+                            name: dashboard.installationDetails?.name || 
+                                  matchingInstallation?.name || 
+                                  `Installation ${dashboard.installationId}`,
+                            username: dashboard.installationDetails?.username || 
+                                    matchingInstallation?.username || 
+                                    dashboard.installationDetails?.customer?.email || "N/A",
+                            location: dashboard.installationDetails?.location || 
+                                    matchingInstallation?.location || "N/A",
+                            type: dashboard.installationDetails?.type || 
+                                  matchingInstallation?.type || "RESIDENTIAL",
+                            // Use more stable daily metrics instead of real-time values that change every 15 seconds
+                            todayGenerationKWh: dashboard.todayGenerationKWh,
+                            currentPowerGenerationWatts: dashboard.currentPowerGenerationWatts,
+                            currentEfficiencyPercentage: dashboard.currentEfficiencyPercentage,
+                            averageEfficiencyPercentage: dashboard.averageEfficiencyPercentage || dashboard.currentEfficiencyPercentage
+                          };
+                        });
+                      
+                      // Set the enriched producers as top producers
+                      if (enrichedProducers.length > 0) {
+                        setTopProducers(enrichedProducers);
+                        console.log("Refreshed: Fetched dashboard data with average efficiency for top producers:", enrichedProducers);
+                      } else {
+                        // Fall back to active installations if no dashboard data
+                        setTopProducers(activeInstallations.slice(0, 5));
+                      }
+                    } catch (error) {
+                      console.error("Error fetching installation dashboards during refresh:", error);
+                      // Fall back to active installations
+                      setTopProducers(activeInstallations.slice(0, 5));
+                    }
                   } else {
-                    const sortedInstallations = [...(systemResponse.recentlyActiveInstallations || [])]
-                      .sort((a, b) => (b.totalProduction || 0) - (a.totalProduction || 0))
-                      .slice(0, 5);
-                    setTopProducers(sortedInstallations);
+                    // No installations to fetch, use what we have
+                    setTopProducers(activeInstallations.slice(0, 5));
                   }
                 }
 
@@ -936,6 +1232,21 @@ export default function EnergyMonitoringPage() {
         </Card>
         <Card>
           <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">Weekly Production</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{totalProductionWeek > 0 ? totalProductionWeek.toFixed(2) : '0.0'} kWh</div>
+            <p className="text-xs text-muted-foreground">
+              <span className={`flex items-center ${totalProductionWeek > 0 ? 'text-emerald-500' : 'text-gray-400'}`}>
+                <ArrowUp className="mr-1 h-4 w-4" />
+                {systemOverview?.weeklyChangePercentage ? `+${systemOverview.weeklyChangePercentage}%` : 
+                 totalProductionWeek > 0 ? "Data available" : "Data unavailable"}
+              </span>
+            </p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium">Monthly Production</CardTitle>
           </CardHeader>
           <CardContent>
@@ -962,23 +1273,6 @@ export default function EnergyMonitoringPage() {
                  totalProductionYear > 0 ? "Data available" : "Data unavailable"}
               </span>
             </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Average Efficiency</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{averageEfficiency.toFixed(1)}%</div>
-            <div className="mt-2 h-2 w-full bg-gray-200 rounded-full overflow-hidden">
-              <div
-                className={`h-full rounded-full ${averageEfficiency >= 85 ? 'bg-green-500' :
-                  averageEfficiency >= 70 ? 'bg-green-400' :
-                    averageEfficiency >= 60 ? 'bg-amber-500' : 'bg-red-500'
-                  }`}
-                style={{ width: `${averageEfficiency}%` }}
-              ></div>
-            </div>
           </CardContent>
         </Card>
       </div>
@@ -1168,12 +1462,23 @@ export default function EnergyMonitoringPage() {
                         </Badge>
                       </TableCell>
                       <TableCell className="text-center">
-                        {installation.totalProduction !== undefined ? `${installation.totalProduction} kWh` : "No data"}
+                        {installation.todayGenerationKWh !== undefined ? 
+                          `${installation.todayGenerationKWh.toFixed(5)} kWh today` : 
+                          installation.currentPowerGenerationWatts !== undefined ? 
+                          `${(installation.currentPowerGenerationWatts).toFixed(2)} W current` : 
+                          "No data"}
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-2">
-                          <span>{installation.efficiency !== undefined ? `${installation.efficiency}%` : "N/A"}</span>
-                          {installation.efficiency > 0 && <Sun className="h-4 w-4 text-amber-500" />}
+                          <span>
+                            {installation.averageEfficiencyPercentage !== undefined ? 
+                              `${(installation.averageEfficiencyPercentage).toFixed(2)}%` : 
+                              installation.currentEfficiencyPercentage !== undefined ? 
+                              `${(installation.currentEfficiencyPercentage).toFixed(2)}%` : 
+                              "N/A"}
+                          </span>
+                          {(installation.averageEfficiencyPercentage > 0 || installation.currentEfficiencyPercentage > 0) && 
+                            <Sun className="h-4 w-4 text-amber-500" />}
                         </div>
                       </TableCell>
                     </TableRow>

@@ -3,6 +3,8 @@ package com.solar.core_services.energy_monitoring.service.impl;
 import com.solar.core_services.energy_monitoring.dto.DeviceStatusRequest;
 import com.solar.core_services.energy_monitoring.dto.SolarInstallationDTO;
 import com.solar.core_services.energy_monitoring.dto.SystemOverviewResponse;
+import com.solar.core_services.energy_monitoring.dto.EnergyReadingDTO;
+import com.solar.core_services.energy_monitoring.dto.TopProducerDTO;
 import com.solar.core_services.energy_monitoring.model.EnergyData;
 import com.solar.core_services.energy_monitoring.model.EnergySummary;
 import com.solar.core_services.energy_monitoring.model.SolarInstallation;
@@ -24,6 +26,8 @@ import java.time.LocalTime;
 import java.time.temporal.TemporalAdjusters;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
@@ -407,8 +411,33 @@ public class SolarInstallationServiceImpl implements SolarInstallationService {
             }
         }
         
+        // Get installations by status distribution
+        Map<String, Long> installationsByStatus = allInstallations.stream()
+                .collect(Collectors.groupingBy(
+                        installation -> installation.getStatus().name(),
+                        Collectors.counting()
+                ));
+                
+        // Get recent readings from all installations (last reading from each active installation)
+        List<EnergyReadingDTO> recentInstallationReadings = activeInstallations.stream()
+                .map(installation -> {
+                    List<EnergyData> readings = energyDataRepository.findByInstallationOrderByTimestampDesc(installation);
+                    if (readings.isEmpty()) {
+                        return null;
+                    }
+                    EnergyData latestReading = readings.get(0);
+                    return new EnergyReadingDTO(
+                            installation.getId(),
+                            latestReading.getTimestamp(),
+                            latestReading.getPowerGenerationWatts(),
+                            latestReading.getPowerConsumptionWatts()
+                    );
+                })
+                .filter(reading -> reading != null)
+                .collect(Collectors.toList());
+                
         // Get top producers
-        List<SolarInstallationDTO> topProducers = activeInstallations.stream()
+        List<TopProducerDTO> topProducers = activeInstallations.stream()
                 .sorted((i1, i2) -> {
                     Double i1Gen = energyDataRepository.sumPowerGenerationForPeriod(i1, startOfDay, endOfDay);
                     Double i2Gen = energyDataRepository.sumPowerGenerationForPeriod(i2, startOfDay, endOfDay);
@@ -418,7 +447,26 @@ public class SolarInstallationServiceImpl implements SolarInstallationService {
                     );
                 })
                 .limit(5)
-                .map(this::convertToDTO)
+                .map(installation -> {
+                    // Get installation's generation data
+                    Double todayGeneration = energyDataRepository.sumPowerGenerationForPeriod(
+                            installation, startOfDay, endOfDay);
+                    Double todayConsumption = energyDataRepository.sumPowerConsumptionForPeriod(
+                            installation, startOfDay, endOfDay);
+                    
+                    // Get most recent reading for current generation
+                    List<EnergyData> recentReadings = energyDataRepository.findByInstallationOrderByTimestampDesc(installation);
+                    Double currentGenerationWatts = recentReadings.isEmpty() ? 0 : recentReadings.get(0).getPowerGenerationWatts();
+                    
+                    // Calculate efficiency
+                    Double efficiency = 0.0;
+                    if (todayConsumption != null && todayConsumption > 0) {
+                        efficiency = (todayGeneration / todayConsumption) * 100;
+                    }
+                    
+                    // Convert to TopProducerDTO with production and efficiency metrics
+                    return convertToTopProducerDTO(installation, todayGeneration, currentGenerationWatts, efficiency);
+                })
                 .collect(Collectors.toList());
         
         // Build the system overview response
@@ -444,6 +492,8 @@ public class SolarInstallationServiceImpl implements SolarInstallationService {
                         .map(this::convertToDTO)
                         .collect(Collectors.toList()))
                 .topProducers(topProducers)
+                .recentInstallationReadings(recentInstallationReadings)
+                .installationsByStatus(installationsByStatus)
                 .build();
         
         return response;
@@ -487,5 +537,55 @@ public class SolarInstallationServiceImpl implements SolarInstallationService {
         }
 
         return builder.build();
+    }
+
+    private TopProducerDTO convertToTopProducerDTO(SolarInstallation installation, Double todayGeneration, Double currentGenerationWatts, Double efficiencyValue) {
+        // Calculate sensible default values if metrics are null
+        double todayGenerationKWh = (todayGeneration != null ? todayGeneration : 0) / 1000.0 / 3600.0;
+        double currentGeneration = (currentGenerationWatts != null ? currentGenerationWatts : 0);
+        
+        // Get the efficiency from energy summaries if current calculation is zero
+        double efficiency = efficiencyValue != null ? efficiencyValue : 0;
+        if (efficiency == 0) {
+            // Try to get from recent daily summaries
+            LocalDate today = LocalDate.now();
+            Optional<EnergySummary> todaySummary = energySummaryRepository.findByInstallationAndPeriodAndDate(
+                    installation, EnergySummary.SummaryPeriod.DAILY, today);
+            
+            if (todaySummary.isPresent() && todaySummary.get().getEfficiencyPercentage() > 0) {
+                efficiency = todaySummary.get().getEfficiencyPercentage();
+            } else {
+                // If no daily summary for today, check weekly summary
+                LocalDate startOfWeek = LocalDate.now().minusDays(LocalDate.now().getDayOfWeek().getValue() - 1);
+                Optional<EnergySummary> weeklySummary = energySummaryRepository.findByInstallationAndPeriodAndDate(
+                        installation, EnergySummary.SummaryPeriod.WEEKLY, startOfWeek);
+                
+                if (weeklySummary.isPresent() && weeklySummary.get().getEfficiencyPercentage() > 0) {
+                    efficiency = weeklySummary.get().getEfficiencyPercentage();
+                }
+            }
+        }
+        
+        // Ensure efficiency is properly formatted as a decimal (frontend expects 0.0-1.0 range)
+        efficiency = efficiency > 1.0 ? efficiency / 100.0 : efficiency;
+        
+        // Calculate utilization rate (currentGeneration as percentage of installed capacity)
+        double utilizationRate = 0;
+        if (installation.getInstalledCapacityKW() > 0) {
+            utilizationRate = Math.min(1.0, currentGeneration / (installation.getInstalledCapacityKW() * 1000));
+        }
+        
+        return TopProducerDTO.builder()
+                .id(installation.getId())
+                .name(installation.getName())
+                .userId(installation.getUser() != null ? installation.getUser().getId() : null)
+                .username(installation.getUser() != null ? installation.getUser().getEmail() : null)
+                .location(installation.getLocation())
+                .installedCapacityKW(installation.getInstalledCapacityKW())
+                .currentPowerGenerationWatts(currentGeneration)
+                .todayGenerationKWh(todayGenerationKWh)
+                .efficiencyPercentage(efficiency)
+                .utilizationRate(utilizationRate)
+                .build();
     }
 }

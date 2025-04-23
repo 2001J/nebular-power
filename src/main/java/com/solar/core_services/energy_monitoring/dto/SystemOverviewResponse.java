@@ -9,6 +9,9 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Response DTO for system-wide energy overview
+ */
 @Data
 @Builder
 @NoArgsConstructor
@@ -30,9 +33,13 @@ public class SystemOverviewResponse {
     private double averageSystemEfficiency;
     private LocalDateTime lastUpdated;
     private List<SolarInstallationDTO> recentlyActiveInstallations;
-    private List<SolarInstallationDTO> topProducers;
+    private List<TopProducerDTO> topProducers;
     
-    // New field to hold recent readings from all installations with timestamps preserved
+    // Holds recent readings from all installations with timestamps preserved
+    // Used for real-time system-wide energy visualization
     private List<EnergyReadingDTO> recentInstallationReadings;
+    
+    // Map of installation counts by status (e.g., "ACTIVE": 10, "SUSPENDED": 2)
+    // Used for status distribution visualizations
     private Map<String, Long> installationsByStatus;
 }
