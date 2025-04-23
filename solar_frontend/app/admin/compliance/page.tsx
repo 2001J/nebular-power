@@ -282,9 +282,8 @@ export default function CompliancePage() {
 
       <Tabs defaultValue="security" value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <div className="w-full">
-          <TabsList className="w-full grid grid-cols-4">
+          <TabsList className="w-full grid grid-cols-3">
             <TabsTrigger value="security" className="flex-1">Security Compliance</TabsTrigger>
-            <TabsTrigger value="payment" className="flex-1">Payment Compliance</TabsTrigger>
             <TabsTrigger value="installation" className="flex-1">Installation Compliance</TabsTrigger>
             <TabsTrigger value="activity" className="flex-1">Activity Log</TabsTrigger>
           </TabsList>
@@ -421,136 +420,6 @@ export default function CompliancePage() {
             </CardContent>
             <CardFooter className="border-t px-6 py-4">
               <Button variant="outline" className="ml-auto" disabled={isLoading || securityData.length === 0}>
-                <Download className="mr-2 h-4 w-4" />
-                Export Report
-              </Button>
-            </CardFooter>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="payment" className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">
-                  Payment Compliance
-                </CardTitle>
-                <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">
-                  {isLoading ? "..." : `${paymentData.complianceRate || 0}%`}
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  On-time payment rate
-                </p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">
-                  Overdue Payments
-                </CardTitle>
-                <FileCheck className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">
-                  {isLoading ? "..." : paymentData.unpaid || 0}
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  {paymentData.unpaid === 1 ? "Payment in grace period" : "Payments overdue"}
-                </p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">
-                  On-Time Payments
-                </CardTitle>
-                <FileClock className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">
-                  {isLoading ? "..." : paymentData.paidOnTime || 0}
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Payments received on time
-                </p>
-              </CardContent>
-            </Card>
-          </div>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Payment Compliance Report</CardTitle>
-              <CardDescription>
-                Summary of payment compliance across all payment plans
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="rounded-md border overflow-hidden">
-                <Table className="table-fixed border-collapse">
-                  <TableHeader>
-                    <TableRow className="bg-muted/50">
-                      <TableHead className="w-[120px] whitespace-nowrap">Customer ID</TableHead>
-                      <TableHead className="w-[140px] whitespace-nowrap">Payment Plan ID</TableHead>
-                      <TableHead className="w-[160px] whitespace-nowrap">Last Payment Date</TableHead>
-                      <TableHead className="w-[100px] whitespace-nowrap">Amount</TableHead>
-                      <TableHead className="w-[100px] whitespace-nowrap">Status</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {isLoading ? (
-                      <TableRow>
-                        <TableCell colSpan={5} className="h-24 text-center">
-                          <div className="flex items-center justify-center">
-                            <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> Loading payment data...
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ) : !paymentData.details || paymentData.details.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={5} className="h-24 text-center">
-                          <div className="flex flex-col items-center justify-center py-4">
-                            <FileCheck className="h-8 w-8 text-muted-foreground mb-2" />
-                            <p className="text-sm text-muted-foreground">
-                              No payment data found in the selected period
-                            </p>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      paymentData.details.slice(0, 5).map((payment, i) => (
-                        <TableRow key={payment.id || i}>
-                          <TableCell className="font-medium">{payment.customerId || "Unknown"}</TableCell>
-                          <TableCell>{payment.paymentPlanId || "Unknown"}</TableCell>
-                          <TableCell>
-                            {payment.lastPaymentDate ?
-                              format(new Date(payment.lastPaymentDate), "MMM dd, yyyy") :
-                              "No payment yet"
-                            }
-                          </TableCell>
-                          <TableCell>${payment.amount ? payment.amount.toFixed(2) : "0.00"}</TableCell>
-                          <TableCell>
-                            <Badge variant={
-                              payment.status === "PAID" ?
-                                "success" :
-                                payment.status === "PARTIAL" ?
-                                  "warning" :
-                                  "destructive"
-                            }>
-                              {payment.status || "Unknown"}
-                            </Badge>
-                          </TableCell>
-                        </TableRow>
-                      ))
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
-            </CardContent>
-            <CardFooter className="border-t px-6 py-4">
-              <Button variant="outline" className="ml-auto" disabled={isLoading || !paymentData.details || paymentData.details.length === 0}>
                 <Download className="mr-2 h-4 w-4" />
                 Export Report
               </Button>

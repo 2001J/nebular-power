@@ -1421,11 +1421,36 @@ export const paymentApi = {
   getPaymentReports: async (reportType = 'all', startDate?: string, endDate?: string) => {
     try {
       console.log(`Fetching payment reports of type: ${reportType}`);
-      const params: any = {};
-      if (startDate) params.startDate = startDate;
-      if (endDate) params.endDate = endDate;
+      
+      // Format dates if not provided - default to last 30 days
+      // Only use the date part (YYYY-MM-DD) as the backend processes time on its side
+      if (!startDate || !endDate) {
+        const today = new Date();
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(today.getDate() - 30);
+        
+        if (!startDate) startDate = thirtyDaysAgo.toISOString().split('T')[0];
+        if (!endDate) endDate = today.toISOString().split('T')[0];
+      }
+      
+      // Just ensure we're just using the date part if full ISO strings are passed
+      if (startDate && startDate.includes('T')) {
+        startDate = startDate.split('T')[0];
+      }
+      
+      if (endDate && endDate.includes('T')) {
+        endDate = endDate.split('T')[0];
+      }
+      
+      console.log(`Using date range for ${reportType} report:`, { startDate, endDate });
+      
+      const params: any = {
+        startDate,
+        endDate
+      };
 
-      const response = await apiClient.get(`/api/admin/payments/reports/${reportType !== 'all' ? reportType : ''}`, {
+      // Call the appropriate report endpoint
+      const response = await apiClient.get(`/api/admin/payments/reports/${reportType}`, {
         params,
         headers: {
           // Add cache control header to prevent caching
@@ -1434,13 +1459,63 @@ export const paymentApi = {
         }
       });
 
+      // For compliance and revenue reports, transform into the expected format
+      if (reportType === 'compliance' || reportType === 'revenue') {
+        const reportData = response.data;
+        
+        // If we received a valid report object
+        if (reportData && typeof reportData === 'object') {
+          console.log(`Received ${reportType} report data:`, reportData);
+          
+          // Create a standardized report structure
+          return {
+            reportType: reportType,
+            data: reportData,
+            summary: {
+              title: reportType === 'compliance' ? 'Compliance Summary' : 'Revenue Summary',
+              metrics: reportType === 'compliance' 
+                ? [
+                    { name: 'Compliance Rate', value: `${reportData.complianceRate || 0}%` },
+                    { name: 'Compliant Customers', value: reportData.compliantCustomers || 0 },
+                    { name: 'Non-Compliant', value: reportData.nonCompliantCustomers || 0 },
+                    { name: 'Overdue Payments', value: reportData.overduePayments || 0 },
+                  ]
+                : [
+                    { name: 'Total Revenue', value: `$${reportData.totalRevenue || 0}` },
+                    { name: 'Expected Revenue', value: `$${reportData.expectedRevenue || 0}` },
+                    { name: 'Collection Rate', value: `${reportData.collectionRate || 0}%` },
+                    { name: 'Number of Payments', value: reportData.numberOfPayments || 0 },
+                  ]
+            },
+            startDate: reportData.startDate || startDate,
+            endDate: reportData.endDate || endDate,
+            generatedDate: reportData.generatedDate || new Date().toISOString().split('T')[0]
+          };
+        }
+      }
+
+      // For other report types, return the data as-is
       return response.data;
     } catch (error: any) {
       console.error(`Error fetching payment reports of type ${reportType}:`, error);
       if (error.response) {
         console.error("Server response:", error.response.status, error.response.data);
       }
-      return [];
+      
+      // Return a formatted error object for easier handling in the UI
+      return {
+        reportType: reportType,
+        error: true,
+        errorMessage: error.message || `Failed to load ${reportType} report`,
+        data: null,
+        summary: {
+          title: reportType === 'compliance' ? 'Compliance Summary' : 'Revenue Summary',
+          metrics: []
+        },
+        startDate: startDate,
+        endDate: endDate,
+        generatedDate: new Date().toISOString().split('T')[0]
+      };
     }
   },
 };

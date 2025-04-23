@@ -59,7 +59,7 @@ import {
   PaginationPrevious,
 } from "@/components/ui/pagination"
 import { DatePickerWithRange } from "@/components/ui/date-range-picker"
-import { paymentComplianceApi } from "@/lib/api"
+import { paymentComplianceApi, paymentApi } from "@/lib/api"
 
 export default function PaymentReportsPage() {
   const router = useRouter()
@@ -80,8 +80,15 @@ export default function PaymentReportsPage() {
       setLoading(true)
 
       let data
-      const startDate = dateRange.from ? dateRange.from.toISOString() : undefined
-      const endDate = dateRange.to ? dateRange.to.toISOString() : undefined
+      // Format dates as ISO strings but only use the date part (YYYY-MM-DD)
+      const startDate = dateRange.from 
+        ? dateRange.from.toISOString().split('T')[0] 
+        : undefined;
+      const endDate = dateRange.to 
+        ? dateRange.to.toISOString().split('T')[0]
+        : undefined;
+
+      console.log(`Fetching ${reportType} report with date range:`, { startDate, endDate });
 
       switch (reportType) {
         case "compliance":
@@ -89,7 +96,8 @@ export default function PaymentReportsPage() {
         case "defaulters":
         case "collection":
         case "summary":
-          data = await paymentComplianceApi.generatePaymentReport(
+          // Use the updated paymentApi.getPaymentReports method instead of paymentComplianceApi.generatePaymentReport
+          data = await paymentApi.getPaymentReports(
             reportType,
             startDate,
             endDate
@@ -113,7 +121,14 @@ export default function PaymentReportsPage() {
           return
       }
 
-      setReportData(data)
+      console.log(`Received ${reportType} report data:`, data)
+      
+      // Extract the actual report data if it's nested in a data property
+      if (data && data.data) {
+        setReportData(data.data)
+      } else {
+        setReportData(data)
+      }
     } catch (error) {
       console.error(`Error fetching ${reportType} report:`, error)
       toast({
@@ -241,6 +256,27 @@ export default function PaymentReportsPage() {
   const renderComplianceReport = () => {
     if (!reportData) return null
 
+    // Get metrics from the standardized format returned by our API
+    const metrics = reportData.summary?.metrics || [];
+    const complianceRate = metrics.find(m => m.name === 'Compliance Rate')?.value || '0%';
+    const compliantCustomers = metrics.find(m => m.name === 'Compliant Customers')?.value || 0;
+    const nonCompliantCustomers = metrics.find(m => m.name === 'Non-Compliant')?.value || 0;
+    const overduePayments = metrics.find(m => m.name === 'Overdue Payments')?.value || 0;
+    
+    // Calculate on-time payment rate or use the original if available
+    const onTimePaymentRate = reportData.onTimePaymentRate || 
+      (reportData.totalPaymentsDue ? Math.round((reportData.paidOnTime / reportData.totalPaymentsDue) * 100) : 0);
+    
+    // Use either the new API format or fall back to the old format
+    const totalPaymentsDue = reportData.totalPaymentsDue || 
+      (typeof compliantCustomers === 'number' && typeof nonCompliantCustomers === 'number' 
+        ? compliantCustomers + nonCompliantCustomers 
+        : 0);
+    
+    const paidOnTime = reportData.paidOnTime || compliantCustomers || 0;
+    const paidLate = reportData.paidLate || 0;
+    const unpaid = reportData.unpaid || nonCompliantCustomers || 0;
+
     return (
       <div className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -249,7 +285,7 @@ export default function PaymentReportsPage() {
               <CardTitle className="text-sm font-medium">Total Payments Due</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{reportData.totalPaymentsDue}</div>
+              <div className="text-2xl font-bold">{totalPaymentsDue}</div>
               <p className="text-xs text-muted-foreground">
                 In selected time period
               </p>
@@ -260,7 +296,7 @@ export default function PaymentReportsPage() {
               <CardTitle className="text-sm font-medium">Compliance Rate</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{reportData.complianceRate}%</div>
+              <div className="text-2xl font-bold">{typeof complianceRate === 'string' ? complianceRate : `${complianceRate}%`}</div>
               <p className="text-xs text-muted-foreground">
                 Payments made (on time or late)
               </p>
@@ -271,7 +307,7 @@ export default function PaymentReportsPage() {
               <CardTitle className="text-sm font-medium">On-Time Payment Rate</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{reportData.onTimePaymentRate}%</div>
+              <div className="text-2xl font-bold">{onTimePaymentRate}%</div>
               <p className="text-xs text-muted-foreground">
                 Payments made on or before due date
               </p>
@@ -289,15 +325,15 @@ export default function PaymentReportsPage() {
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div className="flex flex-col items-center justify-center p-4 bg-muted rounded-lg">
-                <span className="text-4xl font-bold text-green-500">{reportData.paidOnTime}</span>
+                <span className="text-4xl font-bold text-green-500">{paidOnTime}</span>
                 <span className="mt-2 text-sm font-medium">Paid On Time</span>
               </div>
               <div className="flex flex-col items-center justify-center p-4 bg-muted rounded-lg">
-                <span className="text-4xl font-bold text-yellow-500">{reportData.paidLate}</span>
+                <span className="text-4xl font-bold text-yellow-500">{paidLate}</span>
                 <span className="mt-2 text-sm font-medium">Paid Late</span>
               </div>
               <div className="flex flex-col items-center justify-center p-4 bg-muted rounded-lg">
-                <span className="text-4xl font-bold text-red-500">{reportData.unpaid}</span>
+                <span className="text-4xl font-bold text-red-500">{unpaid}</span>
                 <span className="mt-2 text-sm font-medium">Unpaid</span>
               </div>
             </div>
@@ -311,6 +347,29 @@ export default function PaymentReportsPage() {
   const renderRevenueReport = () => {
     if (!reportData) return null
 
+    // Get metrics from the standardized format returned by our API
+    const metrics = reportData.summary?.metrics || [];
+    const totalRevenue = metrics.find(m => m.name === 'Total Revenue')?.value || reportData.totalRevenue || 0;
+    const expectedRevenue = metrics.find(m => m.name === 'Expected Revenue')?.value || reportData.expectedRevenue || 0;
+    const collectionRate = metrics.find(m => m.name === 'Collection Rate')?.value || reportData.collectionRate || 0;
+    const numberOfPayments = metrics.find(m => m.name === 'Number of Payments')?.value || reportData.numberOfPayments || 0;
+    
+    // Convert string currency values (e.g. "$1,000") to numbers if needed
+    const parseToCurrency = (value: any): number => {
+      if (typeof value === 'number') return value;
+      if (typeof value === 'string') {
+        // Remove currency symbol and commas, then parse
+        return parseFloat(value.replace(/[$,]/g, '')) || 0;
+      }
+      return 0;
+    };
+    
+    const totalRevenueNum = parseToCurrency(totalRevenue);
+    const expectedRevenueNum = parseToCurrency(expectedRevenue);
+    const collectionRateNum = typeof collectionRate === 'string' 
+      ? parseFloat(collectionRate.replace(/%/g, '')) 
+      : (collectionRate || 0);
+
     return (
       <div className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -319,7 +378,9 @@ export default function PaymentReportsPage() {
               <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{formatCurrency(reportData.totalRevenue)}</div>
+              <div className="text-2xl font-bold">
+                {typeof totalRevenue === 'string' ? totalRevenue : formatCurrency(totalRevenueNum)}
+              </div>
               <p className="text-xs text-muted-foreground">
                 Collected in selected period
               </p>
@@ -330,7 +391,9 @@ export default function PaymentReportsPage() {
               <CardTitle className="text-sm font-medium">Expected Revenue</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{formatCurrency(reportData.expectedRevenue)}</div>
+              <div className="text-2xl font-bold">
+                {typeof expectedRevenue === 'string' ? expectedRevenue : formatCurrency(expectedRevenueNum)}
+              </div>
               <p className="text-xs text-muted-foreground">
                 Due in selected period
               </p>
@@ -341,9 +404,11 @@ export default function PaymentReportsPage() {
               <CardTitle className="text-sm font-medium">Collection Rate</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{reportData.collectionRate}%</div>
+              <div className="text-2xl font-bold">
+                {typeof collectionRate === 'string' ? collectionRate : `${collectionRateNum}%`}
+              </div>
               <p className="text-xs text-muted-foreground">
-                {reportData.numberOfPayments} payments collected
+                {numberOfPayments} payments collected
               </p>
             </CardContent>
           </Card>
@@ -361,11 +426,15 @@ export default function PaymentReportsPage() {
               <div className="flex flex-col items-center">
                 <div className="flex items-center gap-2">
                   <div className="h-4 w-4 rounded-full bg-primary"></div>
-                  <span className="text-sm">Collected: {formatCurrency(reportData.totalRevenue)}</span>
+                  <span className="text-sm">
+                    Collected: {typeof totalRevenue === 'string' ? totalRevenue : formatCurrency(totalRevenueNum)}
+                  </span>
                 </div>
                 <div className="flex items-center gap-2 mt-2">
                   <div className="h-4 w-4 rounded-full bg-destructive"></div>
-                  <span className="text-sm">Uncollected: {formatCurrency(reportData.expectedRevenue - reportData.totalRevenue)}</span>
+                  <span className="text-sm">
+                    Uncollected: {formatCurrency(expectedRevenueNum - totalRevenueNum)}
+                  </span>
                 </div>
               </div>
             </div>
@@ -524,4 +593,4 @@ export default function PaymentReportsPage() {
       )}
     </div>
   )
-} 
+}
