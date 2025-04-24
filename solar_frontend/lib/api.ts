@@ -2010,6 +2010,37 @@ export const serviceApi = {
       console.error("Error fetching all components status:", error);
       return [];
     }
+  },
+  
+  // Service control operations
+  startService: async (installationId: string) => {
+    try {
+      const response = await apiClient.post(`/api/service/installations/${installationId}/start`);
+      return response.data;
+    } catch (error) {
+      console.error(`Error starting service for installation ${installationId}:`, error);
+      throw error;
+    }
+  },
+  
+  stopService: async (installationId: string) => {
+    try {
+      const response = await apiClient.post(`/api/service/installations/${installationId}/stop`);
+      return response.data;
+    } catch (error) {
+      console.error(`Error stopping service for installation ${installationId}:`, error);
+      throw error;
+    }
+  },
+  
+  restartService: async (installationId: string) => {
+    try {
+      const response = await apiClient.post(`/api/service/installations/${installationId}/restart`);
+      return response.data;
+    } catch (error) {
+      console.error(`Error restarting service for installation ${installationId}:`, error);
+      throw error;
+    }
   }
 };
 
@@ -2022,6 +2053,25 @@ export const serviceControlApi = {
       return response.data;
     } catch (error: any) {
       console.error(`Error fetching service status for installation ${installationId}:`, error);
+      
+      // Check if it's the specific "No active service status found" error
+      if (error.response?.status === 500 && 
+          error.response?.data?.message?.includes("No active service status found")) {
+        // Return a default status object instead of throwing an error
+        return {
+          id: null,
+          installationId: installationId,
+          installationName: `Installation #${installationId}`,
+          status: "PENDING", // Default status
+          updatedAt: new Date().toISOString(),
+          updatedBy: "System",
+          scheduledChange: null,
+          scheduledTime: null,
+          statusReason: "No active status record",
+          active: true
+        };
+      }
+      
       throw error;
     }
   },
@@ -2040,11 +2090,57 @@ export const serviceControlApi = {
 
   updateServiceStatus: async (installationId: string, statusData: any) => {
     try {
-      const response = await apiClient.put(`/api/service/status/${installationId}`, statusData);
+      // Validate the input data
+      if (!statusData || !statusData.status) {
+        throw new Error("Status data is required");
+      }
+      
+      // Ensure the status is in the correct format - backend expects an enum
+      const validStatusValues = [
+        "ACTIVE", "SUSPENDED_PAYMENT", "SUSPENDED_SECURITY", 
+        "SUSPENDED_MAINTENANCE", "TRANSITIONING", "PENDING"
+      ];
+      
+      const status = statusData.status.toString().toUpperCase();
+      if (!validStatusValues.includes(status)) {
+        throw new Error(`Invalid status value: ${status}. Must be one of: ${validStatusValues.join(", ")}`);
+      }
+      
+      // Ensure the payload has the correct format
+      const formattedData = {
+        status: status,
+        statusReason: statusData.statusReason || "",
+        updatedBy: statusData.updatedBy || "SYSTEM",
+        scheduledChange: statusData.scheduledChange || null,
+        scheduledTime: statusData.scheduledTime || null
+      };
+      
+      const response = await apiClient.put(`/api/service/status/${installationId}`, formattedData);
       return response.data;
     } catch (error: any) {
       console.error(`Error updating service status for installation ${installationId}:`, error);
-      throw error;
+      
+      // More detailed error information
+      let errorMessage = "Failed to update service status";
+      
+      if (error.response) {
+        // The request was made and the server responded with a status code
+        // that falls out of the range of 2xx
+        errorMessage += `: Server responded with ${error.response.status}`;
+        if (error.response.data && error.response.data.message) {
+          errorMessage += ` - ${error.response.data.message}`;
+        }
+      } else if (error.request) {
+        // The request was made but no response was received
+        errorMessage += ": No response received from server";
+      } else {
+        // Something happened in setting up the request that triggered an Error
+        errorMessage += `: ${error.message}`;
+      }
+      
+      const enhancedError = new Error(errorMessage);
+      (enhancedError as any).originalError = error;
+      throw enhancedError;
     }
   },
 
@@ -2135,6 +2231,36 @@ export const serviceControlApi = {
     } catch (error: any) {
       console.error(`Error fetching installations by status ${status}:`, error);
       return { content: [], totalElements: 0, totalPages: 0 };
+    }
+  },
+
+  // New batch status retrieval method for better performance
+  getBatchStatuses: async (installationIds: string[]) => {
+    try {
+      // Only send valid IDs to avoid backend errors
+      const validIds = installationIds.filter(id => id && !isNaN(Number(id)));
+      
+      if (validIds.length === 0) {
+        return [];
+      }
+      
+      const response = await apiClient.post('/api/service/status/batch', validIds);
+      return response.data;
+    } catch (error: any) {
+      console.error('Error fetching batch statuses:', error);
+      
+      // Return a list of default status objects for the requested installations
+      return installationIds.map(id => ({
+        id: null,
+        installationId: id,
+        installationName: `Installation #${id}`,
+        status: "UNKNOWN",
+        statusReason: "Could not retrieve status",
+        updatedAt: new Date().toISOString(),
+        lastUpdated: new Date().toISOString(),
+        updatedBy: "System",
+        active: true
+      }));
     }
   },
 
