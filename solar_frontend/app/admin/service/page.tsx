@@ -1,7 +1,8 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { ArrowUpDown, CheckCircle, Clock, Settings, ShieldAlert, AlertTriangle, Clock4, RefreshCw, Plus } from "lucide-react"
+import { useRouter } from "next/navigation"
+import { ArrowUpDown, CheckCircle, Clock, Settings, ShieldAlert, AlertTriangle, Clock4, RefreshCw, Plus, Activity, BarChart2, Zap, Signal, Server } from "lucide-react"
 import { format } from "date-fns"
 
 import { Badge } from "@/components/ui/badge"
@@ -46,7 +47,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { cn } from "@/lib/utils"
-import { serviceControlApi, installationApi } from "@/lib/api"
+import { serviceControlApi, installationApi, serviceApi } from "@/lib/api"
 
 export default function ServicePage() {
   const [activeTab, setActiveTab] = useState("statuses")
@@ -103,6 +104,11 @@ export default function ServicePage() {
     params: "",
     priority: "NORMAL"
   })
+
+  const [isSubmitting, setIsSubmitting] = useState(false)
+
+  // Add state for commandStats
+  const [commandStats, setCommandStats] = useState({})
 
   // Fetch installations and statuses
   useEffect(() => {
@@ -167,10 +173,26 @@ export default function ServicePage() {
         console.log(`Fetching commands with status: ${commandStatusFilter}`)
         const commandsResponse = await serviceControlApi.getCommandsByStatus(commandStatusFilter)
         commandsData = commandsResponse?.content || []
+      } else if (selectedInstallation) {
+        // If we have a selected installation, fetch just for that one
+        console.log(`Fetching commands for selected installation: ${selectedInstallation.id}`)
+        const installationCommands = await serviceControlApi.getCommandsByInstallation(selectedInstallation.id)
+        commandsData = installationCommands?.content || []
       } else {
-        // Fetch commands from all installations
-        console.log(`Fetching commands for ${installations.length} installations`)
-        for (const installation of installations) {
+        // Fetch pending commands from all installations to avoid overloading
+        console.log(`Fetching recent commands for ${installations.length} installations`)
+        
+        // Get command status counts to display in dashboard
+        try {
+          const statusCounts = await serviceControlApi.getCommandStatusCounts()
+          setCommandStats(statusCounts)
+        } catch (error) {
+          console.error("Error fetching command status counts:", error)
+        }
+
+        // Get recent commands from first 5 installations
+        const topInstallations = installations.slice(0, 5)
+        for (const installation of topInstallations) {
           try {
             const installationCommands = await serviceControlApi.getCommandsByInstallation(installation.id)
             if (installationCommands && installationCommands.content) {
@@ -437,64 +459,124 @@ export default function ServicePage() {
     }
   }
 
-  // Handler for sending device commands
   const handleSendCommand = async () => {
-    if (!commandFormData.installationId || !commandFormData.commandType) {
-      toast({
-        title: "Missing Information",
-        description: "Please select an installation and command type.",
-        variant: "destructive",
-      })
-      return
-    }
-
     try {
+      setIsSubmitting(true)
+
+      if (!commandFormData.installationId || !commandFormData.commandType) {
+        toast({
+          title: "Missing Information",
+          description: "Please select an installation and command type",
+          variant: "destructive",
+        })
+        return
+      }
+
+      // Parse the params string into an object if it's provided
       let params = {}
-      if (commandFormData.params) {
+      if (commandFormData.params && commandFormData.params.trim() !== '') {
         try {
           params = JSON.parse(commandFormData.params)
-        } catch (err) {
+        } catch (error) {
           toast({
             title: "Invalid Parameters",
-            description: "Command parameters must be valid JSON.",
+            description: "Command parameters must be valid JSON",
             variant: "destructive",
           })
           return
         }
       }
 
-      const commandData = {
-        commandType: commandFormData.commandType,
-        params: params,
-        priority: commandFormData.priority
-      }
+      // Add priority to params if needed
+      params.priority = commandFormData.priority || 'NORMAL'
 
-      await serviceControlApi.sendCommand(commandFormData.installationId, commandData)
+      // Send the command
+      await serviceControlApi.sendCommand(
+        commandFormData.installationId,
+        commandFormData.commandType,
+        params
+      )
 
       toast({
         title: "Command Sent",
-        description: `${commandFormData.commandType} command sent to installation #${commandFormData.installationId}.`,
+        description: `Command ${commandFormData.commandType} sent to installation ${commandFormData.installationId}`,
+        variant: "default",
       })
 
-      // Reset form and close dialog
+      // Close the dialog and refresh commands
+      setNewCommandDialogOpen(false)
+      fetchCommands()
+
+      // Reset form
       setCommandFormData({
         installationId: "",
         commandType: "",
         params: "",
         priority: "NORMAL"
       })
-      setNewCommandDialogOpen(false)
-
-      // Here you would ideally refresh the commands list
-      // This would require implementing a fetchCommands function
-
     } catch (error) {
-      console.error(`Error sending command to installation ${commandFormData.installationId}:`, error)
+      console.error("Error sending command:", error)
       toast({
         title: "Error",
-        description: "Failed to send command to device.",
+        description: "Failed to send command. Please try again.",
         variant: "destructive",
       })
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  // Add function to handle retry command
+  const handleRetryCommand = async (commandId) => {
+    try {
+      setCommandsLoading(true)
+      
+      await serviceControlApi.retryCommand(commandId)
+      
+      toast({
+        title: "Command Retried",
+        description: "Command has been queued for retry",
+        variant: "default",
+      })
+      
+      // Refresh commands list
+      fetchCommands()
+    } catch (error) {
+      console.error(`Error retrying command ${commandId}:`, error)
+      toast({
+        title: "Error",
+        description: "Failed to retry command. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setCommandsLoading(false)
+    }
+  }
+
+  // Add function to handle cancel command
+  const handleCancelCommand = async (commandId) => {
+    try {
+      setCommandsLoading(true)
+      
+      await serviceControlApi.cancelCommand(commandId)
+      
+      toast({
+        title: "Command Cancelled",
+        description: "Command has been cancelled successfully",
+        variant: "default",
+      })
+      
+      // Refresh commands list
+      fetchCommands()
+    } catch (error) {
+      console.error(`Error cancelling command ${commandId}:`, error)
+      toast({
+        title: "Error",
+        description: "Failed to cancel command. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setCommandsLoading(false)
     }
   }
 
@@ -1017,18 +1099,9 @@ export default function ServicePage() {
                                           size="sm"
                                           onClick={async () => {
                                             try {
-                                              await serviceControlApi.retryCommand(command.id);
-                                              toast({
-                                                title: "Command Retry Initiated",
-                                                description: "The command will be retried."
-                                              });
-                                              fetchCommands();
+                                              await handleRetryCommand(command.id);
                                             } catch (error) {
-                                              toast({
-                                                title: "Error",
-                                                description: "Failed to retry command.",
-                                                variant: "destructive"
-                                              });
+                                              console.error("Error retrying command:", error)
                                             }
                                           }}
                                         >
@@ -1040,18 +1113,9 @@ export default function ServicePage() {
                                             size="sm"
                                             onClick={async () => {
                                               try {
-                                                await serviceControlApi.cancelCommand(command.id);
-                                                toast({
-                                                  title: "Command Cancelled",
-                                                  description: "The command has been cancelled."
-                                                });
-                                                fetchCommands();
+                                                await handleCancelCommand(command.id);
                                               } catch (error) {
-                                                toast({
-                                                  title: "Error",
-                                                  description: "Failed to cancel command.",
-                                                  variant: "destructive"
-                                                });
+                                                console.error("Error cancelling command:", error)
                                               }
                                             }}
                                           >
@@ -1543,4 +1607,4 @@ export default function ServicePage() {
       </Dialog>
     </div>
   )
-} 
+}

@@ -1,11 +1,59 @@
 import axios, { AxiosError, AxiosRequestConfig, AxiosResponse } from 'axios';
-import { toast } from "@/components/ui/use-toast";
 
-// Define a proper API error type interface to handle errors
+// Create a simple toast function that can be called directly
+// This is a placeholder for the actual toast implementation
+const toast = (options: { title: string; description?: string; variant?: string }) => {
+  if (process.env.NODE_ENV === 'development') {
+    console.log(`Toast: ${options.title}${options.description ? ` - ${options.description}` : ''}`);
+  }
+};
+
+// Define interfaces
 interface ApiErrorResponse {
   status?: number;
   data?: any;
   message?: string;
+}
+
+interface EnergyReading {
+  powerGenerationWatts: number;
+  powerConsumptionWatts: number;
+}
+
+interface PaymentPlan {
+  id?: string;
+  customerId: string;
+  amount: number;
+  frequency: string;
+  startDate: string;
+  endDate?: string;
+  status: string;
+}
+
+interface CustomerPaymentPlan {
+  id: string;
+  plans: PaymentPlan[];
+}
+
+// Add interfaces at the top with other interfaces
+interface PaymentData {
+  amount: number;
+  paymentMethod: string;
+  paymentDate: string;
+  description?: string;
+  receiptNumber?: string;
+}
+
+interface PaymentReport {
+  reportType: string;
+  data: any;
+  startDate?: string;
+  endDate?: string;
+  summary?: {
+    totalAmount?: number;
+    count?: number;
+    status?: string;
+  };
 }
 
 // Network error handling configuration
@@ -594,7 +642,9 @@ export const userApi = {
           'Pragma': 'no-cache'
         },
         // Set a shorter timeout for this potentially problematic endpoint
-        timeout: 8000
+        timeout: 8000,
+        // Explicit auth - ensure the token is current
+        withCredentials: true
       });
 
       // Add better validation of the response data
@@ -970,40 +1020,32 @@ export const energyApi = {
   // Calculate average efficiency for an installation
   calculateInstallationAverageEfficiency: async (installationId: string) => {
     try {
-      // First fetch the installation dashboard data which has current efficiency
       const dashboardData = await energyApi.getInstallationDashboard(installationId);
       
       if (!dashboardData) {
-        return 0; // Return zero if no dashboard data
+        return 0;
       }
       
-      // Get recent readings to calculate average efficiency
       const recentReadings = await energyApi.getRecentReadings(installationId, 30);
       
-      // If we have readings, calculate average efficiency from them
       if (recentReadings && recentReadings.length > 0) {
-        // Calculate efficiency from power generation vs consumption ratio
         let efficiencySum = 0;
         let validReadingsCount = 0;
         
-        recentReadings.forEach(reading => {
+        recentReadings.forEach((reading: EnergyReading) => {
           if (reading.powerGenerationWatts > 0 && reading.powerConsumptionWatts > 0) {
-            // Calculate efficiency as a percentage 
             const readingEfficiency = Math.min(100, (reading.powerGenerationWatts / reading.powerConsumptionWatts) * 100);
             efficiencySum += readingEfficiency;
             validReadingsCount++;
           }
         });
         
-        // Return average if we have valid readings, otherwise use current efficiency
         if (validReadingsCount > 0) {
           const averageEfficiency = efficiencySum / validReadingsCount;
-          return Math.round(averageEfficiency * 100) / 100; // Round to 2 decimal places
+          return Math.round(averageEfficiency * 100) / 100;
         }
       }
       
-      // If we don't have enough readings with both generation and consumption,
-      // return the current efficiency from the dashboard
       return dashboardData.currentEfficiencyPercentage || 0;
     } catch (error: any) {
       console.error(`Error calculating average efficiency for installation ${installationId}:`, error.message);
@@ -1266,16 +1308,13 @@ export const paymentApi = {
     try {
       console.log("Fetching admin payments with params:", { page, size, sortBy, direction });
       
-      // Format dates properly - API expects the date in a specific format
       const today = new Date();
       const thirtyDaysAgo = new Date();
       thirtyDaysAgo.setDate(today.getDate() - 30);
       
-      // Format dates in yyyy-MM-dd format for API
       const startDate = thirtyDaysAgo.toISOString().split('T')[0];
       const endDate = today.toISOString().split('T')[0];
       
-      // Call the revenue report endpoint
       const response = await apiClient.get('/api/admin/payments/reports/revenue', {
         params: { 
           startDate,
@@ -1402,10 +1441,11 @@ export const paymentApi = {
         number: page,
         summary: { totalRevenue: 0, expectedRevenue: 0, collectionRate: 0 }
       };
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("Error fetching admin payments:", error);
-      if (error.response) {
-        console.error("Server response:", error.response.status, error.response.data);
+      if (error instanceof Error && 'response' in error) {
+        const axiosError = error as any;
+        console.error("Server response:", axiosError.response?.status, axiosError.response?.data);
       }
       return { 
         content: [], 
@@ -1559,27 +1599,20 @@ export const paymentComplianceApi = {
   },
 
   // Update grace period configuration
-  updateGracePeriodConfig: async (config) => {
+  updateGracePeriodConfig: async (config: {
+    numberOfDays: number;
+    gracePeriodDays: number;
+    reminderFrequency: number;
+    autoSuspendEnabled: boolean;
+    lateFeesEnabled: boolean;
+    lateFeePercentage: number;
+    lateFeeFixedAmount: number;
+  }) => {
     try {
-      // Log the request payload for debugging
       console.log("Updating grace period config with payload:", config);
-
-      // Ensure the payload has the correct structure expected by the API
-      const formattedConfig = {
-        numberOfDays: parseInt(config.numberOfDays?.toString() || config.gracePeriodDays?.toString() || '7'),
-        gracePeriodDays: parseInt(config.numberOfDays?.toString() || config.gracePeriodDays?.toString() || '7'),
-        reminderFrequency: parseInt(config.reminderFrequency?.toString() || '2'),
-        autoSuspendEnabled: config.autoSuspendEnabled !== false,
-        lateFeesEnabled: config.lateFeesEnabled === true,
-        lateFeePercentage: parseFloat(config.lateFeePercentage?.toString() || '0'),
-        lateFeeFixedAmount: parseFloat(config.lateFeeFixedAmount?.toString() || '0')
-      };
-
-      const response = await apiClient.put('/api/admin/payments/grace-period-config', formattedConfig);
-
-      // Log success and return the updated config
+      const response = await apiClient.put('/api/admin/payments/grace-period-config', config);
       console.log("Grace period config updated successfully:", response.data);
-      return response.data || formattedConfig;
+      return response.data || config;
     } catch (error) {
       console.error("Error updating grace period config:", error);
       throw error;
@@ -1605,25 +1638,18 @@ export const paymentComplianceApi = {
   },
 
   // Update reminder configuration
-  updateReminderConfig: async (config) => {
+  updateReminderConfig: async (config: {
+    autoSendReminders: boolean;
+    firstReminderDays: number;
+    secondReminderDays: number;
+    finalReminderDays: number;
+    reminderMethod: string;
+  }) => {
     try {
-      // Log the request payload for debugging
       console.log("Updating reminder config with payload:", config);
-
-      // Ensure the payload has the correct structure expected by the API
-      const formattedConfig = {
-        autoSendReminders: config.autoSendReminders !== false,
-        firstReminderDays: parseInt(config.firstReminderDays?.toString() || '1'),
-        secondReminderDays: parseInt(config.secondReminderDays?.toString() || '3'),
-        finalReminderDays: parseInt(config.finalReminderDays?.toString() || '7'),
-        reminderMethod: config.reminderMethod || "EMAIL"
-      };
-
-      const response = await apiClient.put('/api/admin/payments/reminder-config', formattedConfig);
-
-      // Log success and return the updated config
+      const response = await apiClient.put('/api/admin/payments/reminder-config', config);
       console.log("Reminder config updated successfully:", response.data);
-      return response.data || formattedConfig;
+      return response.data || config;
     } catch (error) {
       console.error("Error updating reminder config:", error);
       throw error;
@@ -1631,7 +1657,7 @@ export const paymentComplianceApi = {
   },
 
   // Send a manual payment reminder
-  sendManualReminder: async (paymentId, reminderType) => {
+  sendManualReminder: async (paymentId: string, reminderType: string) => {
     try {
       const response = await apiClient.post(`/api/admin/payments/${paymentId}/send-reminder`, {
         reminderType
@@ -1644,7 +1670,7 @@ export const paymentComplianceApi = {
   },
 
   // Send a bulk manual reminder
-  sendBulkManualReminder: async (reminderData) => {
+  sendBulkManualReminder: async (reminderData: { paymentIds: string[]; reminderType: string }) => {
     try {
       const response = await apiClient.post('/api/admin/payments/reminders/send', reminderData);
       return response.data;
@@ -1655,7 +1681,7 @@ export const paymentComplianceApi = {
   },
 
   // Get payment reminders history
-  getPaymentReminders: async (paymentId) => {
+  getPaymentReminders: async (paymentId: string) => {
     try {
       const response = await apiClient.get(`/api/admin/payments/${paymentId}/reminders`);
       return response.data || [];
@@ -1666,7 +1692,7 @@ export const paymentComplianceApi = {
   },
 
   // Get customer payment plans
-  getCustomerPaymentPlans: async (customerId) => {
+  getCustomerPaymentPlans: async (customerId: string): Promise<CustomerPaymentPlan[]> => {
     try {
       const response = await apiClient.get(`/api/admin/payments/customers/${customerId}/plan`);
       return response.data || [];
@@ -1677,11 +1703,10 @@ export const paymentComplianceApi = {
   },
 
   // Create payment plan for a customer
-  createPaymentPlan: async (customerId, planData) => {
+  createPaymentPlan: async (customerId: string, planData: PaymentPlan): Promise<PaymentPlan> => {
     try {
-      // Fix: Ensure we're passing a customer ID, not an object
-      const customerIdValue = typeof customerId === 'object' ? customerId.id : customerId;
-
+      // For object type customerId, we expect it to have an id property
+      const customerIdValue = typeof customerId === 'object' && customerId !== null ? (customerId as { id: string }).id : customerId;
       console.log(`Creating payment plan for customer ID: ${customerIdValue}`, planData);
       const response = await apiClient.post(`/api/admin/payments/customers/${customerIdValue}/plan`, planData);
       return response.data;
@@ -1692,7 +1717,7 @@ export const paymentComplianceApi = {
   },
 
   // Update customer payment plan
-  updatePaymentPlan: async (customerId, planId, planData) => {
+  updatePaymentPlan: async (customerId: string, planId: string, planData: Partial<PaymentPlan>): Promise<PaymentPlan> => {
     try {
       const response = await apiClient.put(`/api/admin/payments/customers/${customerId}/plan/${planId}`, planData);
       return response.data;
@@ -1703,7 +1728,7 @@ export const paymentComplianceApi = {
   },
 
   // Record a manual payment
-  recordManualPayment: async (customerId, paymentData) => {
+  recordManualPayment: async (customerId: string, paymentData: PaymentData): Promise<PaymentData> => {
     try {
       const response = await apiClient.post(`/api/admin/payments/customers/${customerId}/manual-payment`, paymentData);
       return response.data;
@@ -1714,7 +1739,7 @@ export const paymentComplianceApi = {
   },
 
   // Get customer installation payments
-  getCustomerInstallationPayments: async (installationId) => {
+  getCustomerInstallationPayments: async (installationId: string) => {
     try {
       const response = await apiClient.get(`/api/admin/payments/customers/${installationId}/payments`);
       return response.data || [];
@@ -1727,7 +1752,7 @@ export const paymentComplianceApi = {
   // PAYMENT ANALYTICS REPORT ENDPOINTS
 
   // Generate payment report by type
-  generatePaymentReport: async (reportType, startDate, endDate) => {
+  generatePaymentReport: async (reportType: string, startDate?: string, endDate?: string): Promise<PaymentReport> => {
     try {
       const response = await apiClient.get(`/api/admin/payments/reports/${reportType}`, {
         params: {
@@ -1755,21 +1780,8 @@ export const paymentComplianceApi = {
     }
   },
 
-  // Get payments by status report
-  getPaymentsByStatusReport: async (status, startDate, endDate) => {
-    try {
-      const response = await apiClient.get(`/api/admin/payments/reports/status/${status}`, {
-        params: { startDate, endDate }
-      });
-      return response.data;
-    } catch (error) {
-      console.error(`Error fetching payments by status ${status} report:`, error);
-      throw error;
-    }
-  },
-
   // Get payment plans by status report
-  getPaymentPlansByStatusReport: async (status, startDate, endDate) => {
+  getPaymentPlansByStatusReport: async (status: string, startDate: string, endDate: string) => {
     try {
       const response = await apiClient.get(`/api/admin/payments/reports/payment-plans/status/${status}`, {
         params: { startDate, endDate }
@@ -1782,7 +1794,7 @@ export const paymentComplianceApi = {
   },
 
   // Get payment plan report
-  getPaymentPlanReport: async (paymentPlanId) => {
+  getPaymentPlanReport: async (paymentPlanId: string) => {
     try {
       const response = await apiClient.get(`/api/admin/payments/reports/payment-plan/${paymentPlanId}`);
       return response.data;
@@ -1793,7 +1805,7 @@ export const paymentComplianceApi = {
   },
 
   // Get overdue payments report
-  getOverduePaymentsReport: async (startDate, endDate) => {
+  getOverduePaymentsReport: async (startDate: string, endDate: string) => {
     try {
       const response = await apiClient.get('/api/admin/payments/reports/overdue', {
         params: { startDate, endDate }
@@ -1806,7 +1818,7 @@ export const paymentComplianceApi = {
   },
 
   // Get installation payment report
-  getInstallationPaymentReport: async (installationId) => {
+  getInstallationPaymentReport: async (installationId: string) => {
     try {
       const response = await apiClient.get(`/api/admin/payments/reports/installation/${installationId}`);
       return response.data;
@@ -1817,7 +1829,7 @@ export const paymentComplianceApi = {
   },
 
   // Get payment history report
-  getPaymentHistoryReport: async (installationId) => {
+  getPaymentHistoryReport: async (installationId: string) => {
     try {
       const response = await apiClient.get(`/api/admin/payments/reports/history/${installationId}`);
       return response.data;
@@ -1828,7 +1840,7 @@ export const paymentComplianceApi = {
   },
 
   // Get payments due report
-  getPaymentsDueReport: async (startDate, endDate) => {
+  getPaymentsDueReport: async (startDate: string, endDate: string) => {
     try {
       const response = await apiClient.get('/api/admin/payments/reports/due', {
         params: { startDate, endDate }
@@ -1838,39 +1850,172 @@ export const paymentComplianceApi = {
       console.error("Error fetching payments due report:", error);
       throw error;
     }
-  }
+  },
+
+  // Get payments by status report
+  getPaymentsByStatusReport: async (status: string, startDate: string, endDate: string) => {
+    try {
+      const response = await apiClient.get(`/api/admin/payments/reports/status/${status}`, {
+        params: { startDate, endDate }
+      });
+      return response.data;
+    } catch (error) {
+      console.error(`Error fetching payments by status ${status} report:`, error);
+      throw error;
+    }
+  },
 };
 
 // Service Control API
 export const serviceApi = {
   getServiceStatus: async () => {
-    const response = await apiClient.get('/api/service/status');
-    return response.data;
+    try {
+      const response = await apiClient.get('/api/service/status');
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching service status:", error);
+      return null;
+    }
   },
 
   sendDeviceCommand: async (commandData: any) => {
-    const response = await apiClient.post('/api/service/commands', commandData);
-    return response.data;
+    try {
+      const response = await apiClient.post('/api/service/commands', commandData);
+      return response.data;
+    } catch (error) {
+      console.error("Error sending device command:", error);
+      throw error;
+    }
   },
 
-  getOperationalLogs: async () => {
-    const response = await apiClient.get('/api/service/logs');
-    return response.data;
+  getOperationalLogs: async (page = 0, size = 25) => {
+    try {
+      const response = await apiClient.get('/api/service/logs', {
+        params: { page, size }
+      });
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching operational logs:", error);
+      return [];
+    }
   },
 
   getSystemIntegration: async () => {
-    const response = await apiClient.get('/api/service/system');
-    return response.data;
+    try {
+      const response = await apiClient.get('/api/service/system');
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching system integration status:", error);
+      return null;
+    }
   },
 
   getModuleIntegration: async () => {
-    const response = await apiClient.get('/api/service/integration');
-    return response.data;
+    try {
+      const response = await apiClient.get('/api/service/integration');
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching module integration status:", error);
+      return null;
+    }
   },
+
+  // System health monitoring
+  getSystemHealth: async () => {
+    try {
+      const response = await apiClient.get('/monitoring/system/health');
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching system health:", error);
+      return null;
+    }
+  },
+
+  // Device heartbeats
+  getSystemHeartbeats: async (page = 0, size = 50) => {
+    try {
+      const response = await apiClient.get('/monitoring/system/heartbeats', {
+        params: { page, size }
+      });
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching system heartbeats:", error);
+      return [];
+    }
+  },
+
+  getDeviceHeartbeat: async (deviceId: string) => {
+    try {
+      const response = await apiClient.get(`/monitoring/system/heartbeats/${deviceId}`);
+      return response.data;
+    } catch (error) {
+      console.error(`Error fetching heartbeat for device ${deviceId}:`, error);
+      return null;
+    }
+  },
+
+  // System diagnostics
+  runSystemDiagnostics: async () => {
+    try {
+      const response = await apiClient.post('/monitoring/system/diagnostics');
+      return response.data;
+    } catch (error) {
+      console.error("Error running system diagnostics:", error);
+      throw error;
+    }
+  },
+
+  getSystemDiagnosticsResult: async (diagnosticId: string) => {
+    try {
+      const response = await apiClient.get(`/monitoring/system/diagnostics/${diagnosticId}`);
+      return response.data;
+    } catch (error) {
+      console.error(`Error fetching diagnostic result ${diagnosticId}:`, error);
+      return null;
+    }
+  },
+
+  // System resources
+  getSystemResources: async () => {
+    try {
+      const response = await apiClient.get('/monitoring/system/resources');
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching system resources:", error);
+      return {
+        cpu: 0,
+        memory: 0,
+        disk: 0,
+        network: 0
+      };
+    }
+  },
+
+  // System component status
+  getComponentStatus: async (componentName: string) => {
+    try {
+      const response = await apiClient.get(`/monitoring/system/components/${componentName}`);
+      return response.data;
+    } catch (error) {
+      console.error(`Error fetching component status for ${componentName}:`, error);
+      return null;
+    }
+  },
+
+  getAllComponentsStatus: async () => {
+    try {
+      const response = await apiClient.get('/monitoring/system/components');
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching all components status:", error);
+      return [];
+    }
+  }
 };
 
 // Service Control API
 export const serviceControlApi = {
+  // Service Status Functions
   getCurrentStatus: async (installationId: string) => {
     try {
       const response = await apiClient.get(`/api/service/status/${installationId}`);
@@ -1981,39 +2126,24 @@ export const serviceControlApi = {
     }
   },
 
-  hasOverduePayments: async (installationId: string) => {
+  getInstallationsByStatus: async (status: string, page = 0, size = 20) => {
     try {
-      const response = await apiClient.get(`/api/service/status/${installationId}/overdue-check`);
+      const response = await apiClient.get('/api/service/status/by-state', {
+        params: { status, page, size }
+      });
       return response.data;
     } catch (error: any) {
-      console.error(`Error checking overdue payments for installation ${installationId}:`, error);
-      return false; // Default to false if API check fails
+      console.error(`Error fetching installations by status ${status}:`, error);
+      return { content: [], totalElements: 0, totalPages: 0 };
     }
   },
 
-  getDaysUntilSuspension: async (installationId: string) => {
+  // Device Command Functions
+  sendCommand: async (installationId: string, command: string, parameters = {}) => {
     try {
-      const response = await apiClient.get(`/api/service/status/${installationId}/days-until-suspension`);
-      return response.data;
-    } catch (error: any) {
-      console.error(`Error fetching days until suspension for installation ${installationId}:`, error);
-      return null; // Return null to indicate unknown days until suspension
-    }
-  },
-
-  getGracePeriod: async (installationId: string) => {
-    try {
-      const response = await apiClient.get(`/api/service/status/${installationId}/grace-period`);
-      return response.data;
-    } catch (error: any) {
-      console.error(`Error fetching grace period for installation ${installationId}:`, error);
-      return 7; // Default grace period of 7 days
-    }
-  },
-
-  sendCommand: async (installationId: string, commandData: any) => {
-    try {
-      const response = await apiClient.post(`/api/service/commands/installation/${installationId}`, commandData);
+      const response = await apiClient.post(`/api/service/commands/${installationId}`, parameters, {
+        params: { command }
+      });
       return response.data;
     } catch (error: any) {
       console.error(`Error sending command to installation ${installationId}:`, error);
@@ -2021,9 +2151,73 @@ export const serviceControlApi = {
     }
   },
 
+  sendBatchCommand: async (batchCommandData: any) => {
+    try {
+      const response = await apiClient.post('/api/service/commands/batch', batchCommandData);
+      return response.data;
+    } catch (error: any) {
+      console.error('Error sending batch command:', error);
+      throw error;
+    }
+  },
+
+  getCommandsByInstallation: async (installationId: string, page = 0, size = 20) => {
+    try {
+      const response = await apiClient.get(`/api/service/commands/${installationId}`, {
+        params: { page, size }
+      });
+      return response.data;
+    } catch (error: any) {
+      console.error(`Error fetching commands for installation ${installationId}:`, error);
+      return { content: [], totalElements: 0, totalPages: 0 };
+    }
+  },
+
+  getCommandsByStatus: async (status: string, page = 0, size = 20) => {
+    try {
+      const response = await apiClient.get(`/api/service/commands/status/${status}`, {
+        params: { page, size }
+      });
+      return response.data;
+    } catch (error: any) {
+      console.error(`Error fetching commands with status ${status}:`, error);
+      return { content: [], totalElements: 0, totalPages: 0 };
+    }
+  },
+
+  getPendingCommands: async (installationId: string) => {
+    try {
+      const response = await apiClient.get(`/api/service/commands/${installationId}/pending`);
+      return response.data;
+    } catch (error: any) {
+      console.error(`Error fetching pending commands for installation ${installationId}:`, error);
+      return [];
+    }
+  },
+
+  getCommandById: async (commandId: string) => {
+    try {
+      const response = await apiClient.get(`/api/service/commands/id/${commandId}`);
+      return response.data;
+    } catch (error: any) {
+      console.error(`Error fetching command with ID ${commandId}:`, error);
+      throw error;
+    }
+  },
+
+  getCommandByCorrelationId: async (correlationId: string) => {
+    try {
+      const response = await apiClient.get(`/api/service/commands/correlation/${correlationId}`);
+      return response.data;
+    } catch (error: any) {
+      console.error(`Error fetching command with correlation ID ${correlationId}:`, error);
+      throw error;
+    }
+  },
+
   cancelCommand: async (commandId: string) => {
     try {
-      const response = await apiClient.delete(`/api/service/commands/${commandId}`);
+      const response = await apiClient.post(`/api/service/commands/${commandId}/cancel`);
       return response.data;
     } catch (error: any) {
       console.error(`Error canceling command ${commandId}:`, error);
@@ -2031,41 +2225,120 @@ export const serviceControlApi = {
     }
   },
 
-  getLogsByTimeRange: async (startTime: string, endTime: string) => {
+  retryCommand: async (commandId: string) => {
+    try {
+      const response = await apiClient.post(`/api/service/commands/${commandId}/retry`);
+      return response.data;
+    } catch (error: any) {
+      console.error(`Error retrying command ${commandId}:`, error);
+      throw error;
+    }
+  },
+
+  getCommandStatusCounts: async () => {
+    try {
+      const response = await apiClient.get('/api/service/commands/stats/status-counts');
+      return response.data;
+    } catch (error: any) {
+      console.error('Error fetching command status counts:', error);
+      return {};
+    }
+  },
+
+  // Operational Logs Functions
+  getOperationalLogs: async (page = 0, size = 25) => {
+    try {
+      const response = await apiClient.get('/api/service/logs', {
+        params: { page, size }
+      });
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching operational logs:", error);
+      return { content: [], totalElements: 0, totalPages: 0 };
+    }
+  },
+
+  getLogsByTimeRange: async (startTime: string, endTime: string, page = 0, size = 20) => {
     try {
       const response = await apiClient.get('/api/service/logs/time-range', {
-        params: { startTime, endTime }
+        params: { startTime, endTime, page, size }
       });
       return response.data;
     } catch (error: any) {
       console.error(`Error fetching logs by time range:`, error);
-      return [];
+      return { content: [], totalElements: 0, totalPages: 0 };
     }
   },
 
-  getLogsByOperation: async (operation: string) => {
+  getLogsByOperation: async (operation: string, page = 0, size = 20) => {
     try {
       const response = await apiClient.get('/api/service/logs/operation', {
-        params: { operation }
+        params: { operation, page, size }
       });
       return response.data;
     } catch (error: any) {
       console.error(`Error fetching logs by operation ${operation}:`, error);
-      return [];
+      return { content: [], totalElements: 0, totalPages: 0 };
     }
   },
 
-  getLogsBySourceSystem: async (sourceSystem: string) => {
+  getLogsBySourceSystem: async (sourceSystem: string, page = 0, size = 20) => {
     try {
       const response = await apiClient.get('/api/service/logs/source', {
-        params: { sourceSystem }
+        params: { sourceSystem, page, size }
       });
       return response.data;
     } catch (error: any) {
       console.error(`Error fetching logs by source system ${sourceSystem}:`, error);
-      return [];
+      return { content: [], totalElements: 0, totalPages: 0 };
     }
   },
+
+  getLogsByInstallation: async (installationId: string, page = 0, size = 20) => {
+    try {
+      const response = await apiClient.get(`/api/service/logs/installation/${installationId}`, {
+        params: { page, size }
+      });
+      return response.data;
+    } catch (error: any) {
+      console.error(`Error fetching logs for installation ${installationId}:`, error);
+      return { content: [], totalElements: 0, totalPages: 0 };
+    }
+  },
+
+  exportLogs: async (filters: any) => {
+    try {
+      const response = await apiClient.get('/api/service/logs/export', {
+        params: filters,
+        responseType: 'blob'
+      });
+      return response.data;
+    } catch (error: any) {
+      console.error('Error exporting logs:', error);
+      throw error;
+    }
+  },
+
+  // System Integration Functions
+  getSystemIntegration: async () => {
+    try {
+      const response = await apiClient.get('/api/service/system');
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching system integration status:", error);
+      return null;
+    }
+  },
+
+  getModuleIntegration: async () => {
+    try {
+      const response = await apiClient.get('/api/service/integration');
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching module integration status:", error);
+      return null;
+    }
+  }
 };
 
 // Security and Tamper Detection API

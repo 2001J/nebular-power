@@ -49,6 +49,9 @@ export default function LogsPage() {
   const [pageSize, setPageSize] = useState(20)
   const [sortField, setSortField] = useState("timestamp")
   const [sortDirection, setSortDirection] = useState("desc")
+  const [totalPages, setTotalPages] = useState(0)
+  const [totalElements, setTotalElements] = useState(0)
+  const [exporting, setExporting] = useState(false)
 
   // Load installation data for filtering
   useEffect(() => {
@@ -99,29 +102,42 @@ export default function LogsPage() {
             startDate.setHours(0, 0, 0, 0)
         }
 
-        let logsData = []
+        let logsData = { content: [], totalElements: 0, totalPages: 0 }
 
         try {
-          // Use the time range API endpoint
-          logsData = await serviceControlApi.getLogsByTimeRange(
-            startDate.toISOString(),
-            endDate.toISOString()
-          )
-
-          // Filter by operation/source if needed
-          if (logType !== "all") {
-            if (logType.startsWith("op_")) {
-              // Filter by operation
-              const operation = logType.replace("op_", "")
-              logsData = await serviceControlApi.getLogsByOperation(operation)
-            } else if (logType.startsWith("src_")) {
-              // Filter by source system
-              const source = logType.replace("src_", "")
-              logsData = await serviceControlApi.getLogsBySourceSystem(source)
-            }
+          if (logType === "all") {
+            // Use the time range API endpoint with pagination
+            logsData = await serviceControlApi.getLogsByTimeRange(
+              startDate.toISOString(),
+              endDate.toISOString(),
+              page,
+              pageSize
+            )
+          } else if (logType.startsWith("op_")) {
+            // Filter by operation
+            const operation = logType.replace("op_", "")
+            logsData = await serviceControlApi.getLogsByOperation(operation, page, pageSize)
+          } else if (logType.startsWith("src_")) {
+            // Filter by source system
+            const source = logType.replace("src_", "")
+            logsData = await serviceControlApi.getLogsBySourceSystem(source, page, pageSize)
+          } else if (logType.startsWith("inst_")) {
+            // Filter by installation ID
+            const installationId = logType.replace("inst_", "")
+            logsData = await serviceControlApi.getLogsByInstallation(installationId, page, pageSize)
           }
 
-          setLogs(logsData)
+          // Sort logs if needed
+          if (logsData.content) {
+            setLogs(logsData.content)
+            setTotalPages(logsData.totalPages || 1)
+            setTotalElements(logsData.totalElements || logsData.content.length)
+          } else {
+            // Handle if API returns just an array instead of a page object
+            setLogs(Array.isArray(logsData) ? logsData : [])
+            setTotalPages(1)
+            setTotalElements(Array.isArray(logsData) ? logsData.length : 0)
+          }
         } catch (error) {
           console.error("Error fetching logs data:", error)
           toast({
@@ -132,6 +148,8 @@ export default function LogsPage() {
 
           // Set empty logs
           setLogs([])
+          setTotalPages(0)
+          setTotalElements(0)
         }
       } catch (error) {
         console.error("Error in logs fetch:", error)
@@ -141,15 +159,20 @@ export default function LogsPage() {
     }
 
     fetchLogs()
-  }, [timeRange, logType, page, pageSize])
+  }, [timeRange, logType, page, pageSize, sortField, sortDirection])
 
   // Handle refreshing logs
   const handleRefreshLogs = () => {
+    setPage(0) // Reset to first page
+    
     if (activeTab === "operational") {
-      setLoading(true)
-
-      // Refresh operational logs...
-      // ... existing operational logs refresh code ...
+      // Force refresh by changing a dependency
+      setTimeRange(prev => {
+        // Toggle between today and same value to force refresh
+        const temp = prev === "today" ? "today_refresh" : "today"
+        setTimeout(() => setTimeRange(prev), 100) // Reset after a short delay
+        return temp
+      })
     } else if (activeTab === "security") {
       handleFetchSecurityLogs()
     }
@@ -340,57 +363,89 @@ export default function LogsPage() {
   })
 
   // Export logs as CSV
-  const handleExportLogs = () => {
-    if (sortedLogs.length === 0) {
-      toast({
-        title: "No Logs to Export",
-        description: "There are no logs to export with the current filters.",
-        variant: "destructive",
-      })
-      return
-    }
-
+  const handleExportLogs = async () => {
     try {
-      // Convert logs to CSV format
-      const headers = ["Timestamp", "Operation", "Status", "Source", "Installation ID", "User ID", "Message"]
-      const rows = sortedLogs.map(log => [
-        log.timestamp ? new Date(log.timestamp).toISOString() : "",
-        log.operation || "",
-        log.status || "",
-        log.sourceSystem || "",
-        log.installationId || "",
-        log.userId || "",
-        log.message || ""
-      ])
+      setExporting(true)
 
-      // Create CSV content
-      const csvContent = [
-        headers.join(","),
-        ...rows.map(row => row.join(","))
-      ].join("\n")
+      // Determine date range
+      const endDate = new Date()
+      let startDate
 
-      // Create download link
-      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" })
-      const url = URL.createObjectURL(blob)
-      const link = document.createElement("a")
-      link.setAttribute("href", url)
-      link.setAttribute("download", `service_logs_${new Date().toISOString().split("T")[0]}.csv`)
-      link.style.visibility = "hidden"
+      switch (timeRange) {
+        case 'today':
+          startDate = new Date()
+          startDate.setHours(0, 0, 0, 0)
+          break
+        case 'yesterday':
+          startDate = new Date()
+          startDate.setDate(startDate.getDate() - 1)
+          startDate.setHours(0, 0, 0, 0)
+          endDate.setDate(endDate.getDate() - 1)
+          endDate.setHours(23, 59, 59, 999)
+          break
+        case 'week':
+          startDate = new Date()
+          startDate.setDate(startDate.getDate() - 7)
+          break
+        case 'month':
+          startDate = new Date()
+          startDate.setMonth(startDate.getMonth() - 1)
+          break
+        default:
+          startDate = new Date()
+          startDate.setHours(0, 0, 0, 0)
+      }
+
+      // Prepare filters based on current view
+      const filters = {
+        startTime: startDate.toISOString(),
+        endTime: endDate.toISOString(),
+        sortField,
+        sortDirection
+      }
+
+      // Add type-specific filters
+      if (logType !== "all") {
+        if (logType.startsWith("op_")) {
+          filters.operation = logType.replace("op_", "")
+        } else if (logType.startsWith("src_")) {
+          filters.sourceSystem = logType.replace("src_", "")
+        } else if (logType.startsWith("inst_")) {
+          filters.installationId = logType.replace("inst_", "")
+        }
+      }
+
+      // Add search term if available
+      if (searchTerm) {
+        filters.searchTerm = searchTerm
+      }
+
+      // Export with all current filters
+      const blobData = await serviceControlApi.exportLogs(filters)
+      
+      // Create and trigger download
+      const url = window.URL.createObjectURL(new Blob([blobData]))
+      const link = document.createElement('a')
+      link.href = url
+      link.setAttribute('download', `logs_export_${new Date().toISOString().split('T')[0]}.csv`)
       document.body.appendChild(link)
       link.click()
-      document.body.removeChild(link)
-
+      link.remove()
+      
       toast({
-        title: "Logs Exported",
-        description: `${sortedLogs.length} logs exported to CSV file.`
+        title: "Export Successful",
+        description: "Logs have been exported successfully",
+        variant: "default",
       })
     } catch (error) {
       console.error("Error exporting logs:", error)
       toast({
         title: "Export Failed",
-        description: "Failed to export logs to CSV. Please try again.",
+        description: "Failed to export logs. Please try again.",
         variant: "destructive",
       })
+    } finally {
+      setExporting(false)
     }
   }
 
@@ -467,6 +522,32 @@ export default function LogsPage() {
                       </SelectContent>
                     </Select>
 
+                    <Select 
+                      value={logType.startsWith("inst_") ? logType : "all_installations"} 
+                      onValueChange={(value) => {
+                        if (value === "all_installations") {
+                          // If the current logType is an installation filter, reset to all
+                          if (logType.startsWith("inst_")) {
+                            setLogType("all");
+                          }
+                        } else {
+                          setLogType(value);
+                        }
+                      }}
+                    >
+                      <SelectTrigger className="w-[180px]">
+                        <SelectValue placeholder="Installation" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all_installations">All Installations</SelectItem>
+                        {installations.map((installation) => (
+                          <SelectItem key={installation.id} value={`inst_${installation.id}`}>
+                            {installation.name || `Installation #${installation.id}`}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+
                     <Select value={timeRange} onValueChange={setTimeRange}>
                       <SelectTrigger className="w-[150px]">
                         <SelectValue placeholder="Time Range" />
@@ -479,8 +560,8 @@ export default function LogsPage() {
                       </SelectContent>
                     </Select>
 
-                    <Button variant="outline" size="icon" onClick={handleRefreshLogs}>
-                      <RefreshCw className="h-4 w-4" />
+                    <Button variant="outline" size="icon" onClick={handleRefreshLogs} disabled={loading}>
+                      {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
                     </Button>
                   </div>
                 </div>
@@ -649,31 +730,64 @@ export default function LogsPage() {
                   </div>
                 )}
 
-                {sortedLogs.length > 0 && (
-                  <div className="flex items-center justify-between mt-4">
-                    <p className="text-sm text-muted-foreground">
-                      Showing {sortedLogs.length} of {filteredLogs.length} logs
-                    </p>
-                    <div className="flex items-center space-x-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setPage(Math.max(0, page - 1))}
-                        disabled={page === 0}
-                      >
-                        Previous
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setPage(page + 1)}
-                        disabled={sortedLogs.length < pageSize}
-                      >
-                        Next
-                      </Button>
-                    </div>
+                {/* Pagination Controls */}
+                <div className="flex items-center justify-between mt-4">
+                  <div className="text-sm text-muted-foreground">
+                    Showing {logs.length > 0 ? page * pageSize + 1 : 0}-
+                    {Math.min((page + 1) * pageSize, totalElements)} of {totalElements} logs
                   </div>
-                )}
+                  <div className="flex items-center space-x-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setPage(0)}
+                      disabled={page === 0 || loading}
+                    >
+                      First
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setPage(p => Math.max(0, p - 1))}
+                      disabled={page === 0 || loading}
+                    >
+                      Previous
+                    </Button>
+                    <span className="text-sm mx-2">
+                      Page {page + 1} of {totalPages || 1}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setPage(p => p + 1)}
+                      disabled={page >= totalPages - 1 || loading}
+                    >
+                      Next
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setPage(totalPages - 1)}
+                      disabled={page >= totalPages - 1 || loading}
+                    >
+                      Last
+                    </Button>
+                    <Select value={pageSize.toString()} onValueChange={(value) => {
+                      setPageSize(Number(value))
+                      setPage(0)
+                    }}>
+                      <SelectTrigger className="w-20">
+                        <SelectValue placeholder="20" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="10">10</SelectItem>
+                        <SelectItem value="20">20</SelectItem>
+                        <SelectItem value="50">50</SelectItem>
+                        <SelectItem value="100">100</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
               </>
             )}
           </CardContent>
