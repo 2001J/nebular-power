@@ -263,8 +263,8 @@ public class TamperDetectionControllerTest {
     void shouldReturnForbiddenForNonAdminUsers() throws Exception {
         // Act & Assert
         mockMvc.perform(post("/api/security/detection/installations/{installationId}/start", installationId))
-                .andExpect(status().is5xxServerError());
+                .andExpect(status().isForbidden()); // Updated to expect 403 (Forbidden) instead of 500 (Internal Server Error)
 
         verifyNoInteractions(tamperDetectionService);
     }
-} 
+}
