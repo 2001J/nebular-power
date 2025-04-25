@@ -19,6 +19,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.Collections;
@@ -312,10 +313,14 @@ public class PaymentReportControllerTest {
         when(paymentReportService.generatePaymentHistoryReport(eq(1L), any(LocalDateTime.class), any(LocalDateTime.class)))
                 .thenReturn(Arrays.asList(testPayment1, testPayment2));
         
+        // Using ISO_DATE format (not ISO_DATE_TIME) which is what the controller expects
+        LocalDate startDate = LocalDate.now().minusMonths(3);
+        LocalDate endDate = LocalDate.now().plusMonths(3);
+        
         // When/Then
         mockMvc.perform(get("/api/admin/payments/reports/history/1")
-                .param("startDate", LocalDateTime.now().minusMonths(3).toString())
-                .param("endDate", LocalDateTime.now().plusMonths(3).toString())
+                .param("startDate", startDate.toString())
+                .param("endDate", endDate.toString())
                 .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$", hasSize(2)))
@@ -333,4 +338,4 @@ public class PaymentReportControllerTest {
         // For now, we'll just verify that the controller class has the @PreAuthorize annotation
         assertTrue(controller.getClass().isAnnotationPresent(org.springframework.security.access.prepost.PreAuthorize.class));
     }
-} 
+}
