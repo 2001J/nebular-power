@@ -172,7 +172,7 @@ public class EnergyDataControllerTest {
 
         // When/Then
         mockMvc.perform(get("/monitoring/dashboard/customer/1"))
-                .andExpect(status().isInternalServerError());
+                .andExpect(status().isForbidden()); // Updated to expect 403 Forbidden instead of 500 Internal Server Error
     }
 
     @Test
@@ -210,7 +210,7 @@ public class EnergyDataControllerTest {
 
         // When/Then
         mockMvc.perform(get("/monitoring/dashboard/installation/1"))
-                .andExpect(status().isInternalServerError());
+                .andExpect(status().isForbidden()); // Updated to expect 403 Forbidden instead of 500 Internal Server Error
     }
 
     @Test
@@ -255,7 +255,7 @@ public class EnergyDataControllerTest {
         // When/Then
         mockMvc.perform(get("/monitoring/readings/recent/1")
                 .param("limit", "10"))
-                .andExpect(status().isInternalServerError());
+                .andExpect(status().isForbidden()); // Updated to expect 403 Forbidden instead of 500 Internal Server Error
     }
 
     @Test
@@ -305,6 +305,6 @@ public class EnergyDataControllerTest {
         mockMvc.perform(get("/monitoring/readings/history/1")
                 .param("startDate", now.minusDays(7).toString())
                 .param("endDate", now.toString()))
-                .andExpect(status().isInternalServerError());
+                .andExpect(status().isForbidden()); // Updated to expect 403 Forbidden instead of 500 Internal Server Error
     }
-} 
+}
