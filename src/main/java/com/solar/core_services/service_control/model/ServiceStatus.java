@@ -64,6 +64,7 @@ public class ServiceStatus {
         SUSPENDED_PAYMENT,       // Suspended due to payment issues
         SUSPENDED_SECURITY,      // Suspended due to security concerns
         SUSPENDED_MAINTENANCE,   // Suspended for maintenance
-        TRANSITIONING            // Currently changing status
+        TRANSITIONING,           // Currently changing status
+        PENDING                  // Awaiting initialization or configuration
     }
 } 

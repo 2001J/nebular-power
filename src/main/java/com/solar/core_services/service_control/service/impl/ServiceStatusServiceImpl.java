@@ -15,6 +15,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -230,5 +231,50 @@ public class ServiceStatusServiceImpl implements ServiceStatusService {
         
         Page<ServiceStatus> statuses = serviceStatusRepository.findByStatusAndActiveTrue(status, pageable);
         return statuses.map(ServiceStatusDTO::fromEntity);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<ServiceStatusDTO> getBatchStatuses(List<Long> installationIds) {
+        log.info("Getting service statuses for {} installations in batch", installationIds.size());
+
+        if (installationIds == null || installationIds.isEmpty()) {
+            return List.of();
+        }
+
+        List<ServiceStatusDTO> results = new ArrayList<>();
+
+        for (Long installationId : installationIds) {
+            try {
+                ServiceStatus status = serviceStatusRepository.findActiveByInstallationId(installationId)
+                    .orElse(null);
+                
+                if (status != null) {
+                    results.add(ServiceStatusDTO.fromEntity(status));
+                } else {
+                    // If no status is found, get the installation to include basic details
+                    SolarInstallation installation = installationRepository.findById(installationId).orElse(null);
+                    
+                    if (installation != null) {
+                        // Create a default pending status
+                        ServiceStatusDTO defaultStatus = new ServiceStatusDTO();
+                        defaultStatus.setInstallationId(installationId);
+                        defaultStatus.setInstallationName(installation.getName());
+                        defaultStatus.setStatus(ServiceStatus.ServiceState.PENDING);
+                        defaultStatus.setStatusReason("No active status record");
+                        defaultStatus.setUpdatedAt(LocalDateTime.now());
+                        defaultStatus.setUpdatedBy("SYSTEM");
+                        defaultStatus.setActive(true);
+                        
+                        results.add(defaultStatus);
+                    }
+                }
+            } catch (Exception e) {
+                log.error("Error fetching status for installation {}: {}", installationId, e.getMessage());
+                // Skip failed installations but continue processing others
+            }
+        }
+
+        return results;
     }
 } 

@@ -70,4 +70,9 @@ public interface ServiceStatusService {
      * Get all installations with a specific status
      */
     Page<ServiceStatusDTO> getInstallationsByStatus(ServiceStatus.ServiceState status, Pageable pageable);
+    
+    /**
+     * Get statuses for multiple installations in a single batch request
+     */
+    List<ServiceStatusDTO> getBatchStatuses(List<Long> installationIds);
 } 

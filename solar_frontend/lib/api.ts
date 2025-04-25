@@ -90,7 +90,7 @@ const getErrorDetails = (error: unknown): ApiErrorResponse => {
 
 // Create axios instance with base URL
 const apiClient = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080',
+  baseURL: '', // Empty baseURL to use relative URLs that go through Next.js proxy
   timeout: NETWORK_CONFIG.timeout,
   headers: {
     'Content-Type': 'application/json',
@@ -1900,6 +1900,69 @@ export const serviceApi = {
     }
   },
 
+  getLogsByTimeRange: async (startTime: string, endTime: string, page = 0, size = 20) => {
+    try {
+      // Get current token to ensure freshness
+      const token = typeof window !== 'undefined' 
+        ? localStorage.getItem("token") || sessionStorage.getItem("token")
+        : null;
+      
+      if (!token) {
+        console.error("No token available for logs by time range request");
+        return { content: [], totalElements: 0, totalPages: 0 };
+      }
+      
+      // Make request with correct parameter names (start/end) as seen in Swagger
+      const response = await apiClient.get('/api/service/logs/time-range', {
+        params: { 
+          start: startTime,  // Changed from startTime to start
+          end: endTime,      // Changed from endTime to end
+          page, 
+          size,
+          sort: ["desc"]  // Add default sort to match Swagger
+        },
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          // Add timestamp to prevent caching issues
+          'X-Timestamp': Date.now()
+        }
+      });
+      
+      console.log("Logs API response:", response.status, response.data ? (Array.isArray(response.data) ? response.data.length : 'object') : 0);
+      
+      // Handle different response formats
+      if (Array.isArray(response.data)) {
+        // If we get an array directly, wrap it in a pageable structure
+        return {
+          content: response.data,
+          totalElements: response.data.length,
+          totalPages: 1,
+          size: size,
+          number: page
+        };
+      }
+      
+      return response.data || { content: [], totalElements: 0, totalPages: 0 };
+    } catch (error: any) {
+      console.error(`Error fetching logs by time range:`, error);
+      if (axios.isAxiosError(error) && error.response?.status === 401) {
+        console.error("Authentication failed for logs by time range - token may be invalid or expired");
+        
+        // Provide user feedback
+        toast({
+          title: "Authentication Error",
+          description: "Your session has expired. Please log in again.",
+          variant: "destructive"
+        });
+      }
+      
+      // Return empty result structure for better error handling
+      return { content: [], totalElements: 0, totalPages: 0 };
+    }
+  },
+
   getSystemIntegration: async () => {
     try {
       const response = await apiClient.get('/api/service/system');
@@ -2125,7 +2188,7 @@ export const serviceControlApi = {
       
       if (error.response) {
         // The request was made and the server responded with a status code
-        // that falls out of the range of 2xx
+        // that falls out of the range of2xx
         errorMessage += `: Server responded with ${error.response.status}`;
         if (error.response.data && error.response.data.message) {
           errorMessage += ` - ${error.response.data.message}`;
@@ -2386,13 +2449,76 @@ export const serviceControlApi = {
 
   getLogsByTimeRange: async (startTime: string, endTime: string, page = 0, size = 20) => {
     try {
+      // Explicitly get the authentication token from storage
+      // This ensures we have the most recent token for this specific request
+      const token = typeof window !== 'undefined' 
+        ? localStorage.getItem("token") || sessionStorage.getItem("token")
+        : null;
+      
+      if (!token) {
+        console.error("No token available for logs by time range request");
+        // Return empty result to avoid errors in the UI
+        return { content: [], totalElements: 0, totalPages: 0 };
+      }
+      
+      // Make request with correct parameter names (start/end) as seen in the Swagger docs
       const response = await apiClient.get('/api/service/logs/time-range', {
-        params: { startTime, endTime, page, size }
+        params: { 
+          start: startTime,  // Using 'start' instead of 'startTime' to match backend API
+          end: endTime,      // Using 'end' instead of 'endTime' to match backend API
+          page, 
+          size,
+          sort: ["desc"]     // Default sort direction
+        },
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          // Add timestamp to prevent caching issues
+          'X-Timestamp': Date.now().toString()
+        }
       });
-      return response.data;
-    } catch (error: any) {
+      
+      console.log(`Logs time-range API response: status=${response.status}, data count=${Array.isArray(response.data) ? response.data.length : 'object'}`);
+      
+      // Handle different response formats
+      if (Array.isArray(response.data)) {
+        // API returns array directly - wrap it in a pageable object
+        return {
+          content: response.data,
+          totalElements: response.data.length,
+          totalPages: 1,
+          size: size,
+          number: page
+        };
+      }
+      
+      // Otherwise assume it's already a pageable object
+      return response.data || { content: [], totalElements: 0, totalPages: 0 };
+    } catch (error) {
       console.error(`Error fetching logs by time range:`, error);
-      return { content: [], totalElements: 0, totalPages: 0 };
+      
+      if (error.response?.status === 401) {
+        console.error("Authentication failed for logs by time range - token may be invalid or expired");
+        
+        // If available, use toast to provide user feedback about authentication error
+        if (typeof window !== 'undefined' && window.dispatchEvent) {
+          // Create a custom event to trigger a toast notification
+          const authErrorEvent = new CustomEvent('auth-error', { 
+            detail: { message: "Your session has expired. Please log in again to view logs." } 
+          });
+          window.dispatchEvent(authErrorEvent);
+        }
+      }
+      
+      // Return empty pageable object to prevent UI errors
+      return { 
+        content: [], 
+        totalElements: 0, 
+        totalPages: 0,
+        size: size,
+        number: page
+      };
     }
   },
 

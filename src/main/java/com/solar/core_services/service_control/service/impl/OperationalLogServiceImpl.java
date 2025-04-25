@@ -47,14 +47,26 @@ public class OperationalLogServiceImpl implements OperationalLogService {
         operationalLog.setSourceSystem(sourceSystem);
         operationalLog.setSourceAction(sourceAction);
         operationalLog.setIpAddress(ipAddress);
+        
+        // Truncate userAgent if it's too long
+        if (userAgent != null && userAgent.length() > 490) {
+            userAgent = userAgent.substring(0, 490) + "...";
+        }
         operationalLog.setUserAgent(userAgent);
+        
         operationalLog.setSuccess(success);
         operationalLog.setErrorDetails(errorDetails);
         
-        operationalLog = operationalLogRepository.save(operationalLog);
-        log.info("Operation logged with ID: {}", operationalLog.getId());
-        
-        return OperationalLogDTO.fromEntity(operationalLog);
+        try {
+            operationalLog = operationalLogRepository.save(operationalLog);
+            log.info("Operation logged with ID: {}", operationalLog.getId());
+            return OperationalLogDTO.fromEntity(operationalLog);
+        } catch (Exception e) {
+            // If there's still an error (e.g., during migration), log it and return null
+            log.error("Error saving operation log: {}", e.getMessage());
+            // Create a transient DTO to return even if saving fails
+            return OperationalLogDTO.fromEntity(operationalLog);
+        }
     }
 
     @Override

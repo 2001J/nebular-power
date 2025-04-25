@@ -14,8 +14,12 @@ import {
   Info,
   AlertTriangle,
   ArrowUpDown,
-  Loader2
+  Loader2,
+  Bug
 } from "lucide-react"
+
+// Import our test functions
+import { testLogsAPI, testFormattedDates } from "@/lib/logsApiTest"
 
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -44,7 +48,7 @@ export default function LogsPage() {
   const [searchTerm, setSearchTerm] = useState("")
   const [logType, setLogType] = useState("all")
   const [activeTab, setActiveTab] = useState("operational")
-  const [timeRange, setTimeRange] = useState("today")
+  const [timeRange, setTimeRange] = useState("month") // Changed default from "today" to "month" for 30 days
   const [page, setPage] = useState(0)
   const [pageSize, setPageSize] = useState(20)
   const [sortField, setSortField] = useState("timestamp")
@@ -52,6 +56,145 @@ export default function LogsPage() {
   const [totalPages, setTotalPages] = useState(0)
   const [totalElements, setTotalElements] = useState(0)
   const [exporting, setExporting] = useState(false)
+  const [initialLoadDone, setInitialLoadDone] = useState(false)
+
+  // Add a direct initial fetch when component mounts
+  useEffect(() => {
+    // This effect runs once on component mount to ensure logs are loaded
+    if (!initialLoadDone) {
+      console.log("🔄 Running initial logs fetch on component mount");
+      fetchLogsData();
+      setInitialLoadDone(true);
+    }
+  }, []);
+
+  // Function to fetch logs data that can be called anywhere
+  const fetchLogsData = async () => {
+    try {
+      console.log("📊 Fetching logs data with:", { timeRange, logType, page, pageSize });
+      setLoading(true);
+
+      // Determine date range with correct ISO format
+      const endDate = new Date();
+      let startDate;
+
+      switch (timeRange) {
+        case 'today':
+          startDate = new Date();
+          startDate.setHours(0, 0, 0, 0);
+          // Set end date to the end of the current day (23:59:59.999)
+          endDate.setHours(23, 59, 59, 999);
+          break;
+        case 'yesterday':
+          startDate = new Date();
+          startDate.setDate(startDate.getDate() - 1);
+          startDate.setHours(0, 0, 0, 0);
+          endDate.setDate(endDate.getDate() - 1);
+          endDate.setHours(23, 59, 59, 999);
+          break;
+        case 'week':
+          startDate = new Date();
+          startDate.setDate(startDate.getDate() - 7);
+          // Keep current endDate with time set to end of day
+          endDate.setHours(23, 59, 59, 999);
+          break;
+        case 'month':
+          startDate = new Date();
+          startDate.setMonth(startDate.getMonth() - 1);
+          // Keep current endDate with time set to end of day
+          endDate.setHours(23, 59, 59, 999);
+          break;
+        default:
+          startDate = new Date();
+          startDate.setHours(0, 0, 0, 0);
+          // Default to end of current day
+          endDate.setHours(23, 59, 59, 999);
+      }
+
+      console.log("📅 Using date range:", {
+        start: startDate.toISOString(),
+        end: endDate.toISOString()
+      });
+
+      let logsData = null;
+
+      try {
+        if (logType === "all") {
+          // Use the ISO format that was proven to work in our tests
+          logsData = await serviceControlApi.getLogsByTimeRange(
+            startDate.toISOString(),
+            endDate.toISOString(),
+            page,
+            pageSize
+          );
+          
+          console.log("✅ Logs fetched successfully with ISO format:", 
+            logsData && logsData.content ? 
+              `Found ${logsData.content.length} logs` : 
+              Array.isArray(logsData) ? 
+                `Found ${logsData.length} logs` : 
+                "No logs found");
+        } else if (logType.startsWith("op_")) {
+          // Filter by operation
+          const operation = logType.replace("op_", "");
+          logsData = await serviceControlApi.getLogsByOperation(operation, page, pageSize);
+        } else if (logType.startsWith("src_")) {
+          // Filter by source system
+          const source = logType.replace("src_", "");
+          logsData = await serviceControlApi.getLogsBySourceSystem(source, page, pageSize);
+        } else if (logType.startsWith("inst_")) {
+          // Filter by installation ID
+          const installationId = logType.replace("inst_", "");
+          logsData = await serviceControlApi.getLogsByInstallation(installationId, page, pageSize);
+        }
+
+        // Process the logs data - our enhanced API always returns a consistent format
+        if (logsData && typeof logsData === 'object') {
+          // Check if we got the expected structure (content array property)
+          if (Array.isArray(logsData.content)) {
+            setLogs(logsData.content);
+            setTotalPages(logsData.totalPages || 1);
+            setTotalElements(logsData.totalElements || logsData.content.length);
+          } else if (Array.isArray(logsData)) {
+            // Direct array response
+            setLogs(logsData);
+            setTotalPages(1);
+            setTotalElements(logsData.length);
+          } else {
+            // Fallback for unexpected response format
+            console.warn("⚠️ Unexpected logs data format:", logsData);
+            setLogs([]);
+            setTotalPages(0);
+            setTotalElements(0);
+          }
+        } else {
+          // Fallback for null or undefined response
+          console.warn("⚠️ No logs data returned:", logsData);
+          setLogs([]);
+          setTotalPages(0);
+          setTotalElements(0);
+        }
+      } catch (error) {
+        console.error("❌ Error fetching logs data:", error);
+        
+        // Show toast error
+        toast({
+          title: "Error",
+          description: "Failed to load logs data. Please try again.",
+          variant: "destructive",
+        });
+
+        // Set empty logs
+        setLogs([]);
+        setTotalPages(0);
+        setTotalElements(0);
+      }
+    } catch (error) {
+      console.error("❌ Error in logs fetch:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Load installation data for filtering
   useEffect(() => {
@@ -67,98 +210,11 @@ export default function LogsPage() {
     fetchInstallations()
   }, [])
 
-  // Load log data
+  // Load log data on dependency changes
   useEffect(() => {
-    const fetchLogs = async () => {
-      try {
-        setLoading(true)
-
-        // Determine date range
-        const endDate = new Date()
-        let startDate
-
-        switch (timeRange) {
-          case 'today':
-            startDate = new Date()
-            startDate.setHours(0, 0, 0, 0)
-            break
-          case 'yesterday':
-            startDate = new Date()
-            startDate.setDate(startDate.getDate() - 1)
-            startDate.setHours(0, 0, 0, 0)
-            endDate.setDate(endDate.getDate() - 1)
-            endDate.setHours(23, 59, 59, 999)
-            break
-          case 'week':
-            startDate = new Date()
-            startDate.setDate(startDate.getDate() - 7)
-            break
-          case 'month':
-            startDate = new Date()
-            startDate.setMonth(startDate.getMonth() - 1)
-            break
-          default:
-            startDate = new Date()
-            startDate.setHours(0, 0, 0, 0)
-        }
-
-        let logsData = { content: [], totalElements: 0, totalPages: 0 }
-
-        try {
-          if (logType === "all") {
-            // Use the time range API endpoint with pagination
-            logsData = await serviceControlApi.getLogsByTimeRange(
-              startDate.toISOString(),
-              endDate.toISOString(),
-              page,
-              pageSize
-            )
-          } else if (logType.startsWith("op_")) {
-            // Filter by operation
-            const operation = logType.replace("op_", "")
-            logsData = await serviceControlApi.getLogsByOperation(operation, page, pageSize)
-          } else if (logType.startsWith("src_")) {
-            // Filter by source system
-            const source = logType.replace("src_", "")
-            logsData = await serviceControlApi.getLogsBySourceSystem(source, page, pageSize)
-          } else if (logType.startsWith("inst_")) {
-            // Filter by installation ID
-            const installationId = logType.replace("inst_", "")
-            logsData = await serviceControlApi.getLogsByInstallation(installationId, page, pageSize)
-          }
-
-          // Sort logs if needed
-          if (logsData.content) {
-            setLogs(logsData.content)
-            setTotalPages(logsData.totalPages || 1)
-            setTotalElements(logsData.totalElements || logsData.content.length)
-          } else {
-            // Handle if API returns just an array instead of a page object
-            setLogs(Array.isArray(logsData) ? logsData : [])
-            setTotalPages(1)
-            setTotalElements(Array.isArray(logsData) ? logsData.length : 0)
-          }
-        } catch (error) {
-          console.error("Error fetching logs data:", error)
-          toast({
-            title: "Error",
-            description: "Failed to load logs data. Please try again.",
-            variant: "destructive",
-          })
-
-          // Set empty logs
-          setLogs([])
-          setTotalPages(0)
-          setTotalElements(0)
-        }
-      } catch (error) {
-        console.error("Error in logs fetch:", error)
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    fetchLogs()
+    console.log("🔄 Dependencies changed for log fetch. Triggering fetch with:", 
+      { timeRange, logType, page, pageSize, sortField, sortDirection });
+    fetchLogsData();
   }, [timeRange, logType, page, pageSize, sortField, sortDirection])
 
   // Handle refreshing logs
@@ -182,6 +238,23 @@ export default function LogsPage() {
   const handleFetchSecurityLogs = async () => {
     try {
       setLoading(true)
+
+      // Check for authentication token first
+      const token = typeof window !== 'undefined' 
+        ? localStorage.getItem("token") || sessionStorage.getItem("token")
+        : null;
+        
+      if (!token) {
+        console.error("Missing authentication token for security logs request");
+        toast({
+          title: "Authentication Error",
+          description: "Your session may have expired. Please log in again.",
+          variant: "destructive"
+        });
+        setSecurityLogs([]);
+        setLoading(false);
+        return;
+      }
 
       // Determine date range
       const endDate = new Date()
@@ -366,6 +439,22 @@ export default function LogsPage() {
   const handleExportLogs = async () => {
     try {
       setExporting(true)
+      
+      // Check for authentication token first
+      const token = typeof window !== 'undefined' 
+        ? localStorage.getItem("token") || sessionStorage.getItem("token")
+        : null;
+        
+      if (!token) {
+        console.error("Missing authentication token for logs export request");
+        toast({
+          title: "Authentication Error",
+          description: "Your session may have expired. Please log in again.",
+          variant: "destructive"
+        });
+        setExporting(false);
+        return;
+      }
 
       // Determine date range
       const endDate = new Date()
@@ -473,6 +562,118 @@ export default function LogsPage() {
           <Button variant="outline" onClick={handleExportLogs}>
             <Download className="h-4 w-4 mr-2" />
             Export Logs
+          </Button>
+
+          {/* Add debug test buttons */}
+          <Button 
+            variant="outline" 
+            onClick={async () => {
+              try {
+                toast({
+                  title: "Testing Logs API",
+                  description: "Checking the logs API directly. Check browser console for results.",
+                });
+                const result = await testLogsAPI();
+                if (result && (Array.isArray(result) ? result.length > 0 : (result.content && result.content.length > 0))) {
+                  toast({
+                    title: "Logs API Test Success",
+                    description: `Found ${Array.isArray(result) ? result.length : result.content.length} logs in the API response!`,
+                  });
+                } else {
+                  toast({
+                    title: "Logs API Test",
+                    description: "API responded but no logs were found in the date range. Check console for details.",
+                    variant: "warning"
+                  });
+                }
+              } catch (error) {
+                console.error("Test API error:", error);
+                toast({
+                  title: "Logs API Test Failed",
+                  description: error.message || "Unknown error occurred",
+                  variant: "destructive"
+                });
+              }
+            }}
+          >
+            <Bug className="h-4 w-4 mr-2" />
+            Test Logs API
+          </Button>
+          
+          <Button 
+            variant="outline" 
+            onClick={async () => {
+              try {
+                toast({
+                  title: "Testing Date Formats",
+                  description: "Trying different date formats to find the one that works with your logs database.",
+                });
+                const result = await testFormattedDates();
+                if (result) {
+                  toast({
+                    title: "Success!",
+                    description: `Found a working date format: "${result.name}". See console for details.`,
+                  });
+                  
+                  // Now try to update the logs display with the working format
+                  try {
+                    setLoading(true);
+                    const logsData = await serviceControlApi.getLogsByTimeRange(
+                      result.start,
+                      result.end,
+                      0,
+                      50
+                    );
+                    
+                    console.log("Retrieved logs with working format:", logsData);
+                    
+                    if (Array.isArray(logsData)) {
+                      setLogs(logsData);
+                      setTotalPages(1);
+                      setTotalElements(logsData.length);
+                      toast({
+                        title: "Logs loaded!",
+                        description: `Successfully loaded ${logsData.length} logs with the working format.`,
+                      });
+                    } else if (logsData && logsData.content) {
+                      setLogs(logsData.content);
+                      setTotalPages(logsData.totalPages || 1);
+                      setTotalElements(logsData.totalElements || logsData.content.length);
+                      toast({
+                        title: "Logs loaded!",
+                        description: `Successfully loaded ${logsData.content.length} logs with the working format.`,
+                      });
+                    } else {
+                      toast({
+                        title: "No logs found",
+                        description: "No logs found even with the working format.",
+                        variant: "warning"
+                      });
+                    }
+                  } catch (loadError) {
+                    console.error("Error loading logs with working format:", loadError);
+                  } finally {
+                    setLoading(false);
+                  }
+                } else {
+                  toast({
+                    title: "No Working Format Found",
+                    description: "Could not find a date format that returns logs. Check console for details.",
+                    variant: "warning"
+                  });
+                }
+              } catch (error) {
+                console.error("Test Date Formats error:", error);
+                toast({
+                  title: "Test Failed",
+                  description: error.message || "Unknown error occurred",
+                  variant: "destructive"
+                });
+              }
+            }}
+          >
+            <Bug className="h-4 w-4 mr-2" />
+            Test Date Formats
           </Button>
         </div>
       </div>
@@ -923,4 +1124,4 @@ export default function LogsPage() {
       </div>
     </div>
   )
-} 
+}

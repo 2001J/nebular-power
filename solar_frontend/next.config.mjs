@@ -21,6 +21,19 @@ const nextConfig = {
     parallelServerBuildTraces: true,
     parallelServerCompiles: true,
   },
+  // Add rewrites for API proxy to solve CORS issues
+  async rewrites() {
+    return [
+      {
+        source: '/api/:path*',
+        destination: 'http://localhost:8080/api/:path*',
+      },
+      {
+        source: '/monitoring/:path*',
+        destination: 'http://localhost:8080/monitoring/:path*',
+      }
+    ];
+  },
   webpack: (config, { isServer }) => {
     // Fix for NodeJS modules used in browser context
     if (!isServer) {

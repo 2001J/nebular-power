@@ -43,7 +43,7 @@ public class OperationalLog {
     @Column(length = 100)
     private String ipAddress;
 
-    @Column(length = 100)
+    @Column(length = 500)
     private String userAgent;
 
     @Column

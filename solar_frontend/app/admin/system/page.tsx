@@ -197,6 +197,24 @@ export default function SystemLogsPage() {
   const fetchLogs = async () => {
     try {
       setLoading(true)
+      
+      // Add token validation to detect authentication issues early
+      const token = typeof window !== 'undefined' 
+        ? localStorage.getItem("token") || sessionStorage.getItem("token")
+        : null;
+        
+      if (!token) {
+        console.error("Missing authentication token for system logs request");
+        toast({
+          title: "Authentication Error",
+          description: "Your session may have expired. Please log in again.",
+          variant: "destructive"
+        });
+        setLogs([]);
+        setLoading(false);
+        return;
+      }
+      
       let logsData: LogEntry[] | { content?: LogEntry[] } = []
 
       // Apply filters based on selected options
@@ -274,6 +292,24 @@ export default function SystemLogsPage() {
   const fetchHeartbeats = async () => {
     try {
       setLoading(true)
+      
+      // Add token validation to detect authentication issues early
+      const token = typeof window !== 'undefined' 
+        ? localStorage.getItem("token") || sessionStorage.getItem("token")
+        : null;
+        
+      if (!token) {
+        console.error("Missing authentication token for system heartbeats request");
+        toast({
+          title: "Authentication Error",
+          description: "Your session may have expired. Please log in again.",
+          variant: "destructive"
+        });
+        setHeartbeats([]);
+        setLoading(false);
+        return;
+      }
+      
       // Get system heartbeats
       const heartbeatsData = await serviceApi.getSystemHeartbeats()
       
@@ -300,6 +336,24 @@ export default function SystemLogsPage() {
   const fetchSystemHealth = async () => {
     try {
       setLoading(true)
+      
+      // Add token validation to detect authentication issues early
+      const token = typeof window !== 'undefined' 
+        ? localStorage.getItem("token") || sessionStorage.getItem("token")
+        : null;
+        
+      if (!token) {
+        console.error("Missing authentication token for system health request");
+        toast({
+          title: "Authentication Error",
+          description: "Your session may have expired. Please log in again.",
+          variant: "destructive"
+        });
+        setSystemHealth(null);
+        setLoading(false);
+        return;
+      }
+      
       // Get system health
       const healthData = await serviceApi.getSystemHealth() as SystemHealthData
       setSystemHealth(healthData)

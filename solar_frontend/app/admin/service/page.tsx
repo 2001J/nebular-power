@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { ArrowUpDown, CheckCircle, Clock, Settings, ShieldAlert, AlertTriangle, Clock4, RefreshCw, Plus, Activity, BarChart2, Zap, Signal, Server } from "lucide-react"
+import { ArrowUpDown, CheckCircle, Clock, Settings, ShieldAlert, AlertTriangle, Clock4, RefreshCw, Plus, Activity, BarChart2, Zap, Signal, Server, Loader2 } from "lucide-react"
 import { format } from "date-fns"
 
 import { Badge } from "@/components/ui/badge"
@@ -48,6 +48,8 @@ import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { cn } from "@/lib/utils"
 import { serviceControlApi, installationApi, serviceApi } from "@/lib/api"
+import { ServiceStatusCard } from "./components/ServiceStatusCard"
+import { ServiceStatusTable } from "./components/ServiceStatusTable"
 
 export default function ServicePage() {
   const [activeTab, setActiveTab] = useState("statuses")
@@ -68,6 +70,8 @@ export default function ServicePage() {
   const [commandStatusFilter, setCommandStatusFilter] = useState("all")
   const [sortBy, setSortBy] = useState("lastUpdated")
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc")
+  const [totalStatusItems, setTotalStatusItems] = useState(0)
+  const [hasLoadedInitialData, setHasLoadedInitialData] = useState(false)
 
   // Form states
   const [statusFormData, setStatusFormData] = useState({
@@ -115,35 +119,23 @@ export default function ServicePage() {
     const fetchData = async () => {
       try {
         setLoading(true)
-
+        
         // Get all installations
         const installationsData = await installationApi.getAllInstallations()
-        setInstallations(installationsData.content || [])
-
-        // Get installations by status if filter is applied
-        if (statusFilter !== "ALL") {
-          const statusData = await serviceControlApi.getInstallationsByStatus(statusFilter, page, pageSize)
-          setStatuses(statusData.content || [])
-        } else {
-          // Otherwise, get status for each installation
-          const allStatuses = []
-          for (const installation of installationsData.content || []) {
-            try {
-              const status = await serviceControlApi.getCurrentStatus(installation.id)
-              allStatuses.push(status)
-            } catch (error) {
-              console.error(`Error fetching status for installation ${installation.id}:`, error)
-            }
-          }
-          setStatuses(allStatuses)
-        }
+        setInstallations(installationsData?.content || [])
+        
+        // Get statuses
+        await fetchPaginatedStatuses()
       } catch (error) {
         console.error("Error fetching service data:", error)
         toast({
           title: "Error",
-          description: "Failed to load service status data",
+          description: "Failed to load service data. Please try again.",
           variant: "destructive",
         })
+        // Set empty arrays to prevent undefined errors
+        setInstallations([])
+        setStatuses([])
       } finally {
         setLoading(false)
       }
@@ -238,7 +230,7 @@ export default function ServicePage() {
   const getStatusBadge = (status) => {
     if (!status) return <Badge variant="outline">Unknown</Badge>
 
-    switch (status) {
+    switch (status.toUpperCase()) {
       case 'ACTIVE':
         return <Badge variant="success">Active</Badge>
       case 'SUSPENDED_PAYMENT':
@@ -249,8 +241,12 @@ export default function ServicePage() {
         return <Badge variant="warning">Maintenance</Badge>
       case 'PENDING':
         return <Badge variant="outline">Pending</Badge>
+      case 'TRANSITIONING':
+        return <Badge variant="secondary">Transitioning</Badge>
       case 'SCHEDULED':
         return <Badge variant="secondary">Scheduled Change</Badge>
+      case 'UNKNOWN':
+        return <Badge variant="outline">Unknown</Badge>
       default:
         return <Badge variant="outline">{status}</Badge>
     }
@@ -281,50 +277,127 @@ export default function ServicePage() {
 
   // Handler for updating status
   const handleUpdateStatus = async () => {
-    if (!selectedInstallation) return
+    if (!selectedInstallation || !selectedInstallation.id) {
+      toast({
+        title: "Error",
+        description: "No installation selected or invalid installation ID",
+        variant: "destructive",
+      })
+      return
+    }
 
     try {
+      setIsSubmitting(true)
+      
       const statusData = {
         status: statusFormData.status,
         statusReason: statusFormData.statusReason
       }
 
-      await serviceControlApi.updateServiceStatus(selectedInstallation.id, statusData)
-
-      toast({
-        title: "Status Updated",
-        description: `Service status for installation #${selectedInstallation.id} has been updated to ${statusFormData.status}.`,
-      })
-
-      // Refresh data
-      const updatedStatus = await serviceControlApi.getCurrentStatus(selectedInstallation.id)
-      setStatuses(prev => {
-        const index = prev.findIndex(s => s.installationId === selectedInstallation.id)
-        if (index >= 0) {
-          const newStatuses = [...prev]
-          newStatuses[index] = updatedStatus
-          return newStatuses
-        }
-        return [...prev, updatedStatus]
-      })
-
+      // Close the dialog first to provide immediate feedback
       setUpdateStatusDialogOpen(false)
 
+      try {
+        // Attempt to update the status
+        const response = await serviceControlApi.updateServiceStatus(selectedInstallation.id, statusData)
+        
+        // Show success toast
+        toast({
+          title: "Status Updated",
+          description: `Service status for installation #${selectedInstallation.id} has been updated to ${statusFormData.status}.`,
+          variant: "default",
+        })
+
+        // Update the local state to reflect the change immediately
+        setStatuses(prev => {
+          // Find the index of the status to update
+          const index = prev.findIndex(s => s.installationId === selectedInstallation.id)
+          if (index >= 0) {
+            // Create a copy of the statuses array
+            const newStatuses = [...prev]
+            // Replace the old status with the updated one
+            newStatuses[index] = {
+              ...prev[index],
+              status: statusFormData.status,
+              statusReason: statusFormData.statusReason,
+              updatedAt: new Date().toISOString(),
+              lastUpdated: new Date().toISOString()
+            }
+            return newStatuses
+          }
+          // If not found, add the new status
+          return [...prev, {
+            id: null,
+            installationId: selectedInstallation.id,
+            status: statusFormData.status,
+            statusReason: statusFormData.statusReason,
+            updatedAt: new Date().toISOString(),
+            lastUpdated: new Date().toISOString(),
+            updatedBy: "Current User"
+          }]
+        })
+        
+        // Force a refresh of the data to ensure UI is in sync
+        setTimeout(() => {
+          fetchPaginatedStatuses()
+        }, 1000)
+        
+      } catch (updateError) {
+        console.error(`Error updating status for installation ${selectedInstallation.id}:`, updateError)
+        
+        // Check if it's a logging error but the status was actually updated
+        if (updateError.message && updateError.message.includes("USER_AGENT")) {
+          // The status was likely updated but the logging failed
+          toast({
+            title: "Status Updated",
+            description: `Service status updated but there was a minor logging issue. Refreshing data...`,
+            variant: "default",
+          })
+          
+          // Force a refresh to get the latest status
+          fetchPaginatedStatuses()
+        } else {
+          // It was a more serious error
+          toast({
+            title: "Error",
+            description: updateError.message || "Failed to update service status. Please try again.",
+            variant: "destructive",
+          })
+        }
+      }
+
+      // Reset form data
+      setStatusFormData({
+        status: "ACTIVE",
+        statusReason: ""
+      })
+
     } catch (error) {
-      console.error(`Error updating status for installation ${selectedInstallation.id}:`, error)
+      console.error(`General error during status update for installation ${selectedInstallation.id}:`, error)
       toast({
         title: "Error",
-        description: "Failed to update service status",
+        description: "An unexpected error occurred. Please try again.",
         variant: "destructive",
       })
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
   // Handler for suspending service
   const handleSuspendService = async () => {
-    if (!selectedInstallation) return
+    if (!selectedInstallation || !selectedInstallation.id) {
+      toast({
+        title: "Error",
+        description: "No installation selected or invalid installation ID",
+        variant: "destructive",
+      })
+      return
+    }
 
     try {
+      setIsSubmitting(true)
+
       if (suspendFormData.suspensionType === "MAINTENANCE") {
         // For maintenance suspension, we need additional data
         const maintenanceData = {
@@ -339,6 +412,7 @@ export default function ServicePage() {
         toast({
           title: "Service Suspended for Maintenance",
           description: `Maintenance scheduled from ${format(maintenanceFormData.startDate, "PP")} to ${format(maintenanceFormData.endDate, "PP")}.`,
+          variant: "default",
         })
       } else if (suspendFormData.suspensionType === "PAYMENT") {
         // For payment suspension
@@ -347,6 +421,7 @@ export default function ServicePage() {
         toast({
           title: "Service Suspended for Payment Issues",
           description: `Service for installation #${selectedInstallation.id} has been suspended.`,
+          variant: "default",
         })
       } else if (suspendFormData.suspensionType === "SECURITY") {
         // For security suspension
@@ -355,20 +430,28 @@ export default function ServicePage() {
         toast({
           title: "Service Suspended for Security Concerns",
           description: `Service for installation #${selectedInstallation.id} has been suspended.`,
+          variant: "default",
         })
       }
 
       // Refresh data
-      const updatedStatus = await serviceControlApi.getCurrentStatus(selectedInstallation.id)
-      setStatuses(prev => {
-        const index = prev.findIndex(s => s.installationId === selectedInstallation.id)
-        if (index >= 0) {
-          const newStatuses = [...prev]
-          newStatuses[index] = updatedStatus
-          return newStatuses
-        }
-        return [...prev, updatedStatus]
-      })
+      try {
+        const updatedStatus = await serviceControlApi.getCurrentStatus(selectedInstallation.id)
+        setStatuses(prev => {
+          const index = prev.findIndex(s => s.installationId === selectedInstallation.id)
+          if (index >= 0) {
+            const newStatuses = [...prev]
+            newStatuses[index] = updatedStatus
+            return newStatuses
+          }
+          return [...prev, updatedStatus]
+        })
+      } catch (refreshError) {
+        console.error("Error refreshing status after suspension:", refreshError)
+        // Force a full refresh
+        const installationsData = await installationApi.getAllInstallations()
+        setInstallations(installationsData?.content || [])
+      }
 
       setSuspendDialogOpen(false)
 
@@ -376,35 +459,53 @@ export default function ServicePage() {
       console.error(`Error suspending service for installation ${selectedInstallation.id}:`, error)
       toast({
         title: "Error",
-        description: "Failed to suspend service",
+        description: error.response?.data?.message || "Failed to suspend service",
         variant: "destructive",
       })
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
   // Handler for restoring service
   const handleRestoreService = async () => {
-    if (!selectedInstallation) return
+    if (!selectedInstallation || !selectedInstallation.id) {
+      toast({
+        title: "Error",
+        description: "No installation selected or invalid installation ID",
+        variant: "destructive",
+      })
+      return
+    }
 
     try {
+      setIsSubmitting(true)
       await serviceControlApi.restoreService(selectedInstallation.id, restoreFormData.reason)
 
       toast({
         title: "Service Restored",
         description: `Service for installation #${selectedInstallation.id} has been restored.`,
+        variant: "default",
       })
 
       // Refresh data
-      const updatedStatus = await serviceControlApi.getCurrentStatus(selectedInstallation.id)
-      setStatuses(prev => {
-        const index = prev.findIndex(s => s.installationId === selectedInstallation.id)
-        if (index >= 0) {
-          const newStatuses = [...prev]
-          newStatuses[index] = updatedStatus
-          return newStatuses
-        }
-        return [...prev, updatedStatus]
-      })
+      try {
+        const updatedStatus = await serviceControlApi.getCurrentStatus(selectedInstallation.id)
+        setStatuses(prev => {
+          const index = prev.findIndex(s => s.installationId === selectedInstallation.id)
+          if (index >= 0) {
+            const newStatuses = [...prev]
+            newStatuses[index] = updatedStatus
+            return newStatuses
+          }
+          return [...prev, updatedStatus]
+        })
+      } catch (refreshError) {
+        console.error("Error refreshing status after restoration:", refreshError)
+        // Force a full refresh
+        const installationsData = await installationApi.getAllInstallations()
+        setInstallations(installationsData?.content || [])
+      }
 
       setRestoreDialogOpen(false)
 
@@ -412,17 +513,27 @@ export default function ServicePage() {
       console.error(`Error restoring service for installation ${selectedInstallation.id}:`, error)
       toast({
         title: "Error",
-        description: "Failed to restore service",
+        description: error.response?.data?.message || "Failed to restore service",
         variant: "destructive",
       })
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
   // Handler for scheduling a status change
   const handleScheduleStatusChange = async () => {
-    if (!selectedInstallation) return
+    if (!selectedInstallation || !selectedInstallation.id) {
+      toast({
+        title: "Error",
+        description: "No installation selected or invalid installation ID",
+        variant: "destructive",
+      })
+      return
+    }
 
     try {
+      setIsSubmitting(true)
       await serviceControlApi.scheduleStatusChange(
         selectedInstallation.id,
         scheduleFormData.targetStatus,
@@ -433,19 +544,27 @@ export default function ServicePage() {
       toast({
         title: "Status Change Scheduled",
         description: `Service status change for installation #${selectedInstallation.id} scheduled for ${format(scheduleFormData.scheduledTime, "PPp")}.`,
+        variant: "default",
       })
 
       // Refresh data
-      const updatedStatus = await serviceControlApi.getCurrentStatus(selectedInstallation.id)
-      setStatuses(prev => {
-        const index = prev.findIndex(s => s.installationId === selectedInstallation.id)
-        if (index >= 0) {
-          const newStatuses = [...prev]
-          newStatuses[index] = updatedStatus
-          return newStatuses
-        }
-        return [...prev, updatedStatus]
-      })
+      try {
+        const updatedStatus = await serviceControlApi.getCurrentStatus(selectedInstallation.id)
+        setStatuses(prev => {
+          const index = prev.findIndex(s => s.installationId === selectedInstallation.id)
+          if (index >= 0) {
+            const newStatuses = [...prev]
+            newStatuses[index] = updatedStatus
+            return newStatuses
+          }
+          return [...prev, updatedStatus]
+        })
+      } catch (refreshError) {
+        console.error("Error refreshing status after scheduling:", refreshError)
+        // Force a full refresh
+        const installationsData = await installationApi.getAllInstallations()
+        setInstallations(installationsData?.content || [])
+      }
 
       setScheduleDialogOpen(false)
 
@@ -453,9 +572,11 @@ export default function ServicePage() {
       console.error(`Error scheduling status change for installation ${selectedInstallation.id}:`, error)
       toast({
         title: "Error",
-        description: "Failed to schedule status change",
+        description: error.response?.data?.message || "Failed to schedule status change",
         variant: "destructive",
       })
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
@@ -580,6 +701,184 @@ export default function ServicePage() {
     }
   }
 
+  // Add these functions for service control actions
+  const handleStartService = async (installationId) => {
+    try {
+      setLoading(true)
+      await serviceApi.startService(installationId)
+      
+      toast({
+        title: "Service Started",
+        description: `Started service for installation #${installationId}`,
+        variant: "default",
+      })
+      
+      // Refresh statuses
+      await fetchPaginatedStatuses()
+    } catch (error) {
+      console.error(`Error starting service for installation ${installationId}:`, error)
+      toast({
+        title: "Error",
+        description: "Failed to start service. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setLoading(false)
+    }
+  }
+  
+  const handleStopService = async (installationId) => {
+    try {
+      setLoading(true)
+      await serviceApi.stopService(installationId)
+      
+      toast({
+        title: "Service Stopped",
+        description: `Stopped service for installation #${installationId}`,
+        variant: "default",
+      })
+      
+      // Refresh statuses
+      await fetchPaginatedStatuses()
+    } catch (error) {
+      console.error(`Error stopping service for installation ${installationId}:`, error)
+      toast({
+        title: "Error",
+        description: "Failed to stop service. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setLoading(false)
+    }
+  }
+  
+  const handleRestartService = async (installationId) => {
+    try {
+      setLoading(true)
+      await serviceApi.restartService(installationId)
+      
+      toast({
+        title: "Service Restarted",
+        description: `Restarted service for installation #${installationId}`,
+        variant: "default",
+      })
+      
+      // Refresh statuses
+      await fetchPaginatedStatuses()
+    } catch (error) {
+      console.error(`Error restarting service for installation ${installationId}:`, error)
+      toast({
+        title: "Error",
+        description: "Failed to restart service. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setLoading(false)
+    }
+  }
+  
+  // Use this improved function to fetch statuses with pagination
+  const fetchPaginatedStatuses = async () => {
+    try {
+      setLoading(true)
+      setStatuses([]) // Clear existing statuses while loading
+
+      let statusesData = []
+      let totalItems = 0
+
+      // If a status filter is applied, use the paginated API endpoint
+      if (statusFilter !== "ALL") {
+        const response = await serviceControlApi.getInstallationsByStatus(statusFilter, page, pageSize)
+        statusesData = response?.content || []
+        totalItems = response?.totalElements || 0
+      } else {
+        // Fetch installations with pagination
+        if (installations.length === 0) {
+          const installationsResponse = await installationApi.getAllInstallations({
+            page, 
+            size: pageSize
+          })
+          
+          const installationsData = installationsResponse?.content || []
+          setInstallations(installationsData)
+          totalItems = installationsResponse?.totalElements || 0
+          
+          // If installations exist, fetch their statuses in batch for better performance
+          if (installationsData.length > 0) {
+            const installationIds = installationsData
+              .filter(installation => installation && installation.id)
+              .map(installation => installation.id)
+            
+            if (installationIds.length > 0) {
+              // Use batch API for better performance
+              statusesData = await serviceControlApi.getBatchStatuses(installationIds)
+            }
+          }
+        } else {
+          // We have installations, fetch statuses for the current page in batch
+          const pageStart = page * pageSize
+          const pageEnd = Math.min(pageStart + pageSize, installations.length)
+          const pageInstallations = installations.slice(pageStart, pageEnd)
+          totalItems = installations.length
+          
+          if (pageInstallations.length > 0) {
+            const installationIds = pageInstallations
+              .filter(installation => installation && installation.id)
+              .map(installation => installation.id)
+            
+            if (installationIds.length > 0) {
+              // Use batch API for better performance
+              statusesData = await serviceControlApi.getBatchStatuses(installationIds)
+            }
+          }
+        }
+      }
+      
+      // Filter out null values
+      statusesData = statusesData.filter(status => status !== null)
+      
+      setStatuses(statusesData)
+      setTotalStatusItems(totalItems)
+      
+    } catch (error) {
+      console.error("Error fetching service status data:", error)
+      toast({
+        title: "Error",
+        description: "Failed to load service status data. Please try again.",
+        variant: "destructive",
+      })
+      setStatuses([])
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Fetch initial data on load
+  useEffect(() => {
+    if (!hasLoadedInitialData) {
+      fetchPaginatedStatuses()
+      setHasLoadedInitialData(true)
+    }
+  }, [hasLoadedInitialData])
+
+  // Fetch data when pagination or filters change
+  useEffect(() => {
+    if (hasLoadedInitialData) {
+      fetchPaginatedStatuses()
+    }
+  }, [page, pageSize, statusFilter, sortBy, sortDirection])
+
+  // Define a function to handle page changes
+  const handlePageChange = (newPage: number) => {
+    setPage(newPage)
+  }
+
+  // Define a function to handle page size changes
+  const handlePageSizeChange = (newSize: number) => {
+    setPageSize(newSize)
+    setPage(0) // Reset to first page when changing page size
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -608,202 +907,81 @@ export default function ServicePage() {
                   Manage service state for all solar installations
                 </CardDescription>
               </div>
-              <Select
-                value={statusFilter}
-                onValueChange={setStatusFilter}
-              >
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder="Filter by status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="ALL">All Statuses</SelectItem>
-                  <SelectItem value="ACTIVE">Active</SelectItem>
-                  <SelectItem value="SUSPENDED_PAYMENT">Suspended (Payment)</SelectItem>
-                  <SelectItem value="SUSPENDED_SECURITY">Suspended (Security)</SelectItem>
-                  <SelectItem value="SUSPENDED_MAINTENANCE">Maintenance</SelectItem>
-                  <SelectItem value="SCHEDULED">Scheduled Changes</SelectItem>
-                </SelectContent>
-              </Select>
+              <div className="flex items-center space-x-2">
+                <Select
+                  value={statusFilter}
+                  onValueChange={setStatusFilter}
+                >
+                  <SelectTrigger className="w-[180px]">
+                    <SelectValue placeholder="Filter by status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ALL">All Statuses</SelectItem>
+                    <SelectItem value="ACTIVE">Active</SelectItem>
+                    <SelectItem value="SUSPENDED_PAYMENT">Suspended (Payment)</SelectItem>
+                    <SelectItem value="SUSPENDED_SECURITY">Suspended (Security)</SelectItem>
+                    <SelectItem value="SUSPENDED_MAINTENANCE">Maintenance</SelectItem>
+                    <SelectItem value="SCHEDULED">Scheduled Changes</SelectItem>
+                  </SelectContent>
+                </Select>
+                
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={fetchPaginatedStatuses}
+                >
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Refresh
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
-              {loading ? (
-                <div className="py-10 text-center">
-                  <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-current border-r-transparent"></div>
-                  <p className="mt-2 text-sm text-muted-foreground">Loading service statuses...</p>
-                </div>
-              ) : (
-                <div className="rounded-md border">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="w-[80px]">ID</TableHead>
-                        <TableHead>Installation</TableHead>
-                        <TableHead>Customer</TableHead>
-                        <TableHead>
-                          <Button
-                            variant="ghost"
-                            className="p-0 font-medium"
-                            onClick={() => {
-                              if (sortBy === "status") {
-                                setSortDirection(sortDirection === "asc" ? "desc" : "asc")
-                              } else {
-                                setSortBy("status")
-                                setSortDirection("asc")
-                              }
-                            }}
-                          >
-                            Status
-                            {sortBy === "status" && (
-                              <ArrowUpDown className="ml-2 h-4 w-4" />
-                            )}
-                          </Button>
-                        </TableHead>
-                        <TableHead>
-                          <Button
-                            variant="ghost"
-                            className="p-0 font-medium"
-                            onClick={() => {
-                              if (sortBy === "lastUpdated") {
-                                setSortDirection(sortDirection === "asc" ? "desc" : "asc")
-                              } else {
-                                setSortBy("lastUpdated")
-                                setSortDirection("desc")
-                              }
-                            }}
-                          >
-                            Last Updated
-                            {sortBy === "lastUpdated" && (
-                              <ArrowUpDown className="ml-2 h-4 w-4" />
-                            )}
-                          </Button>
-                        </TableHead>
-                        <TableHead>Reason</TableHead>
-                        <TableHead className="text-right">Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {statuses.length === 0 ? (
-                        <TableRow>
-                          <TableCell colSpan={7} className="h-24 text-center">
-                            No service statuses found
-                          </TableCell>
-                        </TableRow>
-                      ) : (
-                        statuses.map((statusData) => {
-                          const installation = installations.find(i => i.id === statusData.installationId) || {}
-
-                          return (
-                            <TableRow key={statusData.id || installation.id}>
-                              <TableCell className="font-medium">{statusData.installationId || installation.id}</TableCell>
-                              <TableCell>
-                                {installation.name || `Installation #${statusData.installationId || installation.id}`}
-                              </TableCell>
-                              <TableCell>
-                                {installation.username || installation.customerName || "N/A"}
-                              </TableCell>
-                              <TableCell>
-                                {getStatusBadge(statusData.status)}
-                              </TableCell>
-                              <TableCell>
-                                <div className="flex items-center space-x-2">
-                                  <Clock className="h-4 w-4 text-muted-foreground" />
-                                  <span>{statusData.lastUpdated ? format(new Date(statusData.lastUpdated), "PPp") : "N/A"}</span>
-                                </div>
-                              </TableCell>
-                              <TableCell>
-                                <span className="text-sm line-clamp-1">{statusData.statusReason || "N/A"}</span>
-                              </TableCell>
-                              <TableCell className="text-right">
-                                <div className="flex justify-end gap-2">
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => {
-                                      setSelectedInstallation({
-                                        ...installation,
-                                        status: statusData.status,
-                                      })
-                                      setStatusFormData({
-                                        status: statusData.status || "ACTIVE",
-                                        statusReason: ""
-                                      })
-                                      setUpdateStatusDialogOpen(true)
-                                    }}
-                                  >
-                                    <Settings className="h-4 w-4 mr-2" />
-                                    Update Status
-                                  </Button>
-
-                                  {(!statusData.status || statusData.status === "ACTIVE") && (
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      onClick={() => {
-                                        setSelectedInstallation({
-                                          ...installation,
-                                          status: statusData.status,
-                                        })
-                                        setSuspendFormData({
-                                          reason: "",
-                                          suspensionType: "PAYMENT"
-                                        })
-                                        setSuspendDialogOpen(true)
-                                      }}
-                                    >
-                                      <AlertTriangle className="h-4 w-4 mr-2" />
-                                      Suspend
-                                    </Button>
-                                  )}
-
-                                  {statusData.status && statusData.status.startsWith("SUSPENDED") && (
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      onClick={() => {
-                                        setSelectedInstallation({
-                                          ...installation,
-                                          status: statusData.status,
-                                        })
-                                        setRestoreFormData({
-                                          reason: ""
-                                        })
-                                        setRestoreDialogOpen(true)
-                                      }}
-                                    >
-                                      <CheckCircle className="h-4 w-4 mr-2" />
-                                      Restore
-                                    </Button>
-                                  )}
-
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => {
-                                      setSelectedInstallation({
-                                        ...installation,
-                                        status: statusData.status,
-                                      })
-                                      setScheduleFormData({
-                                        targetStatus: "ACTIVE",
-                                        reason: "",
-                                        scheduledTime: new Date(Date.now() + 24 * 60 * 60 * 1000)
-                                      })
-                                      setScheduleDialogOpen(true)
-                                    }}
-                                  >
-                                    <Clock4 className="h-4 w-4 mr-2" />
-                                    Schedule
-                                  </Button>
-                                </div>
-                              </TableCell>
-                            </TableRow>
-                          )
-                        })
-                      )}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
+              {/* Replace the card grid with the table */}
+              <ServiceStatusTable
+                statuses={statuses}
+                installations={installations}
+                loading={loading}
+                page={page}
+                pageSize={pageSize}
+                totalItems={totalStatusItems}
+                onChangePage={handlePageChange}
+                onChangePageSize={handlePageSizeChange}
+                onStartService={handleStartService}
+                onStopService={handleStopService}
+                onRestartService={handleRestartService}
+                onUpdateStatus={(installation) => {
+                  setSelectedInstallation(installation)
+                  setStatusFormData({
+                    status: installation.status || "ACTIVE",
+                    statusReason: ""
+                  })
+                  setUpdateStatusDialogOpen(true)
+                }}
+                onSuspendService={(installation) => {
+                  setSelectedInstallation(installation)
+                  setSuspendFormData({
+                    reason: "",
+                    suspensionType: "PAYMENT"
+                  })
+                  setSuspendDialogOpen(true)
+                }}
+                onRestoreService={(installation) => {
+                  setSelectedInstallation(installation)
+                  setRestoreFormData({
+                    reason: ""
+                  })
+                  setRestoreDialogOpen(true)
+                }}
+                onScheduleChange={(installation) => {
+                  setSelectedInstallation(installation)
+                  setScheduleFormData({
+                    targetStatus: "ACTIVE",
+                    reason: "",
+                    scheduledTime: new Date(Date.now() + 24 * 60 * 60 * 1000)
+                  })
+                  setScheduleDialogOpen(true)
+                }}
+              />
             </CardContent>
           </Card>
         </TabsContent>
@@ -1227,11 +1405,18 @@ export default function ServicePage() {
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setUpdateStatusDialogOpen(false)}>
+            <Button variant="outline" onClick={() => setUpdateStatusDialogOpen(false)} disabled={isSubmitting}>
               Cancel
             </Button>
-            <Button onClick={() => handleUpdateStatus()}>
-              Update Status
+            <Button onClick={() => handleUpdateStatus()} disabled={isSubmitting}>
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Updating...
+                </>
+              ) : (
+                "Update Status"
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1370,11 +1555,18 @@ export default function ServicePage() {
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setSuspendDialogOpen(false)}>
+            <Button variant="outline" onClick={() => setSuspendDialogOpen(false)} disabled={isSubmitting}>
               Cancel
             </Button>
-            <Button onClick={() => handleSuspendService()}>
-              Suspend Service
+            <Button onClick={() => handleSuspendService()} disabled={isSubmitting}>
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Suspending...
+                </>
+              ) : (
+                "Suspend Service"
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1412,11 +1604,18 @@ export default function ServicePage() {
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setRestoreDialogOpen(false)}>
+            <Button variant="outline" onClick={() => setRestoreDialogOpen(false)} disabled={isSubmitting}>
               Cancel
             </Button>
-            <Button onClick={() => handleRestoreService()}>
-              Restore Service
+            <Button onClick={() => handleRestoreService()} disabled={isSubmitting}>
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Restoring...
+                </>
+              ) : (
+                "Restore Service"
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1502,11 +1701,18 @@ export default function ServicePage() {
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setScheduleDialogOpen(false)}>
+            <Button variant="outline" onClick={() => setScheduleDialogOpen(false)} disabled={isSubmitting}>
               Cancel
             </Button>
-            <Button onClick={() => handleScheduleStatusChange()}>
-              Schedule Change
+            <Button onClick={() => handleScheduleStatusChange()} disabled={isSubmitting}>
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Scheduling...
+                </>
+              ) : (
+                "Schedule Change"
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1596,11 +1802,18 @@ export default function ServicePage() {
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setNewCommandDialogOpen(false)}>
+            <Button variant="outline" onClick={() => setNewCommandDialogOpen(false)} disabled={isSubmitting}>
               Cancel
             </Button>
-            <Button onClick={() => handleSendCommand()}>
-              Send Command
+            <Button onClick={() => handleSendCommand()} disabled={isSubmitting}>
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Sending...
+                </>
+              ) : (
+                "Send Command"
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>

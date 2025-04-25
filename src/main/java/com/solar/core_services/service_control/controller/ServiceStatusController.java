@@ -17,6 +17,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
@@ -32,6 +33,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/service/status")
 @RequiredArgsConstructor
+@Slf4j
 @Tag(name = "Service Status", description = "APIs for managing service status operations")
 public class ServiceStatusController {
 
@@ -96,19 +98,24 @@ public class ServiceStatusController {
         String username = authentication.getName();
         ServiceStatusDTO updatedStatus = serviceStatusService.updateServiceStatus(installationId, request, username);
         
-        // Log the operation
-        operationalLogService.logOperation(
-                installationId,
-                OperationalLog.OperationType.SERVICE_STATUS_UPDATE,
-                username,
-                "Updated service status to " + request.getStatus() + " with reason: " + request.getStatusReason(),
-                "SERVICE_CONTROL",
-                "STATUS_UPDATE",
-                httpRequest.getRemoteAddr(),
-                httpRequest.getHeader("User-Agent"),
-                true,
-                null
-        );
+        // Log the operation with error handling
+        try {
+            operationalLogService.logOperation(
+                    installationId,
+                    OperationalLog.OperationType.SERVICE_STATUS_UPDATE,
+                    username,
+                    "Updated service status to " + request.getStatus() + " with reason: " + request.getStatusReason(),
+                    "SERVICE_CONTROL",
+                    "STATUS_UPDATE",
+                    httpRequest.getRemoteAddr(),
+                    httpRequest.getHeader("User-Agent"),
+                    true,
+                    null
+            );
+        } catch (Exception e) {
+            // Log the error but don't prevent the operation from succeeding
+            log.error("Failed to log operation: {}", e.getMessage());
+        }
         
         return ResponseEntity.ok(updatedStatus);
     }
@@ -134,19 +141,24 @@ public class ServiceStatusController {
         String username = authentication.getName();
         ServiceStatusDTO updatedStatus = serviceStatusService.suspendServiceForPayment(installationId, reason, username);
         
-        // Log the operation
-        operationalLogService.logOperation(
-                installationId,
-                OperationalLog.OperationType.SERVICE_SUSPENSION,
-                username,
-                "Suspended service for payment issues. Reason: " + reason,
-                "SERVICE_CONTROL",
-                "PAYMENT_SUSPENSION",
-                httpRequest.getRemoteAddr(),
-                httpRequest.getHeader("User-Agent"),
-                true,
-                null
-        );
+        // Log the operation with error handling
+        try {
+            operationalLogService.logOperation(
+                    installationId,
+                    OperationalLog.OperationType.SERVICE_SUSPENSION,
+                    username,
+                    "Suspended service for payment issues. Reason: " + reason,
+                    "SERVICE_CONTROL",
+                    "PAYMENT_SUSPENSION",
+                    httpRequest.getRemoteAddr(),
+                    httpRequest.getHeader("User-Agent"),
+                    true,
+                    null
+            );
+        } catch (Exception e) {
+            // Log the error but don't prevent the operation from succeeding
+            log.error("Failed to log operation: {}", e.getMessage());
+        }
         
         return ResponseEntity.ok(updatedStatus);
     }
@@ -172,19 +184,24 @@ public class ServiceStatusController {
         String username = authentication.getName();
         ServiceStatusDTO updatedStatus = serviceStatusService.suspendServiceForSecurity(installationId, reason, username);
         
-        // Log the operation
-        operationalLogService.logOperation(
-                installationId,
-                OperationalLog.OperationType.SERVICE_SUSPENSION,
-                username,
-                "Suspended service for security issues. Reason: " + reason,
-                "SERVICE_CONTROL",
-                "SECURITY_SUSPENSION",
-                httpRequest.getRemoteAddr(),
-                httpRequest.getHeader("User-Agent"),
-                true,
-                null
-        );
+        // Log the operation with error handling
+        try {
+            operationalLogService.logOperation(
+                    installationId,
+                    OperationalLog.OperationType.SERVICE_SUSPENSION,
+                    username,
+                    "Suspended service for security issues. Reason: " + reason,
+                    "SERVICE_CONTROL",
+                    "SECURITY_SUSPENSION",
+                    httpRequest.getRemoteAddr(),
+                    httpRequest.getHeader("User-Agent"),
+                    true,
+                    null
+            );
+        } catch (Exception e) {
+            // Log the error but don't prevent the operation from succeeding
+            log.error("Failed to log operation: {}", e.getMessage());
+        }
         
         return ResponseEntity.ok(updatedStatus);
     }
@@ -211,20 +228,25 @@ public class ServiceStatusController {
         ServiceStatusDTO updatedStatus = serviceStatusService.suspendServiceForMaintenance(
                 installationId, request.getReason(), username);
         
-        // Log the operation
-        operationalLogService.logOperation(
-                installationId,
-                OperationalLog.OperationType.SERVICE_SUSPENSION,
-                username,
-                "Suspended service for maintenance. Reason: " + request.getReason() + 
-                        ", Scheduled: " + request.getStartTime() + " to " + request.getEndTime(),
-                "SERVICE_CONTROL",
-                "MAINTENANCE_SUSPENSION",
-                httpRequest.getRemoteAddr(),
-                httpRequest.getHeader("User-Agent"),
-                true,
-                null
-        );
+        // Log the operation with error handling
+        try {
+            operationalLogService.logOperation(
+                    installationId,
+                    OperationalLog.OperationType.SERVICE_SUSPENSION,
+                    username,
+                    "Suspended service for maintenance. Reason: " + request.getReason() + 
+                            ", Scheduled: " + request.getStartTime() + " to " + request.getEndTime(),
+                    "SERVICE_CONTROL",
+                    "MAINTENANCE_SUSPENSION",
+                    httpRequest.getRemoteAddr(),
+                    httpRequest.getHeader("User-Agent"),
+                    true,
+                    null
+            );
+        } catch (Exception e) {
+            // Log the error but don't prevent the operation from succeeding
+            log.error("Failed to log operation: {}", e.getMessage());
+        }
         
         return ResponseEntity.ok(updatedStatus);
     }
@@ -250,19 +272,24 @@ public class ServiceStatusController {
         String username = authentication.getName();
         ServiceStatusDTO updatedStatus = serviceStatusService.restoreService(installationId, reason, username);
         
-        // Log the operation
-        operationalLogService.logOperation(
-                installationId,
-                OperationalLog.OperationType.SERVICE_RESTORATION,
-                username,
-                "Restored service. Reason: " + reason,
-                "SERVICE_CONTROL",
-                "SERVICE_RESTORATION",
-                httpRequest.getRemoteAddr(),
-                httpRequest.getHeader("User-Agent"),
-                true,
-                null
-        );
+        // Log the operation with error handling
+        try {
+            operationalLogService.logOperation(
+                    installationId,
+                    OperationalLog.OperationType.SERVICE_RESTORATION,
+                    username,
+                    "Restored service. Reason: " + reason,
+                    "SERVICE_CONTROL",
+                    "SERVICE_RESTORATION",
+                    httpRequest.getRemoteAddr(),
+                    httpRequest.getHeader("User-Agent"),
+                    true,
+                    null
+            );
+        } catch (Exception e) {
+            // Log the error but don't prevent the operation from succeeding
+            log.error("Failed to log operation: {}", e.getMessage());
+        }
         
         return ResponseEntity.ok(updatedStatus);
     }
@@ -294,19 +321,24 @@ public class ServiceStatusController {
         ServiceStatusDTO scheduledStatus = serviceStatusService.scheduleStatusChange(
                 installationId, targetStatus, reason, username, scheduledTime);
         
-        // Log the operation
-        operationalLogService.logOperation(
-                installationId,
-                OperationalLog.OperationType.STATUS_CHANGE_SCHEDULED,
-                username,
-                "Scheduled status change to " + targetStatus + " at " + scheduledTime + ". Reason: " + reason,
-                "SERVICE_CONTROL",
-                "SCHEDULE_STATUS_CHANGE",
-                httpRequest.getRemoteAddr(),
-                httpRequest.getHeader("User-Agent"),
-                true,
-                null
-        );
+        // Log the operation with error handling
+        try {
+            operationalLogService.logOperation(
+                    installationId,
+                    OperationalLog.OperationType.STATUS_CHANGE_SCHEDULED,
+                    username,
+                    "Scheduled status change to " + targetStatus + " at " + scheduledTime + ". Reason: " + reason,
+                    "SERVICE_CONTROL",
+                    "SCHEDULE_STATUS_CHANGE",
+                    httpRequest.getRemoteAddr(),
+                    httpRequest.getHeader("User-Agent"),
+                    true,
+                    null
+            );
+        } catch (Exception e) {
+            // Log the error but don't prevent the operation from succeeding
+            log.error("Failed to log operation: {}", e.getMessage());
+        }
         
         return ResponseEntity.ok(scheduledStatus);
     }
@@ -329,19 +361,24 @@ public class ServiceStatusController {
         String username = authentication.getName();
         ServiceStatusDTO updatedStatus = serviceStatusService.cancelScheduledChange(installationId, username);
         
-        // Log the operation
-        operationalLogService.logOperation(
-                installationId,
-                OperationalLog.OperationType.SCHEDULED_CHANGE_CANCELLED,
-                username,
-                "Cancelled scheduled status change",
-                "SERVICE_CONTROL",
-                "CANCEL_SCHEDULED_CHANGE",
-                httpRequest.getRemoteAddr(),
-                httpRequest.getHeader("User-Agent"),
-                true,
-                null
-        );
+        // Log the operation with error handling
+        try {
+            operationalLogService.logOperation(
+                    installationId,
+                    OperationalLog.OperationType.SCHEDULED_CHANGE_CANCELLED,
+                    username,
+                    "Cancelled scheduled status change",
+                    "SERVICE_CONTROL",
+                    "CANCEL_SCHEDULED_CHANGE",
+                    httpRequest.getRemoteAddr(),
+                    httpRequest.getHeader("User-Agent"),
+                    true,
+                    null
+            );
+        } catch (Exception e) {
+            // Log the error but don't prevent the operation from succeeding
+            log.error("Failed to log operation: {}", e.getMessage());
+        }
         
         return ResponseEntity.ok(updatedStatus);
     }
@@ -378,5 +415,24 @@ public class ServiceStatusController {
         
         Page<ServiceStatusDTO> installations = serviceStatusService.getInstallationsByStatus(status, pageable);
         return ResponseEntity.ok(installations);
+    }
+
+    @PostMapping("/batch")
+    @Operation(
+        summary = "Get statuses for multiple installations",
+        description = "Retrieves service statuses for multiple installations in a single request."
+    )
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Service statuses retrieved successfully")
+    })
+    public ResponseEntity<List<ServiceStatusDTO>> getBatchStatuses(
+            @Parameter(description = "List of installation IDs to retrieve statuses for", required = true)
+            @RequestBody List<Long> installationIds) {
+        
+        log.info("Getting service statuses for {} installations", installationIds.size());
+        
+        List<ServiceStatusDTO> statuses = serviceStatusService.getBatchStatuses(installationIds);
+        
+        return ResponseEntity.ok(statuses);
     }
 } 
