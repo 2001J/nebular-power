@@ -1947,10 +1947,12 @@ export const serviceApi = {
       return response.data || { content: [], totalElements: 0, totalPages: 0 };
     } catch (error: any) {
       console.error(`Error fetching logs by time range:`, error);
+      
+      // Provide user feedback in case of authentication error
       if (axios.isAxiosError(error) && error.response?.status === 401) {
         console.error("Authentication failed for logs by time range - token may be invalid or expired");
         
-        // Provide user feedback
+        // Show toast notification
         toast({
           title: "Authentication Error",
           description: "Your session has expired. Please log in again.",
@@ -2187,8 +2189,8 @@ export const serviceControlApi = {
       let errorMessage = "Failed to update service status";
       
       if (error.response) {
-        // The request was made and the server responded with a status code
-        // that falls out of the range of2xx
+        // The request was made and the server responded with astatus code
+        // that falls out of the range of 2xx
         errorMessage += `: Server responded with ${error.response.status}`;
         if (error.response.data && error.response.data.message) {
           errorMessage += ` - ${error.response.data.message}`;
@@ -2358,7 +2360,7 @@ export const serviceControlApi = {
       return response.data;
     } catch (error: any) {
       console.error(`Error fetching commands for installation ${installationId}:`, error);
-      return { content: [], totalElements: 0, totalPages: 0 };
+      return { content: [], totalElements: 0, totalPages: 0, size, number: page };
     }
   },
 
@@ -2370,7 +2372,7 @@ export const serviceControlApi = {
       return response.data;
     } catch (error: any) {
       console.error(`Error fetching commands with status ${status}:`, error);
-      return { content: [], totalElements: 0, totalPages: 0 };
+      return { content: [], totalElements: 0, totalPages: 0, size, number: page };
     }
   },
 
@@ -2511,7 +2513,7 @@ export const serviceControlApi = {
         }
       }
       
-      // Return empty pageable object to prevent UI errors
+      // Return empty result structure for better error handling
       return { 
         content: [], 
         totalElements: 0, 
@@ -2530,7 +2532,7 @@ export const serviceControlApi = {
       return response.data;
     } catch (error: any) {
       console.error(`Error fetching logs by operation ${operation}:`, error);
-      return { content: [], totalElements: 0, totalPages: 0 };
+      return { content: [], totalElements: 0, totalPages: 0, size, number: page };
     }
   },
 
@@ -2542,7 +2544,7 @@ export const serviceControlApi = {
       return response.data;
     } catch (error: any) {
       console.error(`Error fetching logs by source system ${sourceSystem}:`, error);
-      return { content: [], totalElements: 0, totalPages: 0 };
+      return { content: [], totalElements: 0, totalPages: 0, size, number: page };
     }
   },
 
@@ -2554,7 +2556,7 @@ export const serviceControlApi = {
       return response.data;
     } catch (error: any) {
       console.error(`Error fetching logs for installation ${installationId}:`, error);
-      return { content: [], totalElements: 0, totalPages: 0 };
+      return { content: [], totalElements: 0, totalPages: 0, size, number: page };
     }
   },
 
@@ -2656,14 +2658,27 @@ export const securityApi = {
     }
   },
 
-  getUnresolvedEvents: async (page = 0, size = 20) => {
+  getLogsByActivityType: async (installationId: string, activityType: string, page = 0, size = 20) => {
     try {
-      const response = await apiClient.get(`/api/security/admin/alerts`, {
-        params: { page, size }
+      const response = await apiClient.get(`/api/security/installations/${installationId}/events/activity-type`, {
+        params: { activityType, page, size }
       });
       return response.data;
     } catch (error: any) {
-      console.error(`Error fetching unresolved events:`, error);
+      console.error(`Error fetching events by activity type:`, error);
+      return { content: [], totalElements: 0, totalPages: 0, size, number: page };
+    }
+  },
+
+  getAdminAuditLogs: async (page = 0, size = 20, activityType?: string) => {
+    try {
+      const params: any = { page, size };
+      if (activityType) params.activityType = activityType;
+
+      const response = await apiClient.get('/api/security/admin/audit', { params });
+      return response.data;
+    } catch (error: any) {
+      console.error('Error fetching admin security audit logs:', error);
       return { content: [], totalElements: 0, totalPages: 0, size, number: page };
     }
   },
@@ -2811,6 +2826,16 @@ export const securityApi = {
   },
 
   // Security Audit Logs APIs
+  getUserSecurityLogs: async (page = 0, size = 20) => {
+    try {
+      // Call the user audit logs function which already exists
+      return await securityApi.getUserAuditLogs(page, size);
+    } catch (error: any) {
+      console.error('Error fetching user security audit logs:', error);
+      return { content: [], totalElements: 0, totalPages: 0, size, number: page };
+    }
+  },
+
   getUserAuditLogs: async (page = 0, size = 20) => {
     try {
       const response = await apiClient.get('/api/security/audit', {
@@ -2835,7 +2860,7 @@ export const securityApi = {
     }
   },
 
-  getAuditLogsByTimeRange: async (installationId: string, startTime: string, endTime: string, page = 0, size = 20) => {
+  getLogsByTimeRange: async (installationId: string, startTime: string, endTime: string, page = 0, size = 20) => {
     try {
       const response = await apiClient.get(`/api/security/admin/installations/${installationId}/audit/time-range`, {
         params: { startTime, endTime, page, size }
@@ -2847,7 +2872,7 @@ export const securityApi = {
     }
   },
 
-  getAuditLogsByActivityType: async (installationId: string, activityType: string, page = 0, size = 20) => {
+  getLogsByActivityType: async (installationId: string, activityType: string, page = 0, size = 20) => {
     try {
       const response = await apiClient.get(`/api/security/admin/installations/${installationId}/audit/activity-type`, {
         params: { activityType, page, size }
@@ -2870,7 +2895,7 @@ export const securityApi = {
       console.error('Error fetching admin security audit logs:', error);
       return { content: [], totalElements: 0, totalPages: 0, size, number: page };
     }
-  }
+  },
 };
 
 // Tamper Detection API

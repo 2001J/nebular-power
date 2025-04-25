@@ -14,12 +14,8 @@ import {
   Info,
   AlertTriangle,
   ArrowUpDown,
-  Loader2,
-  Bug
+  Loader2
 } from "lucide-react"
-
-// Import our test functions
-import { testLogsAPI, testFormattedDates } from "@/lib/logsApiTest"
 
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -237,7 +233,13 @@ export default function LogsPage() {
   // Handle fetching security logs
   const handleFetchSecurityLogs = async () => {
     try {
-      setLoading(true)
+      setLoading(true);
+      
+      console.log("🔎 Fetching security logs with filters:", { 
+        logType, 
+        timeRange,
+        isInstallationFilter: logType.startsWith("sec_inst_")
+      });
 
       // Check for authentication token first
       const token = typeof window !== 'undefined' 
@@ -256,118 +258,301 @@ export default function LogsPage() {
         return;
       }
 
-      // Determine date range
-      const endDate = new Date()
-      let startDate
+      // Determine date range with proper timestamps
+      const endDate = new Date();
+      let startDate;
 
       switch (timeRange) {
         case 'today':
-          startDate = new Date()
-          startDate.setHours(0, 0, 0, 0)
-          break
+          startDate = new Date();
+          startDate.setHours(0, 0, 0, 0);
+          endDate.setHours(23, 59, 59, 999);
+          break;
         case 'yesterday':
-          startDate = new Date()
-          startDate.setDate(startDate.getDate() - 1)
-          startDate.setHours(0, 0, 0, 0)
-          endDate.setDate(endDate.getDate() - 1)
-          endDate.setHours(23, 59, 59, 999)
-          break
+          startDate = new Date();
+          startDate.setDate(startDate.getDate() - 1);
+          startDate.setHours(0, 0, 0, 0);
+          endDate.setDate(endDate.getDate() - 1);
+          endDate.setHours(23, 59, 59, 999);
+          break;
         case 'week':
-          startDate = new Date()
-          startDate.setDate(startDate.getDate() - 7)
-          break
+          startDate = new Date();
+          startDate.setDate(startDate.getDate() - 7);
+          startDate.setHours(0, 0, 0, 0); // Set to start of day
+          endDate.setHours(23, 59, 59, 999); // Set to end of day
+          break;
         case 'month':
-          startDate = new Date()
-          startDate.setMonth(startDate.getMonth() - 1)
-          break
+          startDate = new Date();
+          startDate.setMonth(startDate.getMonth() - 1);
+          startDate.setHours(0, 0, 0, 0); // Set to start of day
+          endDate.setHours(23, 59, 59, 999); // Set to end of day
+          break;
         default:
-          startDate = new Date()
-          startDate.setHours(0, 0, 0, 0)
+          startDate = new Date();
+          startDate.setHours(0, 0, 0, 0);
+          endDate.setHours(23, 59, 59, 999);
       }
 
-      let securityLogsData = []
+      const startTimeFormatted = startDate.toISOString();
+      const endTimeFormatted = endDate.toISOString();
+
+      console.log("🔍 Security logs - using date range:", {
+        startTime: startTimeFormatted,
+        endTime: endTimeFormatted
+      });
 
       try {
-        // First try to get user security logs
-        securityLogsData = await securityApi.getUserSecurityLogs()
+        let securityLogsData = [];
+        let fetchedData = false;
+        let requestAttempts = 0;
+        let filterApplied = false;
 
-        // If we have an activity type filter
-        if (logType !== "all") {
-          // Filter by activity type
-          securityLogsData = await securityApi.getLogsByActivityType(
-            null, // No specific installation
-            logType
-          )
+        // Check if we're filtering by activity type but not by installation
+        if (logType !== "all" && !logType.startsWith("sec_inst_")) {
+          filterApplied = true;
+          console.log(`🔍 Filtering by activity type: ${logType}`);
+          
+          try {
+            requestAttempts++;
+            // Get all admin logs filtered by activity type
+            const activityLogs = await securityApi.getAdminAuditLogs(0, 100, logType);
+            if (activityLogs && activityLogs.content && activityLogs.content.length > 0) {
+              securityLogsData = activityLogs.content;
+              setTotalPages(activityLogs.totalPages || 1);
+              setTotalElements(activityLogs.totalElements || activityLogs.content.length);
+              fetchedData = true;
+              console.log(`✅ Found ${activityLogs.content.length} security logs for activity type ${logType}`);
+            } else {
+              console.log(`No logs found for activity type ${logType}`);
+              // Clear logs when no data is found for selected activity type
+              securityLogsData = [];
+              setTotalPages(0);
+              setTotalElements(0);
+              fetchedData = true; // Mark as fetched even though empty, to prevent fallback to all logs
+            }
+          } catch (error) {
+            console.warn("Could not fetch logs by activity type:", error);
+            // Don't reset securityLogsData here, to allow fallback
+          }
         }
-
-        // If no logs are found, get installation logs for all installations
-        if (!securityLogsData || securityLogsData.length === 0) {
-          for (const installation of installations) {
+        // Check if we're filtering by installation ID
+        else if (logType.startsWith("sec_inst_")) {
+          filterApplied = true;
+          const installationId = logType.replace("sec_inst_", "");
+          console.log(`🔍 Fetching security logs for installation ${installationId}`);
+          
+          try {
+            requestAttempts++;
+            // Try to get logs by time range for this specific installation
+            const installationLogs = await securityApi.getLogsByTimeRange(
+              installationId,
+              startTimeFormatted,
+              endTimeFormatted
+            );
+            
+            if (installationLogs && Array.isArray(installationLogs) && installationLogs.length > 0) {
+              securityLogsData = installationLogs;
+              fetchedData = true;
+              console.log(`✅ Found ${installationLogs.length} security logs for installation ${installationId}`);
+            } else if (installationLogs && installationLogs.content && installationLogs.content.length > 0) {
+              securityLogsData = installationLogs.content;
+              fetchedData = true;
+              console.log(`✅ Found ${installationLogs.content.length} security logs for installation ${installationId}`);
+            } else {
+              console.log(`No logs found for installation ${installationId} in the selected time range`);
+              // Clear logs when no data is found for selected installation
+              securityLogsData = [];
+              setTotalPages(0);
+              setTotalElements(0);
+              fetchedData = true; // Mark as fetched even though empty
+            }
+          } catch (error) {
+            console.warn(`Could not fetch logs for installation ${installationId}:`, error);
+          }
+        }
+        
+        // If not filtering or the filter returned no results AND we're showing "all", get logs for multiple installations
+        if (!fetchedData && logType === "all") {
+          const combinedLogs = [];
+          console.log(`🔍 Fetching security logs for all installations`);
+          
+          // Try to get logs for the available installations
+          if (installations.length > 0) {
+            // Only get logs for up to 5 installations to avoid too many requests
+            const installationsToFetch = installations.slice(0, 5);
+            
+            for (const installation of installationsToFetch as Array<{id: number | string, name?: string}>) {
+              try {
+                requestAttempts++;
+                console.log(`🔍 Fetching security logs for installation ${installation.id}`);
+                const installationLogs = await securityApi.getLogsByTimeRange(
+                  installation.id.toString(),
+                  startTimeFormatted,
+                  endTimeFormatted
+                );
+                
+                if (Array.isArray(installationLogs) && installationLogs.length > 0) {
+                  combinedLogs.push(...installationLogs);
+                  fetchedData = true;
+                  console.log(`✅ Found ${installationLogs.length} security logs for installation ${installation.id}`);
+                } else if (installationLogs && installationLogs.content && installationLogs.content.length > 0) {
+                  combinedLogs.push(...installationLogs.content);
+                  fetchedData = true;
+                  console.log(`✅ Found ${installationLogs.content.length} security logs for installation ${installation.id}`);
+                }
+              } catch (error) {
+                console.warn(`Could not fetch logs for installation ${installation.id}:`, error);
+              }
+            }
+          }
+          
+          // If we got logs by installation
+          if (combinedLogs.length > 0) {
+            securityLogsData = combinedLogs;
+            setTotalPages(1);
+            setTotalElements(combinedLogs.length);
+          } 
+          // If we still don't have data, try user logs as fallback
+          else if (!fetchedData) {
+            console.log(`🔍 Fetching user security logs as fallback`);
             try {
-              const installationLogs = await securityApi.getLogsByTimeRange(
-                installation.id,
-                startDate.toISOString(),
-                endDate.toISOString()
-              )
-
-              if (installationLogs && Array.isArray(installationLogs)) {
-                securityLogsData = [...securityLogsData, ...installationLogs]
+              requestAttempts++;
+              const userLogsData = await securityApi.getUserSecurityLogs(0, 100);
+              
+              if (userLogsData && userLogsData.content) {
+                securityLogsData = userLogsData.content;
+                setTotalPages(userLogsData.totalPages || 1);
+                setTotalElements(userLogsData.totalElements || userLogsData.content.length);
+                fetchedData = true;
+                console.log(`✅ Found ${userLogsData.content.length} user security logs`);
+              } else if (Array.isArray(userLogsData)) {
+                securityLogsData = userLogsData;
+                setTotalPages(1);
+                setTotalElements(userLogsData.length);
+                fetchedData = true;
+                console.log(`✅ Found ${userLogsData.length} user security logs`);
               }
             } catch (error) {
-              console.error(`Error fetching security logs for installation ${installation.id}:`, error)
+              console.warn("Could not fetch user security logs:", error);
             }
           }
         }
-
-        setSecurityLogs(securityLogsData)
-
+        
+        // Filter by activity type if we're viewing logs for a specific installation
+        if (logType.startsWith("sec_inst_") && logType !== "all" && securityLogsData.length > 0) {
+          const parts = logType.split("_");
+          if (parts.length > 3) {
+            const activityType = parts[3]; // Extract activity type from filter if present
+            if (activityType && activityType !== "inst") {
+              filterApplied = true;
+              console.log(`🔍 Further filtering installation logs by activity type: ${activityType}`);
+              const preFilterCount = securityLogsData.length;
+              securityLogsData = securityLogsData.filter((log: any) => 
+                log.activityType === activityType
+              );
+              console.log(`Filtered from ${preFilterCount} to ${securityLogsData.length} logs with activity type ${activityType}`);
+            }
+          }
+        }
+        
+        // Sort logs by timestamp descending (newest first)
+        if (securityLogsData.length > 0) {
+          securityLogsData.sort((a: any, b: any) => {
+            return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
+          });
+        }
+        
+        setSecurityLogs(securityLogsData);
+        
         if (securityLogsData.length > 0) {
           toast({
             title: "Security Logs Refreshed",
-            description: "The security audit logs have been refreshed."
-          })
+            description: `Loaded ${securityLogsData.length} security audit logs.`
+          });
         } else {
+          // Provide guidance if no logs were found
+          let suggestion = '';
+          
+          if (filterApplied) {
+            if (logType !== "all" && !logType.startsWith("sec_inst_")) {
+              suggestion = `No data found for activity type "${logType}". Try a different activity type or time range.`;
+            } else if (logType.startsWith("sec_inst_")) {
+              const parts = logType.split("_");
+              if (parts.length > 3) {
+                suggestion = `No data found for the selected installation and activity type. Try a different combination.`;
+              } else {
+                suggestion = 'Try expanding your time range to last 7 or 30 days.';
+              }
+            }
+          } else if (!logType.startsWith("sec_inst_")) {
+            suggestion = 'Try selecting a specific installation for better results.';
+          } else if (timeRange === 'today' || timeRange === 'yesterday') {
+            suggestion = 'Try expanding your time range to last 7 or 30 days.';
+          }
+          
           toast({
-            title: "No Security Logs",
-            description: "No security logs found for the selected filters."
-          })
+            title: "No Security Logs Found",
+            description: suggestion,
+            variant: "default"
+          });
         }
       } catch (error) {
-        console.error("Error fetching security logs:", error)
+        console.error("Error fetching security logs:", error);
         toast({
           title: "Error",
           description: "Failed to load security logs. Please try again.",
           variant: "destructive",
-        })
-
-        // Set empty logs
-        setSecurityLogs([])
+        });
+        setSecurityLogs([]);
       }
     } catch (error) {
-      console.error("Error in security logs fetch:", error)
+      console.error("Error in security logs fetch:", error);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
   }
 
   // Handle tab change
   const handleTabChange = (value) => {
-    setActiveTab(value)
+    // Reset filters when switching tabs to ensure independence
+    setSearchTerm("");
+    setLogType("all");
+    
+    // Update active tab
+    setActiveTab(value);
 
-    if (value === "security" && securityLogs.length === 0) {
-      // Load security logs when tab is first opened
-      handleFetchSecurityLogs()
+    if (value === "security") {
+      // Load security logs when tab is first opened or switched to
+      handleFetchSecurityLogs();
+    } else {
+      // Reset to operational logs
+      fetchLogsData();
     }
   }
 
+  // Auto-fetch security logs when filters change
+  useEffect(() => {
+    if (activeTab === "security" && initialLoadDone) {
+      console.log("🔄 Security logs filter changed, auto-refreshing...");
+      handleFetchSecurityLogs();
+    }
+  }, [logType, timeRange, activeTab, initialLoadDone]);
+
   // Filter logs based on search term
-  const filteredLogs = logs.filter(log =>
-    log.operation?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    log.sourceSystem?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    log.message?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    log.installationId?.toString().includes(searchTerm) ||
-    log.userId?.toString().includes(searchTerm)
-  )
+  const filteredLogs = activeTab === "operational" 
+    ? logs.filter(log =>
+        log.operation?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        log.sourceSystem?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        log.details?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        log.installationId?.toString().includes(searchTerm) ||
+        log.userId?.toString().includes(searchTerm)
+      )
+    : securityLogs.filter(log =>
+        log.activityType?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        log.details?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        log.userId?.toString().includes(searchTerm) ||
+        log.installationId?.toString().includes(searchTerm)
+      );
 
   // Get status badge for log status
   const getStatusBadge = (status) => {
@@ -563,118 +748,6 @@ export default function LogsPage() {
             <Download className="h-4 w-4 mr-2" />
             Export Logs
           </Button>
-
-          {/* Add debug test buttons */}
-          <Button 
-            variant="outline" 
-            onClick={async () => {
-              try {
-                toast({
-                  title: "Testing Logs API",
-                  description: "Checking the logs API directly. Check browser console for results.",
-                });
-                const result = await testLogsAPI();
-                if (result && (Array.isArray(result) ? result.length > 0 : (result.content && result.content.length > 0))) {
-                  toast({
-                    title: "Logs API Test Success",
-                    description: `Found ${Array.isArray(result) ? result.length : result.content.length} logs in the API response!`,
-                  });
-                } else {
-                  toast({
-                    title: "Logs API Test",
-                    description: "API responded but no logs were found in the date range. Check console for details.",
-                    variant: "warning"
-                  });
-                }
-              } catch (error) {
-                console.error("Test API error:", error);
-                toast({
-                  title: "Logs API Test Failed",
-                  description: error.message || "Unknown error occurred",
-                  variant: "destructive"
-                });
-              }
-            }}
-          >
-            <Bug className="h-4 w-4 mr-2" />
-            Test Logs API
-          </Button>
-          
-          <Button 
-            variant="outline" 
-            onClick={async () => {
-              try {
-                toast({
-                  title: "Testing Date Formats",
-                  description: "Trying different date formats to find the one that works with your logs database.",
-                });
-                const result = await testFormattedDates();
-                if (result) {
-                  toast({
-                    title: "Success!",
-                    description: `Found a working date format: "${result.name}". See console for details.`,
-                  });
-                  
-                  // Now try to update the logs display with the working format
-                  try {
-                    setLoading(true);
-                    const logsData = await serviceControlApi.getLogsByTimeRange(
-                      result.start,
-                      result.end,
-                      0,
-                      50
-                    );
-                    
-                    console.log("Retrieved logs with working format:", logsData);
-                    
-                    if (Array.isArray(logsData)) {
-                      setLogs(logsData);
-                      setTotalPages(1);
-                      setTotalElements(logsData.length);
-                      toast({
-                        title: "Logs loaded!",
-                        description: `Successfully loaded ${logsData.length} logs with the working format.`,
-                      });
-                    } else if (logsData && logsData.content) {
-                      setLogs(logsData.content);
-                      setTotalPages(logsData.totalPages || 1);
-                      setTotalElements(logsData.totalElements || logsData.content.length);
-                      toast({
-                        title: "Logs loaded!",
-                        description: `Successfully loaded ${logsData.content.length} logs with the working format.`,
-                      });
-                    } else {
-                      toast({
-                        title: "No logs found",
-                        description: "No logs found even with the working format.",
-                        variant: "warning"
-                      });
-                    }
-                  } catch (loadError) {
-                    console.error("Error loading logs with working format:", loadError);
-                  } finally {
-                    setLoading(false);
-                  }
-                } else {
-                  toast({
-                    title: "No Working Format Found",
-                    description: "Could not find a date format that returns logs. Check console for details.",
-                    variant: "warning"
-                  });
-                }
-              } catch (error) {
-                console.error("Test Date Formats error:", error);
-                toast({
-                  title: "Test Failed",
-                  description: error.message || "Unknown error occurred",
-                  variant: "destructive"
-                });
-              }
-            }}
-          >
-            <Bug className="h-4 w-4 mr-2" />
-            Test Date Formats
-          </Button>
         </div>
       </div>
 
@@ -781,26 +854,65 @@ export default function LogsPage() {
                       placeholder="Search security logs..."
                       className="pl-8"
                       value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
+                      onChange={(e) => {
+                        setSearchTerm(e.target.value);
+                        // No need to add auto-refresh here as we apply search locally
+                      }}
                     />
                   </div>
 
                   <div className="flex gap-2">
-                    <Select defaultValue="all" onValueChange={(value) => setLogType(value)}>
+                    <Select value={logType} onValueChange={(value) => {
+                      setLogType(value);
+                      // No need for setTimeout - the useEffect will handle the refresh
+                    }}>
                       <SelectTrigger className="w-[180px]">
                         <SelectValue placeholder="Activity Type" />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="all">All Activities</SelectItem>
-                        <SelectItem value="LOGIN">Authentication</SelectItem>
-                        <SelectItem value="TAMPER_DETECTION">Tamper Detection</SelectItem>
-                        <SelectItem value="CONFIGURATION">Configuration Change</SelectItem>
-                        <SelectItem value="ACCESS_CONTROL">Access Control</SelectItem>
-                        <SelectItem value="ALERT_MANAGEMENT">Alert Management</SelectItem>
+                        <SelectItem value="SENSOR_READING">Sensor Reading</SelectItem>
+                        <SelectItem value="CONFIGURATION_CHANGE">Configuration Change</SelectItem>
+                        <SelectItem value="ALERT_GENERATED">Alert Generated</SelectItem>
+                        <SelectItem value="ALERT_ACKNOWLEDGED">Alert Acknowledged</SelectItem>
+                        <SelectItem value="ALERT_RESOLVED">Alert Resolved</SelectItem>
+                        <SelectItem value="SYSTEM_DIAGNOSTIC">System Diagnostic</SelectItem>
+                        <SelectItem value="SENSITIVITY_CHANGE">Sensitivity Change</SelectItem>
+                        <SelectItem value="MANUAL_CHECK">Manual Check</SelectItem>
+                        <SelectItem value="REMOTE_ACCESS">Remote Access</SelectItem>
+                        <SelectItem value="FIRMWARE_UPDATE">Firmware Update</SelectItem>
                       </SelectContent>
                     </Select>
 
-                    <Select defaultValue="week" onValueChange={(value) => setTimeRange(value)}>
+                    <Select 
+                      value={logType.startsWith("sec_inst_") ? logType : "all_installations"} 
+                      onValueChange={(value) => {
+                        if (value === "all_installations") {
+                          // If the current logType is an installation filter, reset to all
+                          if (logType.startsWith("sec_inst_")) {
+                            setLogType("all");
+                            // No need for setTimeout - the useEffect will handle the refresh
+                          }
+                        } else {
+                          setLogType(value);
+                          // No need for setTimeout - the useEffect will handle the refresh
+                        }
+                      }}
+                    >
+                      <SelectTrigger className="w-[180px]">
+                        <SelectValue placeholder="Installation" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all_installations">All Installations</SelectItem>
+                        {installations.map((installation) => (
+                          <SelectItem key={installation.id} value={`sec_inst_${installation.id}`}>
+                            {installation.name || `Installation #${installation.id}`}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+
+                    <Select value={timeRange} onValueChange={setTimeRange}>
                       <SelectTrigger className="w-[150px]">
                         <SelectValue placeholder="Time Range" />
                       </SelectTrigger>
@@ -812,10 +924,45 @@ export default function LogsPage() {
                       </SelectContent>
                     </Select>
 
-                    <Button variant="outline" size="icon" onClick={() => handleFetchSecurityLogs()}>
-                      <RefreshCw className="h-4 w-4" />
+                    <Button 
+                      variant="outline" 
+                      size="icon" 
+                      onClick={() => handleFetchSecurityLogs()}
+                      disabled={loading}
+                    >
+                      {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
                     </Button>
                   </div>
+                </div>
+
+                {/* Status indicator when loading or filtering */}
+                {loading && (
+                  <div className="mt-2 text-sm text-muted-foreground bg-muted/50 p-2 rounded-md flex items-center animate-pulse">
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    <span>Loading security logs...</span>
+                  </div>
+                )}
+                
+                {!loading && logType !== "all" && (
+                  <div className="mt-2 text-sm text-blue-500 bg-blue-50 dark:bg-blue-950/30 p-2 rounded-md flex items-center">
+                    <Info className="h-4 w-4 mr-2" />
+                    <span>
+                      <strong>Filter applied:</strong> {logType.startsWith("sec_inst_") 
+                        ? `Installation ${logType.replace("sec_inst_", "")}` 
+                        : `Activity type "${logType}"`}
+                    </span>
+                  </div>
+                )}
+
+                {/* Time Range Selection Guide/Help */}
+                <div className="mt-2 text-sm text-muted-foreground bg-muted p-2 rounded-md flex items-center">
+                  <Info className="h-4 w-4 mr-2" />
+                  <span>
+                    Tip: Select an installation first for best results. Time range filters logs from {' '}
+                    {timeRange === 'today' ? 'today only' : 
+                     timeRange === 'yesterday' ? 'yesterday only' : 
+                     timeRange === 'week' ? 'the past 7 days' : 'the past 30 days'}.
+                  </span>
                 </div>
               </TabsContent>
             </Tabs>
@@ -841,10 +988,25 @@ export default function LogsPage() {
                       <p className="text-sm text-muted-foreground">
                         {searchTerm ? (
                           <>No logs match your search criteria. Try adjusting your filters.</>
+                        ) : logType !== "all" ? (
+                          <>No logs match the selected filter{activeTab === "security" && logType !== "all" ? ` (${logType})` : ""}. Try different parameters.</>
                         ) : (
                           <>No logs found for the selected time period and filters.</>
                         )}
                       </p>
+                      {activeTab === "security" && logType !== "all" && (
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={() => {
+                            setLogType("all");
+                            setTimeout(() => handleFetchSecurityLogs(), 100);
+                          }}
+                          className="mt-2"
+                        >
+                          Clear Activity Filter
+                        </Button>
+                      )}
                     </div>
                   </div>
                 ) : (
@@ -856,42 +1018,63 @@ export default function LogsPage() {
                             <Button
                               variant="ghost"
                               className="p-0 font-medium"
-                              onClick={() => handleSort("timestamp")}
+                              onClick={() => handleSort(activeTab === "operational" ? "timestamp" : "timestamp")}
                             >
                               Timestamp
-                              {sortField === "timestamp" && (
+                              {sortField === (activeTab === "operational" ? "timestamp" : "timestamp") && (
                                 <ArrowUpDown className="ml-2 h-4 w-4" />
                               )}
                             </Button>
                           </TableHead>
-                          <TableHead>
-                            <Button
-                              variant="ghost"
-                              className="p-0 font-medium"
-                              onClick={() => handleSort("operation")}
-                            >
-                              Operation
-                              {sortField === "operation" && (
-                                <ArrowUpDown className="ml-2 h-4 w-4" />
-                              )}
-                            </Button>
-                          </TableHead>
-                          <TableHead>
-                            <Button
-                              variant="ghost"
-                              className="p-0 font-medium"
-                              onClick={() => handleSort("status")}
-                            >
-                              Status
-                              {sortField === "status" && (
-                                <ArrowUpDown className="ml-2 h-4 w-4" />
-                              )}
-                            </Button>
-                          </TableHead>
-                          <TableHead>Source</TableHead>
-                          <TableHead>Installation</TableHead>
-                          <TableHead>User</TableHead>
-                          <TableHead className="w-1/4">Message</TableHead>
+                          {activeTab === "operational" ? (
+                            <>
+                              <TableHead>
+                                <Button
+                                  variant="ghost"
+                                  className="p-0 font-medium"
+                                  onClick={() => handleSort("operation")}
+                                >
+                                  Operation
+                                  {sortField === "operation" && (
+                                    <ArrowUpDown className="ml-2 h-4 w-4" />
+                                  )}
+                                </Button>
+                              </TableHead>
+                              <TableHead>
+                                <Button
+                                  variant="ghost"
+                                  className="p-0 font-medium"
+                                  onClick={() => handleSort("success")}
+                                >
+                                  Status
+                                  {sortField === "success" && (
+                                    <ArrowUpDown className="ml-2 h-4 w-4" />
+                                  )}
+                                </Button>
+                              </TableHead>
+                              <TableHead>Source System</TableHead>
+                              <TableHead>Installation</TableHead>
+                              <TableHead className="w-1/3">Details</TableHead>
+                            </>
+                          ) : (
+                            <>
+                              <TableHead>
+                                <Button
+                                  variant="ghost"
+                                  className="p-0 font-medium"
+                                  onClick={() => handleSort("activityType")}
+                                >
+                                  Activity Type
+                                  {sortField === "activityType" && (
+                                    <ArrowUpDown className="ml-2 h-4 w-4" />
+                                  )}
+                                </Button>
+                              </TableHead>
+                              <TableHead className="w-1/3">Details</TableHead>
+                              <TableHead>Installation</TableHead>
+                              <TableHead>User ID</TableHead>
+                            </>
+                          )}
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -904,25 +1087,62 @@ export default function LogsPage() {
                               <TableCell className="font-mono text-xs">
                                 {log.timestamp ? format(new Date(log.timestamp), "yyyy-MM-dd HH:mm:ss") : "N/A"}
                               </TableCell>
-                              <TableCell>{log.operation || "N/A"}</TableCell>
-                              <TableCell>
-                                <div className="flex items-center">
-                                  {getLogIcon(log.status)}
-                                  <span className="ml-2">{getStatusBadge(log.status)}</span>
-                                </div>
-                              </TableCell>
-                              <TableCell>{log.sourceSystem || "N/A"}</TableCell>
-                              <TableCell>
-                                {log.installationId
-                                  ? installation
-                                    ? installation.name
-                                    : `Installation #${log.installationId}`
-                                  : "N/A"}
-                              </TableCell>
-                              <TableCell>{log.userId || "System"}</TableCell>
-                              <TableCell className="max-w-md truncate" title={log.message}>
-                                {log.message || "No message"}
-                              </TableCell>
+                              
+                              {activeTab === "operational" ? (
+                                <>
+                                  <TableCell>{log.operation || "N/A"}</TableCell>
+                                  <TableCell>
+                                    <div className="flex items-center">
+                                      {log.success === true ? (
+                                        <CheckCircle className="h-4 w-4 text-green-500" />
+                                      ) : log.success === false ? (
+                                        <XCircle className="h-4 w-4 text-red-500" />
+                                      ) : (
+                                        <Info className="h-4 w-4" />
+                                      )}
+                                      <span className="ml-2">
+                                        {log.success === true ? (
+                                          <Badge variant="outline" className="bg-green-50 text-green-700 hover:bg-green-50 border-green-200">Success</Badge>
+                                        ) : log.success === false ? (
+                                          <Badge variant="outline" className="bg-red-50 text-red-700 hover:bg-red-50 border-red-200">Failure</Badge>
+                                        ) : (
+                                          <Badge variant="outline">Unknown</Badge>
+                                        )}
+                                      </span>
+                                    </div>
+                                  </TableCell>
+                                  <TableCell>{log.sourceSystem || "N/A"}</TableCell>
+                                  <TableCell>
+                                    {log.installationId
+                                      ? installation
+                                        ? installation.name
+                                        : `Installation #${log.installationId}`
+                                      : "N/A"}
+                                  </TableCell>
+                                  <TableCell className="max-w-md truncate" title={log.details}>
+                                    {log.details || "No details"}
+                                  </TableCell>
+                                </>
+                              ) : (
+                                <>
+                                  <TableCell>
+                                    <Badge variant="outline">
+                                      {log.activityType || "Unknown"}
+                                    </Badge>
+                                  </TableCell>
+                                  <TableCell className="max-w-md truncate" title={log.details}>
+                                    {log.details || "No details"}
+                                  </TableCell>
+                                  <TableCell>
+                                    {log.installationId
+                                      ? installation
+                                        ? installation.name
+                                        : `Installation #${log.installationId}`
+                                      : "N/A"}
+                                  </TableCell>
+                                  <TableCell>{log.userId || "SYSTEM"}</TableCell>
+                                </>
+                              )}
                             </TableRow>
                           )
                         })}
@@ -994,133 +1214,161 @@ export default function LogsPage() {
           </CardContent>
         </Card>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Log Distribution</CardTitle>
-              <CardDescription>Distribution of logs by operation type</CardDescription>
-            </CardHeader>
-            <CardContent className="h-[300px]">
-              {loading ? (
-                <div className="flex items-center justify-center h-full">
-                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                </div>
-              ) : logs.length === 0 ? (
-                <div className="flex items-center justify-center h-full">
-                  <p className="text-sm text-muted-foreground">No data available</p>
-                </div>
-              ) : (
-                <div className="h-full flex flex-col items-center justify-center text-center">
-                  {/* Simple visualization for now */}
-                  <div className="space-y-2 w-full max-w-sm">
+        {/* Only show dashboard cards for operational logs */}
+        {activeTab === "operational" && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Log Distribution</CardTitle>
+                <CardDescription>Distribution of logs by operation type</CardDescription>
+              </CardHeader>
+              <CardContent className="h-[300px]">
+                {loading ? (
+                  <div className="flex items-center justify-center h-full">
+                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                  </div>
+                ) : logs.length === 0 ? (
+                  <div className="flex items-center justify-center h-full">
+                    <p className="text-sm text-muted-foreground">No data available</p>
+                  </div>
+                ) : (
+                  <div className="h-full flex flex-col items-center justify-center text-center">
+                    {/* Simple visualization for now */}
+                    <div className="space-y-2 w-full max-w-sm">
+                      {(() => {
+                        // Calculate operation type distribution
+                        const operationCounts = {}
+                        logs.forEach(log => {
+                          const operation = log.operation || "Unknown"
+                          operationCounts[operation] = (operationCounts[operation] || 0) + 1
+                        })
+
+                        return Object.entries(operationCounts)
+                          .sort((a, b) => b[1] - a[1])
+                          .slice(0, 5)
+                          .map(([operation, count]) => {
+                            const percentage = Math.round((count / logs.length) * 100)
+                            return (
+                              <div key={operation} className="space-y-1">
+                                <div className="flex justify-between text-sm">
+                                  <span>{operation}</span>
+                                  <span>{percentage}%</span>
+                                </div>
+                                <div className="h-2 rounded-full bg-secondary overflow-hidden">
+                                  <div
+                                    className="h-full bg-primary"
+                                    style={{ width: `${percentage}%` }}
+                                  />
+                                </div>
+                              </div>
+                            )
+                          })
+                      })()}
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Log Status</CardTitle>
+                <CardDescription>Success vs. failure rate</CardDescription>
+              </CardHeader>
+              <CardContent className="h-[300px]">
+                {loading ? (
+                  <div className="flex items-center justify-center h-full">
+                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                  </div>
+                ) : logs.length === 0 ? (
+                  <div className="flex items-center justify-center h-full">
+                    <p className="text-sm text-muted-foreground">No data available</p>
+                  </div>
+                ) : (
+                  <div className="h-full flex flex-col items-center justify-center text-center">
+                    {/* Calculate success/failure rates based directly on SUCCESS field */}
                     {(() => {
-                      // Calculate operation type distribution
-                      const operationCounts = {}
+                      const statusCounts = { success: 0, failure: 0 }
+
                       logs.forEach(log => {
-                        const operation = log.operation || "Unknown"
-                        operationCounts[operation] = (operationCounts[operation] || 0) + 1
+                        if (log.success === true) statusCounts.success++
+                        else if (log.success === false) statusCounts.failure++
                       })
 
-                      return Object.entries(operationCounts)
-                        .sort((a, b) => b[1] - a[1])
-                        .slice(0, 5)
-                        .map(([operation, count]) => {
-                          const percentage = Math.round((count / logs.length) * 100)
-                          return (
-                            <div key={operation} className="space-y-1">
-                              <div className="flex justify-between text-sm">
-                                <span>{operation}</span>
-                                <span>{percentage}%</span>
+                      const total = logs.length
+                      const successRate = Math.round((statusCounts.success / total) * 100) || 0
+                      const failureRate = Math.round((statusCounts.failure / total) * 100) || 0
+
+                      return (
+                        <div className="space-y-6 w-full max-w-sm">
+                          <div className="text-center mb-6">
+                            <div className="relative pt-1">
+                              <div className="flex mb-2 items-center justify-between">
+                                <div>
+                                  <span className="text-xs font-semibold inline-block py-1 px-2 uppercase rounded-full text-green-600 bg-green-200">
+                                    Success
+                                  </span>
+                                </div>
+                                <div>
+                                  <span className="text-xs font-semibold inline-block py-1 px-2 uppercase rounded-full text-red-600 bg-red-200">
+                                    Failure
+                                  </span>
+                                </div>
                               </div>
-                              <div className="h-2 rounded-full bg-secondary overflow-hidden">
-                                <div
-                                  className="h-full bg-primary"
-                                  style={{ width: `${percentage}%` }}
-                                />
+                              <div className="overflow-hidden h-2 mb-4 text-xs flex rounded bg-gray-200">
+                                <div style={{ width: `${successRate}%` }} className="shadow-none flex flex-col text-center whitespace-nowrap justify-center bg-green-500">
+                                </div>
+                                <div style={{ width: `${failureRate}%` }} className="shadow-none flex flex-col text-center whitespace-nowrap justify-center bg-red-500">
+                                </div>
+                              </div>
+                              <div className="flex justify-between text-xs text-muted-foreground">
+                                <span>{successRate}%</span>
+                                {failureRate > 0 && <span>{failureRate}%</span>}
                               </div>
                             </div>
-                          )
-                        })
+                          </div>
+                          
+                          <div className="flex justify-between items-center">
+                            <div className="flex items-center">
+                              <div className="w-4 h-4 rounded-full bg-green-500 mr-2"></div>
+                              <span>Success</span>
+                            </div>
+                            <span className="font-semibold">{statusCounts.success} logs ({successRate}%)</span>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <div className="flex items-center">
+                              <div className="w-4 h-4 rounded-full bg-red-500 mr-2"></div>
+                              <span>Failure</span>
+                            </div>
+                            <span className="font-semibold">{statusCounts.failure} logs ({failureRate}%)</span>
+                          </div>
+                        </div>
+                      )
                     })()}
                   </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Log Status</CardTitle>
-              <CardDescription>Success vs. failure rate</CardDescription>
-            </CardHeader>
-            <CardContent className="h-[300px]">
-              {loading ? (
-                <div className="flex items-center justify-center h-full">
-                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                </div>
-              ) : logs.length === 0 ? (
-                <div className="flex items-center justify-center h-full">
-                  <p className="text-sm text-muted-foreground">No data available</p>
-                </div>
-              ) : (
-                <div className="h-full flex flex-col items-center justify-center text-center">
-                  {/* Calculate success/failure rates */}
-                  {(() => {
-                    const statusCounts = { success: 0, failure: 0, warning: 0, info: 0, other: 0 }
-
-                    logs.forEach(log => {
-                      const status = log.status?.toLowerCase() || "other"
-                      if (status === "success") statusCounts.success++
-                      else if (status === "failure" || status === "error") statusCounts.failure++
-                      else if (status === "warning") statusCounts.warning++
-                      else if (status === "info") statusCounts.info++
-                      else statusCounts.other++
-                    })
-
-                    const total = logs.length
-                    const successRate = Math.round((statusCounts.success / total) * 100)
-                    const failureRate = Math.round((statusCounts.failure / total) * 100)
-                    const warningRate = Math.round((statusCounts.warning / total) * 100)
-                    const infoRate = Math.round((statusCounts.info / total) * 100)
-
-                    return (
-                      <div className="space-y-4 w-full max-w-sm">
-                        <div className="flex justify-between items-center">
-                          <div className="flex items-center">
-                            <div className="w-4 h-4 rounded-full bg-green-500 mr-2"></div>
-                            <span>Success</span>
-                          </div>
-                          <span className="font-semibold">{successRate}%</span>
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <div className="flex items-center">
-                            <div className="w-4 h-4 rounded-full bg-red-500 mr-2"></div>
-                            <span>Failure</span>
-                          </div>
-                          <span className="font-semibold">{failureRate}%</span>
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <div className="flex items-center">
-                            <div className="w-4 h-4 rounded-full bg-yellow-500 mr-2"></div>
-                            <span>Warning</span>
-                          </div>
-                          <span className="font-semibold">{warningRate}%</span>
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <div className="flex items-center">
-                            <div className="w-4 h-4 rounded-full bg-blue-500 mr-2"></div>
-                            <span>Info</span>
-                          </div>
-                          <span className="font-semibold">{infoRate}%</span>
-                        </div>
-                      </div>
-                    )
-                  })()}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        )}
+        
+        {/* For security logs, maybe add a different dashboard or info panel */}
+        {activeTab === "security" && (
+          <div className="mt-4">
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle>Security Logs Overview</CardTitle>
+                <CardDescription>
+                  View and monitor security-related activities across your installations
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="text-sm text-muted-foreground">
+                <p>Use the filters above to narrow down security logs by activity type or installation.</p>
+                <p className="mt-2">Security logs record sensitive activities such as tamper events, configuration changes, alert acknowledgments, and system diagnostics.</p>
+              </CardContent>
+            </Card>
+          </div>
+        )}
       </div>
     </div>
   )

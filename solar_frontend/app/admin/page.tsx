@@ -69,7 +69,6 @@ export default function AdminDashboardPage() {
   const { toast } = useToast()
   const router = useRouter()
   const [selectedPeriod, setSelectedPeriod] = useState("week")
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split("T")[0])
   const [loading, setLoading] = useState(true)
 
   // State to store API data
@@ -434,18 +433,6 @@ export default function AdminDashboardPage() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2 md:gap-4">
-          <Select value={selectedDate} onValueChange={setSelectedDate}>
-            <SelectTrigger className="w-[150px] md:w-[180px]">
-              <SelectValue placeholder="Select date" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={new Date().toISOString().split("T")[0]}>Today</SelectItem>
-              <SelectItem value={new Date(Date.now() - 86400000).toISOString().split("T")[0]}>Yesterday</SelectItem>
-              <SelectItem value={new Date(Date.now() - 604800000).toISOString().split("T")[0]}>Last week</SelectItem>
-              <SelectItem value={new Date(Date.now() - 2592000000).toISOString().split("T")[0]}>Last month</SelectItem>
-            </SelectContent>
-          </Select>
-
           <Button variant="outline" size="icon">
             <Filter className="h-4 w-4" />
           </Button>

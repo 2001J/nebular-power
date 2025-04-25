@@ -186,6 +186,15 @@ public class SecurityLogServiceImpl implements SecurityLogService {
                 userId
         );
     }
+
+    @Override
+    public Page<SecurityLogDTO> getAllSecurityLogs(Pageable pageable) {
+        log.info("Getting all security logs with pagination: {}", pageable);
+        
+        Page<SecurityLog> securityLogs = securityLogRepository.findAllByOrderByTimestampDesc(pageable);
+        
+        return securityLogs.map(this::convertToDTO);
+    }
     
     private SecurityLogDTO convertToDTO(SecurityLog securityLog) {
         SecurityLogDTO dto = new SecurityLogDTO();
@@ -199,4 +208,4 @@ public class SecurityLogServiceImpl implements SecurityLogService {
         dto.setLocation(securityLog.getLocation());
         return dto;
     }
-} 
+}

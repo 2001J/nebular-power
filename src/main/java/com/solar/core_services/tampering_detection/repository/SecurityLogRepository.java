@@ -26,4 +26,7 @@ public interface SecurityLogRepository extends JpaRepository<SecurityLog, Long> 
     
     @Query("SELECT s FROM SecurityLog s WHERE s.activityType = ?1 ORDER BY s.timestamp DESC")
     Page<SecurityLog> findByActivityType(SecurityLog.ActivityType activityType, Pageable pageable);
-} 
+    
+    // Added new method to get all security logs ordered by timestamp descending
+    Page<SecurityLog> findAllByOrderByTimestampDesc(Pageable pageable);
+}

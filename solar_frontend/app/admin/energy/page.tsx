@@ -16,6 +16,7 @@ import {
   MapPin,
   AlertTriangle,
   User,
+  Loader2,
 } from "lucide-react"
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
@@ -93,219 +94,202 @@ export default function EnergyMonitoringPage() {
   // Handle time range change with proper type
   const handleTimeRangeChange = (value: string) => {
     setTimeRange(value);
+    // Trigger data fetch when time range changes
+    fetchEnergyData();
   };
 
   // Load energy data
-  useEffect(() => {
-    const fetchEnergyData = async () => {
-      try {
-        setLoading(true)
+  const fetchEnergyData = async () => {
+    try {
+      setLoading(true)
 
-        // Get system overview data
-        const systemResponse = await energyApi.getSystemOverview()
+      // Get system overview data
+      const systemResponse = await energyApi.getSystemOverview()
 
-        if (systemResponse) {
-          setSystemOverview(systemResponse)
-          setInstallations(systemResponse.recentlyActiveInstallations || [])
+      if (systemResponse) {
+        setSystemOverview(systemResponse)
+        setInstallations(systemResponse.recentlyActiveInstallations || [])
 
-          // Set dashboard metrics consistently
-          const todayTotal = systemResponse.todayTotalGenerationKWh || 0
-          const weekTotal = systemResponse.weekToDateGenerationKWh || 0
-          const monthTotal = systemResponse.monthToDateGenerationKWh || 0
-          const yearTotal = systemResponse.yearToDateGenerationKWh || 0
-          const efficiency = systemResponse.averageSystemEfficiency || 0
+        // Set dashboard metrics consistently
+        const todayTotal = systemResponse.todayTotalGenerationKWh || 0
+        const weekTotal = systemResponse.weekToDateGenerationKWh || 0
+        const monthTotal = systemResponse.monthToDateGenerationKWh || 0
+        const yearTotal = systemResponse.yearToDateGenerationKWh || 0
+        const efficiency = systemResponse.averageSystemEfficiency || 0
+        
+        // Log metrics for debugging
+        console.log('Energy metrics received from backend:', {
+          todayTotal,
+          weekTotal,
+          monthTotal,
+          yearTotal,
+          efficiency,
+          currentGeneration: systemResponse.currentSystemGenerationWatts || 0
+        })
+        
+        setTotalProductionToday(todayTotal)
+        setTotalProductionWeek(weekTotal)
+        setTotalProductionMonth(monthTotal)
+        setTotalProductionYear(yearTotal)
+        setAverageEfficiency(efficiency)
+
+        // Extract energy data from the system overview - ensuring consistency with summary metrics
+        if (systemResponse.energyData && systemResponse.energyData[timeRange]) {
+          // We have pre-formatted data from the API
+          setEnergyData(systemResponse.energyData[timeRange])
+        } else if (systemResponse.energyDataByTimeRange && systemResponse.energyDataByTimeRange[timeRange]) {
+          // Alternative property name
+          setEnergyData(systemResponse.energyDataByTimeRange[timeRange])
+        } else if (todayTotal > 0 || monthTotal > 0) {
+          // We have energy data but no formatted time series - fetch raw readings
           
-          // Log metrics for debugging
-          console.log('Energy metrics received from backend:', {
-            todayTotal,
-            weekTotal,
-            monthTotal,
-            yearTotal,
-            efficiency,
-            currentGeneration: systemResponse.currentSystemGenerationWatts || 0
-          })
-          
-          setTotalProductionToday(todayTotal)
-          setTotalProductionWeek(weekTotal)
-          setTotalProductionMonth(monthTotal)
-          setTotalProductionYear(yearTotal)
-          setAverageEfficiency(efficiency)
-
-          // Extract energy data from the system overview - ensuring consistency with summary metrics
-          if (systemResponse.energyData && systemResponse.energyData[timeRange]) {
-            // We have pre-formatted data from the API
-            setEnergyData(systemResponse.energyData[timeRange])
-          } else if (systemResponse.energyDataByTimeRange && systemResponse.energyDataByTimeRange[timeRange]) {
-            // Alternative property name
-            setEnergyData(systemResponse.energyDataByTimeRange[timeRange])
-          } else if (todayTotal > 0 || monthTotal > 0) {
-            // We have energy data but no formatted time series - fetch raw readings
-            
-            // If we have active installations, fetch their readings
-            if (systemResponse.recentlyActiveInstallations && systemResponse.recentlyActiveInstallations.length > 0) {
-              try {
-                // Get data from all active installations
-                const activeInstallations = systemResponse.recentlyActiveInstallations
-                
-                // Create an array to hold all readings
-                let allReadings = []
-                
-                // Fetch and combine readings from all installations 
-                const readingsPromises = activeInstallations.map(installation => 
-                  energyApi.getRecentReadings(installation.id, 50)
-                    .then(readings => {
-                      if (readings && readings.length > 0) {
-                        // Add installation type info to each reading for better charts
-                        const enhancedReadings = readings.map(reading => ({
-                          ...reading,
-                          installationType: installation.type || 'RESIDENTIAL'
-                        }))
-                        return enhancedReadings
-                      }
-                      return []
-                    })
-                    .catch(error => {
-                      console.error(`Error fetching readings for installation ${installation.id}:`, error)
-                      return []
-                    })
-                )
-                
-                // Wait for all readings to be fetched
-                const installationReadings = await Promise.all(readingsPromises)
-                
-                // Combine all readings
-                allReadings = installationReadings.flat()
-                
-                if (allReadings.length > 0) {
-                  // Transform combined readings into chart data - ensuring consistency with summary metrics
-                  const chartData = transformReadingsToChartData(allReadings, timeRange)
-                  setEnergyData(chartData)
-                } else {
-                  // Fallback to basic chart data
-                  setEnergyData(createBasicChartData(systemResponse, timeRange))
-                }
-              } catch (error) {
-                console.error("Error fetching installation readings:", error)
+          // If we have active installations, fetch their readings
+          if (systemResponse.recentlyActiveInstallations && systemResponse.recentlyActiveInstallations.length > 0) {
+            try {
+              // Get data from all active installations
+              const activeInstallations = systemResponse.recentlyActiveInstallations
+              
+              // Create an array to hold all readings
+              let allReadings = []
+              
+              // Fetch and combine readings from all installations 
+              const readingsPromises = activeInstallations.map(installation => 
+                energyApi.getRecentReadings(installation.id, 50)
+                  .then(readings => {
+                    if (readings && readings.length > 0) {
+                      // Add installation type info to each reading for better charts
+                      const enhancedReadings = readings.map(reading => ({
+                        ...reading,
+                        installationType: installation.type || 'RESIDENTIAL'
+                      }))
+                      return enhancedReadings
+                    }
+                    return []
+                  })
+                  .catch(error => {
+                    console.error(`Error fetching readings for installation ${installation.id}:`, error)
+                    return []
+                  })
+              )
+              
+              // Wait for all readings to be fetched
+              const installationReadings = await Promise.all(readingsPromises)
+              
+              // Combine all readings
+              allReadings = installationReadings.flat()
+              
+              if (allReadings.length > 0) {
+                // Transform combined readings into chart data - ensuring consistency with summary metrics
+                const chartData = transformReadingsToChartData(allReadings, timeRange)
+                setEnergyData(chartData)
+              } else {
                 // Fallback to basic chart data
                 setEnergyData(createBasicChartData(systemResponse, timeRange))
               }
-            } else {
-              // No installations available, fallback to basic chart data
+            } catch (error) {
+              console.error("Error fetching installation readings:", error)
+              // Fallback to basic chart data
               setEnergyData(createBasicChartData(systemResponse, timeRange))
             }
           } else {
-            // No energy data available
-            setEnergyData([])
+            // No installations available, fallback to basic chart data
+            setEnergyData(createBasicChartData(systemResponse, timeRange))
           }
+        } else {
+          // No energy data available
+          setEnergyData([])
+        }
 
-          // Get active installations to use as top producers if needed
-          const activeInstallations = systemResponse.recentlyActiveInstallations || [];
-          
-          // Get and fetch dashboard data for each installation 
-          // First get the IDs of installations to check (either from topProducers or active installations)
-          let installationIdsToFetch = [];
-          
-          // Use top producers from system overview if available
-          if (systemResponse.topProducers && Array.isArray(systemResponse.topProducers) && systemResponse.topProducers.length > 0) {
-            installationIdsToFetch = systemResponse.topProducers.slice(0, 5).map(prod => prod.id);
-          } 
-          // Otherwise use active installations 
-          else if (activeInstallations.length > 0) {
-            installationIdsToFetch = activeInstallations.slice(0, 5).map(inst => inst.id);
-          }
-          
-          // If we have IDs to fetch, get dashboard data for each
-          if (installationIdsToFetch.length > 0) {
-            try {
-              // Fetch dashboard data for each installation and calculate their average efficiency
-              const dashboardPromises = installationIdsToFetch.map(async id => {
-                try {
-                  // Get dashboard data
-                  const dashboard = await energyApi.getInstallationDashboard(id);
-                  
-                  // Also calculate average efficiency
-                  const averageEfficiency = await energyApi.calculateInstallationAverageEfficiency(id);
-                  
-                  return {
-                    ...dashboard,
-                    averageEfficiencyPercentage: averageEfficiency
-                  };
-                } catch (error) {
-                  console.error(`Error fetching dashboard for installation ${id}:`, error);
-                  return null;
-                }
-              });
-              
-              // Wait for all dashboards to be fetched
-              const dashboardResults = await Promise.all(dashboardPromises);
-              
-              // Filter out null results and create enriched top producers
-              const enrichedProducers = dashboardResults
-                .filter(dashboard => dashboard !== null)
-                .map(dashboard => {
-                  // Find matching installation from active installations to get additional metadata
-                  const matchingInstallation = activeInstallations.find(
-                    inst => inst.id === dashboard.installationId
-                  );
-                  
-                  // Return combined data with dashboard values - prioritizing stable daily metrics over fluctuating real-time values
-                  return {
-                    id: dashboard.installationId,
-                    name: dashboard.installationDetails?.name || 
-                          matchingInstallation?.name || 
-                          `Installation ${dashboard.installationId}`,
-                    username: dashboard.installationDetails?.username || 
-                            matchingInstallation?.username || 
-                            dashboard.installationDetails?.customer?.email || "N/A",
-                    location: dashboard.installationDetails?.location || 
-                            matchingInstallation?.location || "N/A",
-                    type: dashboard.installationDetails?.type || 
-                          matchingInstallation?.type || "RESIDENTIAL",
-                    // Use more stable daily metrics instead of real-time values that change every 15 seconds
-                    todayGenerationKWh: dashboard.todayGenerationKWh,
-                    currentPowerGenerationWatts: dashboard.currentPowerGenerationWatts, // Keep as fallback
-                    currentEfficiencyPercentage: dashboard.currentEfficiencyPercentage,
-                    // Add average efficiency for more stable metric
-                    averageEfficiencyPercentage: dashboard.averageEfficiencyPercentage || dashboard.currentEfficiencyPercentage
-                  };
-                });
-              
-              // Set the enriched producers as top producers
-              if (enrichedProducers.length > 0) {
-                setTopProducers(enrichedProducers);
-                console.log("Fetched dashboard data with average efficiency for top producers:", enrichedProducers);
-              } else {
-                // Fall back to active installations if no dashboard data
-                setTopProducers(activeInstallations.slice(0, 5));
+        // Get active installations to use as top producers if needed
+        const activeInstallations = systemResponse.recentlyActiveInstallations || [];
+        
+        // Get and fetch dashboard data for each installation 
+        // First get the IDs of installations to check (either from topProducers or active installations)
+        let installationIdsToFetch = [];
+        
+        // Use top producers from system overview if available
+        if (systemResponse.topProducers && Array.isArray(systemResponse.topProducers) && systemResponse.topProducers.length > 0) {
+          installationIdsToFetch = systemResponse.topProducers.slice(0, 5).map(prod => prod.id);
+        } 
+        // Otherwise use active installations 
+        else if (activeInstallations.length > 0) {
+          installationIdsToFetch = activeInstallations.slice(0, 5).map(inst => inst.id);
+        }
+        
+        // If we have IDs to fetch, get dashboard data for each
+        if (installationIdsToFetch.length > 0) {
+          try {
+            // Fetch dashboard data for each installation and calculate their average efficiency
+            const dashboardPromises = installationIdsToFetch.map(async id => {
+              try {
+                // Get dashboard data
+                const dashboard = await energyApi.getInstallationDashboard(id);
+                
+                // Also calculate average efficiency
+                const averageEfficiency = await energyApi.calculateInstallationAverageEfficiency(id);
+                
+                return {
+                  ...dashboard,
+                  averageEfficiencyPercentage: averageEfficiency
+                };
+              } catch (error) {
+                console.error(`Error fetching dashboard for installation ${id}:`, error);
+                return null;
               }
-            } catch (error) {
-              console.error("Error fetching installation dashboards:", error);
-              // Fall back to active installations
+            });
+            
+            // Wait for all dashboards to be fetched
+            const dashboardResults = await Promise.all(dashboardPromises);
+            
+            // Filter out null results and create enriched top producers
+            const enrichedProducers = dashboardResults
+              .filter(dashboard => dashboard !== null)
+              .map(dashboard => {
+                // Find matching installation from active installations to get additional metadata
+                const matchingInstallation = activeInstallations.find(
+                  inst => inst.id === dashboard.installationId
+                );
+                
+                // Return combined data with dashboard values - prioritizing stable daily metrics over fluctuating real-time values
+                return {
+                  id: dashboard.installationId,
+                  name: dashboard.installationDetails?.name || 
+                        matchingInstallation?.name || 
+                        `Installation ${dashboard.installationId}`,
+                  username: dashboard.installationDetails?.username || 
+                          matchingInstallation?.username || 
+                          dashboard.installationDetails?.customer?.email || "N/A",
+                  location: dashboard.installationDetails?.location || 
+                          matchingInstallation?.location || "N/A",
+                  type: dashboard.installationDetails?.type || 
+                        matchingInstallation?.type || "RESIDENTIAL",
+                  // Use more stable daily metrics instead of real-time values that change every 15 seconds
+                  todayGenerationKWh: dashboard.todayGenerationKWh,
+                  currentPowerGenerationWatts: dashboard.currentPowerGenerationWatts, // Keep as fallback
+                  currentEfficiencyPercentage: dashboard.currentEfficiencyPercentage,
+                  // Add average efficiency for more stable metric
+                  averageEfficiencyPercentage: dashboard.averageEfficiencyPercentage || dashboard.currentEfficiencyPercentage
+                };
+              });
+            
+            // Set the enriched producers as top producers
+            if (enrichedProducers.length > 0) {
+              setTopProducers(enrichedProducers);
+              console.log("Fetched dashboard data with average efficiency for top producers:", enrichedProducers);
+            } else {
+              // Fall back to active installations if no dashboard data
               setTopProducers(activeInstallations.slice(0, 5));
             }
-          } else {
-            // No installations to fetch, use what we have
+          } catch (error) {
+            console.error("Error fetching installation dashboards:", error);
+            // Fall back to active installations
             setTopProducers(activeInstallations.slice(0, 5));
           }
         } else {
-          setSystemOverview(null)
-          setInstallations([])
-          setEnergyData([])
-          setTopProducers([])
-          setTotalProductionToday(0)
-          setTotalProductionMonth(0)
-          setTotalProductionYear(0)
-          setAverageEfficiency(0)
+          // No installations to fetch, use what we have
+          setTopProducers(activeInstallations.slice(0, 5));
         }
-      } catch (error) {
-        console.error("Error fetching energy data:", error)
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: "Failed to load energy monitoring data from the server.",
-        })
-
-        // Reset data on error instead of using sample data
+      } else {
         setSystemOverview(null)
         setInstallations([])
         setEnergyData([])
@@ -314,84 +298,43 @@ export default function EnergyMonitoringPage() {
         setTotalProductionMonth(0)
         setTotalProductionYear(0)
         setAverageEfficiency(0)
-      } finally {
-        setLoading(false)
       }
-    }
-
-    fetchEnergyData()
-
-    // Set up websocket connection for real-time updates
-    let wsConnection = null
-
-    try {
-      wsConnection = energyWebSocket.createSystemMonitor(
-        // Message handler
-        (data) => {
-          if (data.type === 'ENERGY_UPDATE') {
-            // Update real-time metrics with data validation
-            if (data.payload.currentSystemGenerationWatts !== undefined) {
-              setSystemOverview(prev => ({
-                ...prev,
-                currentSystemGenerationWatts: data.payload.currentSystemGenerationWatts
-              }))
-              console.log('WebSocket: Updated current generation to', data.payload.currentSystemGenerationWatts)
-            }
-
-            if (data.payload.todayTotalGenerationKWh !== undefined) {
-              setTotalProductionToday(data.payload.todayTotalGenerationKWh)
-              console.log('WebSocket: Updated today total to', data.payload.todayTotalGenerationKWh)
-            }
-            
-            // Also update monthly and yearly if provided
-            if (data.payload.monthToDateGenerationKWh !== undefined) {
-              setTotalProductionMonth(data.payload.monthToDateGenerationKWh)
-              console.log('WebSocket: Updated month total to', data.payload.monthToDateGenerationKWh)
-            }
-            
-            if (data.payload.yearToDateGenerationKWh !== undefined) {
-              setTotalProductionYear(data.payload.yearToDateGenerationKWh)
-              console.log('WebSocket: Updated year total to', data.payload.yearToDateGenerationKWh)
-            }
-
-            // Add new data point to charts if in day view
-            if (timeRange === 'day' && data.payload.timestamp) {
-              setEnergyData(prev => {
-                const newData = [...prev]
-                const hour = new Date(data.payload.timestamp).getHours()
-                const existingIndex = newData.findIndex(item =>
-                  item.name && item.name.includes(`${hour}:`))
-
-                if (existingIndex >= 0) {
-                  // Update existing data point
-                  newData[existingIndex] = {
-                    ...newData[existingIndex],
-                    total: data.payload.powerGenerationWatts / 1000,
-                    consumption: data.payload.powerConsumptionWatts / 1000
-                  }
-                }
-
-                return newData
-              })
-            }
-          }
-        },
-        // Error handler
-        (error) => {
-          console.error('WebSocket error:', error)
-        }
-      )
     } catch (error) {
-      console.error('Error setting up WebSocket:', error)
-    }
+      console.error("Error fetching energy data:", error)
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to load energy monitoring data from the server.",
+      })
 
-    // Clean up WebSocket connection on unmount
-    return () => {
-      if (wsConnection) {
-        wsConnection.close()
-      }
+      // Reset data on error instead of using sample data
+      setSystemOverview(null)
+      setInstallations([])
+      setEnergyData([])
+      setTopProducers([])
+      setTotalProductionToday(0)
+      setTotalProductionMonth(0)
+      setTotalProductionYear(0)
+      setAverageEfficiency(0)
+    } finally {
+      setLoading(false)
     }
-  }, [timeRange, toast])
+  }
+
+  // Auto-fetch data when component mounts or timeRange changes
+  useEffect(() => {
+    console.log("🔄 Initial data fetch for energy monitoring with timeRange:", timeRange);
+    fetchEnergyData();
+  }, [timeRange]);
+
+  // Additional useEffect for initialization
+  useEffect(() => {
+    console.log("Energy monitoring component mounted");
+    // Return cleanup function
+    return () => {
+      console.log("Energy monitoring component unmounted");
+    };
+  }, []);
 
   // Format number with unit
   const formatEnergyValue = (value: number): string => {
@@ -963,201 +906,10 @@ export default function EnergyMonitoringPage() {
             </SelectContent>
           </Select>
           <Button variant="outline" size="icon" onClick={() => {
-            setLoading(true);
-            // Refresh data
-            setTimeout(async () => {
-              try {
-                // Get system overview data
-                const systemResponse = await energyApi.getSystemOverview();
-                if (systemResponse) {
-                  setSystemOverview(systemResponse);
-                  setInstallations(systemResponse.recentlyActiveInstallations || []);
-                  
-                  // Set dashboard metrics consistently
-                  const todayTotal = systemResponse.todayTotalGenerationKWh || 0;
-                  const monthTotal = systemResponse.monthToDateGenerationKWh || 0;
-                  const yearTotal = systemResponse.yearToDateGenerationKWh || 0;
-                  const efficiency = systemResponse.averageSystemEfficiency || 0;
-                  
-                  setTotalProductionToday(todayTotal);
-                  setTotalProductionMonth(monthTotal);
-                  setTotalProductionYear(yearTotal);
-                  setAverageEfficiency(efficiency);
-
-                  // Extract energy data from the system overview - ensuring consistency with summary metrics
-                  if (systemResponse.energyData && systemResponse.energyData[timeRange]) {
-                    // We have pre-formatted data from the API
-                    setEnergyData(systemResponse.energyData[timeRange]);
-                  } else if (systemResponse.energyDataByTimeRange && systemResponse.energyDataByTimeRange[timeRange]) {
-                    // Alternative property name
-                    setEnergyData(systemResponse.energyDataByTimeRange[timeRange]);
-                  } else if (todayTotal > 0 || monthTotal > 0) {
-                    // We have energy data but no formatted time series - fetch raw readings
-                    
-                    // If we have active installations, fetch their readings
-                    if (systemResponse.recentlyActiveInstallations && systemResponse.recentlyActiveInstallations.length > 0) {
-                      try {
-                        // Get data from all active installations
-                        const activeInstallations = systemResponse.recentlyActiveInstallations
-                        
-                        // Create an array to hold all readings
-                        let allReadings = []
-                        
-                        // Fetch and combine readings from all installations 
-                        const readingsPromises = activeInstallations.map(installation => 
-                          energyApi.getRecentReadings(installation.id, 50)
-                            .then(readings => {
-                              if (readings && readings.length > 0) {
-                                // Add installation type info to each reading for better charts
-                                const enhancedReadings = readings.map(reading => ({
-                                  ...reading,
-                                  installationType: installation.type || 'RESIDENTIAL'
-                                }))
-                                return enhancedReadings
-                              }
-                              return []
-                            })
-                            .catch(error => {
-                              console.error(`Error fetching readings for installation ${installation.id}:`, error)
-                              return []
-                            })
-                        )
-                        
-                        // Wait for all readings to be fetched
-                        const installationReadings = await Promise.all(readingsPromises)
-                        
-                        // Combine all readings
-                        allReadings = installationReadings.flat()
-                        
-                        if (allReadings.length > 0) {
-                          // Transform combined readings into chart data - ensuring consistency with summary metrics
-                          const chartData = transformReadingsToChartData(allReadings, timeRange)
-                          setEnergyData(chartData)
-                        } else {
-                          // Fallback to basic chart data
-                          setEnergyData(createBasicChartData(systemResponse, timeRange))
-                        }
-                      } catch (error) {
-                        console.error("Error fetching installation readings:", error)
-                        // Fallback to basic chart data
-                        setEnergyData(createBasicChartData(systemResponse, timeRange))
-                      }
-                    } else {
-                      // No installations available, fallback to basic chart data
-                      setEnergyData(createBasicChartData(systemResponse, timeRange))
-                    }
-                  } else {
-                    // No energy data available
-                    setEnergyData([])
-                  }
-
-                  // Get active installations to use as top producers if needed
-                  const activeInstallations = systemResponse.recentlyActiveInstallations || [];
-                  
-                  // Get and fetch dashboard data for each installation 
-                  // First get the IDs of installations to check (either from topProducers or active installations)
-                  let installationIdsToFetch = [];
-                  
-                  // Use top producers from system overview if available
-                  if (systemResponse.topProducers && Array.isArray(systemResponse.topProducers) && systemResponse.topProducers.length > 0) {
-                    installationIdsToFetch = systemResponse.topProducers.slice(0, 5).map(prod => prod.id);
-                  } 
-                  // Otherwise use active installations 
-                  else if (activeInstallations.length > 0) {
-                    installationIdsToFetch = activeInstallations.slice(0, 5).map(inst => inst.id);
-                  }
-                  
-                  // If we have IDs to fetch, get dashboard data for each
-                  if (installationIdsToFetch.length > 0) {
-                    try {
-                      // Fetch dashboard data for each installation and calculate their average efficiency
-                      const dashboardPromises = installationIdsToFetch.map(async id => {
-                        try {
-                          // Get dashboard data
-                          const dashboard = await energyApi.getInstallationDashboard(id);
-                          
-                          // Also calculate average efficiency
-                          const averageEfficiency = await energyApi.calculateInstallationAverageEfficiency(id);
-                          
-                          return {
-                            ...dashboard,
-                            averageEfficiencyPercentage: averageEfficiency
-                          };
-                        } catch (error) {
-                          console.error(`Error fetching dashboard for installation ${id}:`, error);
-                          return null;
-                        }
-                      });
-                      
-                      // Wait for all dashboards to be fetched
-                      const dashboardResults = await Promise.all(dashboardPromises);
-                      
-                      // Filter out null results and create enriched top producers
-                      const enrichedProducers = dashboardResults
-                        .filter(dashboard => dashboard !== null)
-                        .map(dashboard => {
-                          // Find matching installation from active installations to get additional metadata
-                          const matchingInstallation = activeInstallations.find(
-                            inst => inst.id === dashboard.installationId
-                          );
-                          
-                          // Return combined data with dashboard values
-                          return {
-                            id: dashboard.installationId,
-                            name: dashboard.installationDetails?.name || 
-                                  matchingInstallation?.name || 
-                                  `Installation ${dashboard.installationId}`,
-                            username: dashboard.installationDetails?.username || 
-                                    matchingInstallation?.username || 
-                                    dashboard.installationDetails?.customer?.email || "N/A",
-                            location: dashboard.installationDetails?.location || 
-                                    matchingInstallation?.location || "N/A",
-                            type: dashboard.installationDetails?.type || 
-                                  matchingInstallation?.type || "RESIDENTIAL",
-                            // Use more stable daily metrics instead of real-time values that change every 15 seconds
-                            todayGenerationKWh: dashboard.todayGenerationKWh,
-                            currentPowerGenerationWatts: dashboard.currentPowerGenerationWatts,
-                            currentEfficiencyPercentage: dashboard.currentEfficiencyPercentage,
-                            averageEfficiencyPercentage: dashboard.averageEfficiencyPercentage || dashboard.currentEfficiencyPercentage
-                          };
-                        });
-                      
-                      // Set the enriched producers as top producers
-                      if (enrichedProducers.length > 0) {
-                        setTopProducers(enrichedProducers);
-                        console.log("Refreshed: Fetched dashboard data with average efficiency for top producers:", enrichedProducers);
-                      } else {
-                        // Fall back to active installations if no dashboard data
-                        setTopProducers(activeInstallations.slice(0, 5));
-                      }
-                    } catch (error) {
-                      console.error("Error fetching installation dashboards during refresh:", error);
-                      // Fall back to active installations
-                      setTopProducers(activeInstallations.slice(0, 5));
-                    }
-                  } else {
-                    // No installations to fetch, use what we have
-                    setTopProducers(activeInstallations.slice(0, 5));
-                  }
-                }
-
-                toast({
-                  title: "Data refreshed",
-                  description: "Energy monitoring data has been updated."
-                });
-              } catch (error) {
-                console.error("Error refreshing data:", error);
-                toast({
-                  variant: "destructive",
-                  title: "Error",
-                  description: "Failed to refresh energy monitoring data."
-                });
-              } finally {
-                setLoading(false);
-              }
-            }, 300);
+            console.log("🔄 Manual refresh triggered for energy monitoring");
+            fetchEnergyData();
           }}>
-            <RefreshCw className="h-4 w-4" />
+            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
           </Button>
           <Button variant="outline" size="icon" onClick={handleExportData}>
             <Download className="h-4 w-4" />

@@ -21,6 +21,7 @@ import {
   Info,
   Check,
   X,
+  Loader2,
 } from "lucide-react"
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
@@ -280,6 +281,7 @@ export default function InstallationDetailPage() {
     }
 
     if (id) {
+      console.log(`🔄 Loading installation ${id} data with timeRange: ${timeRange}`);
       fetchInstallationData()
     }
     
@@ -719,7 +721,11 @@ export default function InstallationDetailPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Select value={timeRange} onValueChange={setTimeRange}>
+          <Select value={timeRange} onValueChange={(value) => {
+            console.log(`Changing time range to: ${value}`);
+            setTimeRange(value);
+            // Data will refresh automatically due to timeRange dependency in useEffect
+          }}>
             <SelectTrigger className="w-[180px]">
               <SelectValue placeholder="Select time range" />
             </SelectTrigger>
@@ -731,10 +737,90 @@ export default function InstallationDetailPage() {
             </SelectContent>
           </Select>
           <Button variant="outline" size="icon" onClick={() => {
-            setLoading(true)
-            setTimeout(() => setLoading(false), 500)
+            console.log("🔄 Manual refresh triggered for installation details");
+            // Use the existing fetchInstallationData function
+            if (id) {
+              setLoading(true)
+              const fetchInstallationData = async () => {
+                try {
+                  // First fetch installation dashboard data
+                  const dashboardData = await energyApi.getInstallationDashboard(id)
+                  
+                  // Calculate the average efficiency for this installation
+                  const averageEfficiency = await energyApi.calculateInstallationAverageEfficiency(id)
+                  
+                  // Then get additional installation details if needed
+                  const installationData = await installationApi.getInstallationDetails(id)
+                  
+                  if (dashboardData && installationData) {
+                    // Process data here (same as in useEffect)
+                    // Combine dashboard data with installation details
+                    const combinedData = {
+                      ...installationData,
+                      currentPowerGenerationWatts: dashboardData.currentPowerGenerationWatts,
+                      currentPowerConsumptionWatts: dashboardData.currentPowerConsumptionWatts,
+                      efficiencyPercentage: dashboardData.currentEfficiencyPercentage,
+                      totalYield: dashboardData.lifetimeGenerationKWh,
+                      todayGenerationKWh: dashboardData.todayGenerationKWh,
+                      todayConsumptionKWh: dashboardData.todayConsumptionKWh,
+                      weekToDateGenerationKWh: dashboardData.weekToDateGenerationKWh,
+                      weekToDateConsumptionKWh: dashboardData.weekToDateConsumptionKWh,
+                      monthToDateGenerationKWh: dashboardData.monthToDateGenerationKWh,
+                      monthToDateConsumptionKWh: dashboardData.monthToDateConsumptionKWh,
+                      yearToDateGenerationKWh: dashboardData.yearToDateGenerationKWh,
+                      yearToDateConsumptionKWh: dashboardData.yearToDateConsumptionKWh,
+                      lifetimeGenerationKWh: dashboardData.lifetimeGenerationKWh,
+                      lifetimeConsumptionKWh: dashboardData.lifetimeConsumptionKWh
+                    }
+                    
+                    // Update state with the new data
+                    setInstallation(combinedData)
+                    
+                    // Store customer info separately if available
+                    if (installationData.username) {
+                      setCustomerInfo({
+                        email: installationData.username,
+                        userId: installationData.userId
+                      })
+                    }
+                    
+                    // Use readings from the dashboard if available
+                    setRecentReadings(dashboardData.recentReadings || [])
+                    
+                    // Calculate performance metrics from dashboard data
+                    const perfMetrics = {
+                      efficiency: averageEfficiency || dashboardData.currentEfficiencyPercentage || 0,
+                      dailyYield: dashboardData.todayGenerationKWh || 0,
+                      monthlyYield: dashboardData.monthToDateGenerationKWh || 0,
+                      yearlyYield: dashboardData.yearToDateGenerationKWh || 0,
+                      totalYield: dashboardData.lifetimeGenerationKWh || 0,
+                      uptimePercent: 98 // Default value
+                    }
+                    
+                    setPerformance(perfMetrics)
+                    
+                    // Transform readings to chart data if available
+                    if (dashboardData.recentReadings && dashboardData.recentReadings.length > 0) {
+                      const chartData = transformReadingsToChartData(dashboardData.recentReadings, timeRange)
+                      setEnergyData(chartData)
+                    }
+                  }
+                } catch (error) {
+                  console.error("Error refreshing installation data:", error)
+                  toast({
+                    variant: "destructive",
+                    title: "Error",
+                    description: "Failed to refresh installation data. Please try again later.",
+                  })
+                } finally {
+                  setLoading(false)
+                }
+              }
+              
+              fetchInstallationData()
+            }
           }}>
-            <RefreshCw className="h-4 w-4" />
+            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
           </Button>
         </div>
       </div>

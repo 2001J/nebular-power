@@ -27,9 +27,12 @@ public interface SecurityLogService {
     
     Page<SecurityLogDTO> getSecurityLogsByActivityType(SecurityLog.ActivityType activityType, Pageable pageable);
     
+    // Added new method to get all security logs without filtering by activity type
+    Page<SecurityLogDTO> getAllSecurityLogs(Pageable pageable);
+    
     void logTamperEventCreated(Long installationId, Long tamperEventId, String details, String ipAddress);
     
     void logTamperEventStatusChange(Long installationId, Long tamperEventId, String details, String userId);
     
     void logConfigurationChange(Long installationId, String details, String userId);
-} 
+}

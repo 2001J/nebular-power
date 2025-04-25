@@ -64,6 +64,37 @@ public class GlobalExceptionHandler {
         error.put("message", ex.getMessage());
         return new ResponseEntity<>(error, HttpStatus.NOT_FOUND);
     }
+    
+    @ExceptionHandler(org.springframework.security.access.AccessDeniedException.class)
+    @ResponseStatus(HttpStatus.FORBIDDEN)
+    public ResponseEntity<Map<String, String>> handleAccessDenied(org.springframework.security.access.AccessDeniedException ex) {
+        Map<String, String> error = new HashMap<>();
+        error.put("status", "FORBIDDEN");
+        error.put("message", "You do not have permission to access this resource");
+        error.put("error", "Access Denied");
+        error.put("details", ex.getMessage());
+        return new ResponseEntity<>(error, HttpStatus.FORBIDDEN);
+    }
+    
+    @ExceptionHandler(org.springframework.security.authentication.InsufficientAuthenticationException.class)
+    @ResponseStatus(HttpStatus.UNAUTHORIZED)
+    public ResponseEntity<Map<String, String>> handleInsufficientAuthentication(org.springframework.security.authentication.InsufficientAuthenticationException ex) {
+        Map<String, String> error = new HashMap<>();
+        error.put("status", "UNAUTHORIZED");
+        error.put("message", "Authentication is required to access this resource");
+        error.put("error", "Unauthorized");
+        return new ResponseEntity<>(error, HttpStatus.UNAUTHORIZED);
+    }
+    
+    @ExceptionHandler(org.springframework.security.core.AuthenticationException.class)
+    @ResponseStatus(HttpStatus.UNAUTHORIZED)
+    public ResponseEntity<Map<String, String>> handleAuthenticationException(org.springframework.security.core.AuthenticationException ex) {
+        Map<String, String> error = new HashMap<>();
+        error.put("status", "UNAUTHORIZED");
+        error.put("message", "Authentication failed: " + ex.getMessage());
+        error.put("error", "Authentication Failed");
+        return new ResponseEntity<>(error, HttpStatus.UNAUTHORIZED);
+    }
 
     @ExceptionHandler(RuntimeException.class)
     @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
@@ -72,4 +103,4 @@ public class GlobalExceptionHandler {
         error.put("message", ex.getMessage());
         return new ResponseEntity<>(error, HttpStatus.INTERNAL_SERVER_ERROR);
     }
-} 
+}
