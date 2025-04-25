@@ -327,9 +327,9 @@ public class TamperEventControllerTest {
                 .param("severities", "HIGH,CRITICAL")
                 .param("page", "0")
                 .param("size", "10"))
-                .andExpect(status().is5xxServerError())
-                .andExpect(jsonPath("$.message").value("Access Denied"));
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.message").value("You do not have permission to access this resource"));
 
         verifyNoInteractions(tamperEventService);
     }
-} 
+}
