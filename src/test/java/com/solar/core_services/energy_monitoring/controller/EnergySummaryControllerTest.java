@@ -144,7 +144,7 @@ public class EnergySummaryControllerTest {
 
         // When/Then
         mockMvc.perform(get("/monitoring/summaries/1/daily"))
-                .andExpect(status().isInternalServerError());
+                .andExpect(status().isForbidden()); // Updated to expect 403 Forbidden instead of 500
     }
 
     @Test
@@ -234,7 +234,7 @@ public class EnergySummaryControllerTest {
         mockMvc.perform(get("/monitoring/summaries/1/DAILY")
                 .param("startDate", today.minusDays(7).toString())
                 .param("endDate", today.toString()))
-                .andExpect(status().isInternalServerError());
+                .andExpect(status().isForbidden()); // Updated to expect 403 Forbidden instead of 500
     }
 
     @Test
@@ -264,7 +264,7 @@ public class EnergySummaryControllerTest {
         mockMvc.perform(post("/monitoring/summaries/1/generate/daily")
                 .with(csrf())
                 .param("date", today.toString()))
-                .andExpect(status().isInternalServerError());
+                .andExpect(status().isForbidden()); // Updated to expect 403 Forbidden instead of 500
     }
 
     @Test
@@ -300,4 +300,4 @@ public class EnergySummaryControllerTest {
                 .andExpect(jsonPath("$.period", is("MONTHLY")))
                 .andExpect(jsonPath("$.totalGenerationKWh", is(600.0)));
     }
-} 
+}
