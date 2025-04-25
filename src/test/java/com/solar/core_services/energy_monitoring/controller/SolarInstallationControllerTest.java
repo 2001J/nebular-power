@@ -159,7 +159,7 @@ public class SolarInstallationControllerTest {
 
                 // When/Then
                 mockMvc.perform(get("/monitoring/installations/customer/1"))
-                                .andExpect(status().is5xxServerError());
+                                .andExpect(status().isForbidden()); // Updated to expect 403 (Forbidden) instead of 500
         }
 
         @Test
@@ -202,7 +202,7 @@ public class SolarInstallationControllerTest {
 
                 // When/Then
                 mockMvc.perform(get("/monitoring/installations/1"))
-                                .andExpect(status().is5xxServerError());
+                                .andExpect(status().isForbidden()); // Updated to expect 403 (Forbidden) instead of 500
         }
 
         @Test
@@ -266,7 +266,7 @@ public class SolarInstallationControllerTest {
                                 .with(csrf())
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(newInstallationDTO)))
-                                .andExpect(status().is5xxServerError());
+                                .andExpect(status().isForbidden()); // Updated to expect 403 (Forbidden) instead of 500
         }
 
         @Test
@@ -332,7 +332,7 @@ public class SolarInstallationControllerTest {
                                 .with(csrf())
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(updateDTO)))
-                                .andExpect(status().is5xxServerError());
+                                .andExpect(status().isForbidden()); // Updated to expect 403 (Forbidden) instead of 500
         }
 
         @Test
@@ -370,7 +370,7 @@ public class SolarInstallationControllerTest {
         public void testGetSystemOverview_Unauthorized() throws Exception {
                 // When/Then
                 mockMvc.perform(get("/monitoring/installations/overview"))
-                                .andExpect(status().is5xxServerError());
+                                .andExpect(status().isForbidden()); // Updated to expect 403 (Forbidden) instead of 500
         }
 
         @Test
@@ -393,6 +393,6 @@ public class SolarInstallationControllerTest {
         public void testGetTamperAlerts_Unauthorized() throws Exception {
                 // When/Then
                 mockMvc.perform(get("/monitoring/installations/tamper-alerts"))
-                                .andExpect(status().is5xxServerError());
+                                .andExpect(status().isForbidden()); // Updated to expect 403 (Forbidden) instead of 500
         }
 }
