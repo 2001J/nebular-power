@@ -147,10 +147,10 @@ public class AlertConfigControllerTest {
     @WithMockUser(roles = "ADMIN")
     @DisplayName("Should get alert configs for current user")
     void shouldGetAlertConfigsForCurrentUser() throws Exception {
-        // Update test to expect 500 status in test environment due to security constraints
+        // Update test to expect 403 status (CLIENT_ERROR) with the correct error message
         mockMvc.perform(get("/api/security/user/alert-configs"))
-                .andExpect(status().is5xxServerError())
-                .andExpect(jsonPath("$.message").value("Access Denied"));
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.message").value("You do not have permission to access this resource"));
     }
 
     @Test
@@ -254,10 +254,10 @@ public class AlertConfigControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(testUpdateDTO))
                 .with(csrf()))
-                .andExpect(status().is5xxServerError())
-                .andExpect(jsonPath("$.message").value("Access Denied"));
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.message").value("You do not have permission to access this resource"));
 
         // Verify no interactions with alertConfigService for this request
         verifyNoInteractions(alertConfigService);
     }
-} 
+}
