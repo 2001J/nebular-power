@@ -59,6 +59,9 @@ public class SecurityLogControllerTest {
     @MockBean
     private SolarInstallationRepository installationRepository;
 
+    @MockBean
+    private com.solar.core_services.tampering_detection.repository.SecurityLogRepository securityLogRepository;
+
     private Long installationId = 1L;
     private SecurityLogDTO testSecurityLogDTO;
     private List<SecurityLogDTO> testSecurityLogDTOList;
@@ -99,17 +102,33 @@ public class SecurityLogControllerTest {
     @DisplayName("Should get security logs by installation ID")
     void shouldGetSecurityLogsByInstallationId() throws Exception {
         // Arrange
-        when(securityLogService.getSecurityLogsByInstallationId(eq(installationId), any(Pageable.class)))
-            .thenReturn(testSecurityLogDTOPage);
+        // Create a properly populated non-empty page of security logs with minimal mocking
+        Page<SecurityLog> mockSecurityLogsPage = mock(Page.class);
+        
+        // Set up only the mocks that are actually used by the controller
+        when(installationRepository.findById(installationId))
+            .thenReturn(java.util.Optional.of(testInstallation));
+        when(securityLogRepository.findByInstallationOrderByTimestampDesc(eq(testInstallation), any(Pageable.class)))
+            .thenReturn(mockSecurityLogsPage);
+        
+        // Page needs to map to our DTO - this is the only mock behavior we need for the page
+        when(mockSecurityLogsPage.map(any())).thenAnswer(invocation -> {
+            // Create a new page with our DTO
+            return new PageImpl<>(List.of(testSecurityLogDTO));
+        });
 
         // Act & Assert
         mockMvc.perform(get("/api/security/admin/installations/{installationId}/audit", installationId))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content").isArray())
+                .andExpect(jsonPath("$.content.length()").value(1))
                 .andExpect(jsonPath("$.content[0].id").value(testSecurityLogDTO.getId()))
                 .andExpect(jsonPath("$.content[0].installationId").value(testSecurityLogDTO.getInstallationId()))
                 .andExpect(jsonPath("$.content[0].activityType").value(testSecurityLogDTO.getActivityType()));
 
-        verify(securityLogService).getSecurityLogsByInstallationId(eq(installationId), any(Pageable.class));
+        // Verify the repository interaction
+        verify(installationRepository).findById(installationId);
+        verify(securityLogRepository).findByInstallationOrderByTimestampDesc(eq(testInstallation), any(Pageable.class));
     }
 
     @Test
@@ -137,15 +156,17 @@ public class SecurityLogControllerTest {
     @DisplayName("Should get security logs by installation ID and time range")
     void shouldGetSecurityLogsByInstallationAndTimeRange() throws Exception {
         // Arrange
-        LocalDateTime start = LocalDateTime.now().minusDays(7);
-        LocalDateTime end = LocalDateTime.now();
+        LocalDateTime startTime = LocalDateTime.now().minusDays(7);
+        LocalDateTime endTime = LocalDateTime.now();
         when(securityLogService.getSecurityLogsByInstallationAndTimeRange(eq(installationId), any(LocalDateTime.class), any(LocalDateTime.class)))
             .thenReturn(testSecurityLogDTOList);
+        when(installationRepository.findById(installationId))
+            .thenReturn(java.util.Optional.of(testInstallation));
 
         // Act & Assert
         mockMvc.perform(get("/api/security/admin/installations/{installationId}/audit/time-range", installationId)
-                .param("start", start.toString())
-                .param("end", end.toString()))
+                .param("startTime", startTime.toString())
+                .param("endTime", endTime.toString()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].id").value(testSecurityLogDTO.getId()))
                 .andExpect(jsonPath("$[0].installationId").value(testSecurityLogDTO.getInstallationId()))
@@ -213,4 +234,4 @@ public class SecurityLogControllerTest {
         verify(installationRepository).findByUser(testUser);
         verifyNoInteractions(securityLogService);
     }
-} 
+}
