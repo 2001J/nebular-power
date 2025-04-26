@@ -35,14 +35,19 @@ export default function CustomerLayout({
       icon: Home,
     },
     {
-      href: "/customer/layout",
-      label: "Layout",
-      icon: LayoutGrid,
+      href: "/customer/charts",
+      label: "Energy Charts",
+      icon: BarChart3,
     },
     {
-      href: "/customer/charts",
-      label: "Charts",
-      icon: BarChart3,
+      href: "/customer/analytics",
+      label: "Analytics",
+      icon: FileText,
+    },
+    {
+      href: "/customer/alerts",
+      label: "System Alerts",
+      icon: AlertTriangle,
     },
     {
       href: "/customer/reports",
@@ -50,19 +55,14 @@ export default function CustomerLayout({
       icon: FileText,
     },
     {
-      href: "/customer/alerts",
-      label: "Alerts",
-      icon: AlertTriangle,
+      href: "/customer/payments",
+      label: "Payments",
+      icon: Settings,
     },
     {
       href: "/customer/profile",
       label: "Profile",
       icon: User,
-    },
-    {
-      href: "/customer/settings",
-      label: "Settings",
-      icon: Settings,
     },
   ]
 
