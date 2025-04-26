@@ -902,6 +902,11 @@ export const energyApi = {
   getInstallationDashboard: async (installationId: string) => {
     try {
       const response = await apiClient.get(`/monitoring/dashboard/installation/${installationId}`);
+      // Only return actual data from the server, no fallbacks
+      if (!response || !response.data) {
+        console.error(`No dashboard data received for installation ${installationId}`);
+        return null;
+      }
       return response.data;
     } catch (error: any) {
       console.error(`Error fetching installation dashboard for ${installationId}:`, error.message);
@@ -915,6 +920,11 @@ export const energyApi = {
       const response = await apiClient.get(`/monitoring/readings/recent/${installationId}`, {
         params: { limit },
       });
+      // Only return actual data from the server
+      if (!response || !response.data) {
+        console.error(`No readings data received for installation ${installationId}`);
+        return [];
+      }
       return response.data;
     } catch (error: any) {
       console.error(`Error fetching recent readings for installation ${installationId}:`, error.message);
@@ -1050,6 +1060,25 @@ export const energyApi = {
     } catch (error: any) {
       console.error(`Error calculating average efficiency for installation ${installationId}:`, error.message);
       return 0;
+    }
+  },
+
+  getSummariesByPeriodAndDateRange: async (installationId: string, period: string, startDate: string, endDate: string) => {
+    try {
+      console.log(`Fetching ${period} summaries for installation ${installationId} from ${startDate} to ${endDate}`);
+      // Use the same endpoint pattern that's defined in EnergySummaryController.java
+      const response = await apiClient.get(`/monitoring/summaries/${installationId}/${period}`, {
+        params: { startDate, endDate }
+      });
+      // Only return actual data from the server
+      if (!response || !response.data) {
+        console.error(`No summaries data received for installation ${installationId}`);
+        return [];
+      }
+      return response.data;
+    } catch (error: any) {
+      console.error(`Error fetching ${period} summaries for installation ${installationId} in date range:`, error.message);
+      return [];
     }
   },
 };
@@ -2620,6 +2649,22 @@ export const securityApi = {
         console.error("Error setting up request:", error.message);
       }
       // Return empty array instead of null to avoid additional null checks
+      return [];
+    }
+  },
+
+  // Add this method for customer dashboard
+  getInstallationAlerts: async (installationId: string) => {
+    try {
+      const response = await apiClient.get(`/api/security/installations/${installationId}/events`);
+      // Only return actual data from the server
+      if (!response || !response.data) {
+        console.error(`No alerts data received for installation ${installationId}`);
+        return [];
+      }
+      return response.data && response.data.content ? response.data.content : [];
+    } catch (error: any) {
+      console.error(`Error fetching alerts for installation ${installationId}:`, error);
       return [];
     }
   },
