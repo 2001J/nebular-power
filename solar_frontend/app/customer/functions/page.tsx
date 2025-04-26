@@ -22,7 +22,7 @@ export default function FunctionsPage() {
       description: "Calculate the amount and efficiency",
       icon: Calculator,
       color: "bg-blue-500",
-      href: "/dashboard/functions/calculator",
+      href: "/customer/functions/calculator",
     },
     {
       id: "buy-assets",
@@ -30,7 +30,7 @@ export default function FunctionsPage() {
       description: "Buy electricity generating assets",
       icon: Plus,
       color: "bg-green-500",
-      href: "/dashboard/functions/buy",
+      href: "/customer/functions/buy",
     },
     {
       id: "sell-asset",
@@ -38,7 +38,7 @@ export default function FunctionsPage() {
       description: "Sell your electricity generating assets",
       icon: Minus,
       color: "bg-red-500",
-      href: "/dashboard/functions/sell",
+      href: "/customer/functions/sell",
     },
     {
       id: "rent-asset",
@@ -46,7 +46,7 @@ export default function FunctionsPage() {
       description: "Rent your electricity generating assets",
       icon: RefreshCw,
       color: "bg-purple-500",
-      href: "/dashboard/functions/rent",
+      href: "/customer/functions/rent",
     },
     {
       id: "deposit",
@@ -54,7 +54,7 @@ export default function FunctionsPage() {
       description: "Deposit money or crypto",
       icon: ArrowDownToLine,
       color: "bg-amber-500",
-      href: "/dashboard/functions/deposit",
+      href: "/customer/functions/deposit",
     },
     {
       id: "withdraw",
@@ -62,7 +62,7 @@ export default function FunctionsPage() {
       description: "Withdraw money or crypto",
       icon: ArrowUpFromLine,
       color: "bg-cyan-500",
-      href: "/dashboard/functions/withdraw",
+      href: "/customer/functions/withdraw",
     },
   ]
 
@@ -145,7 +145,7 @@ export default function FunctionsPage() {
         <TabsContent value="favorites" className="mt-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <Link
-              href="/dashboard/functions/buy"
+              href="/customer/functions/buy"
               className="flex items-center gap-3 p-4 bg-white border rounded-lg hover:shadow-md transition-shadow"
             >
               <div className="h-10 w-10 rounded-full bg-green-500 flex items-center justify-center">
@@ -154,7 +154,7 @@ export default function FunctionsPage() {
               <span className="font-medium">Buy assets</span>
             </Link>
             <Link
-              href="/dashboard/functions/calculator"
+              href="/customer/functions/calculator"
               className="flex items-center gap-3 p-4 bg-white border rounded-lg hover:shadow-md transition-shadow"
             >
               <div className="h-10 w-10 rounded-full bg-blue-500 flex items-center justify-center">
@@ -163,7 +163,7 @@ export default function FunctionsPage() {
               <span className="font-medium">Calculator</span>
             </Link>
             <Link
-              href="/dashboard/functions/withdraw"
+              href="/customer/functions/withdraw"
               className="flex items-center gap-3 p-4 bg-white border rounded-lg hover:shadow-md transition-shadow"
             >
               <div className="h-10 w-10 rounded-full bg-cyan-500 flex items-center justify-center">

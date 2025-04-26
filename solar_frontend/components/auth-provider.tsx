@@ -126,13 +126,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (user) {
       try {
         if (pathname.startsWith("/admin") && user.role !== "ADMIN") {
-          console.log("Access denied: User is not an admin, redirecting to dashboard")
+          console.log("Access denied: User is not an admin, redirecting to customer dashboard")
           toast({
             title: "Access Denied",
             description: "You don't have permission to access the admin area.",
             variant: "destructive",
           })
-          router.push("/dashboard")
+          router.push("/customer")
         } else if (pathname.startsWith("/dashboard") && user.role === "ADMIN") {
           console.log("Admin user, redirecting to admin dashboard")
           router.push("/admin")
@@ -218,8 +218,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.log("Admin user logged in, redirecting to admin dashboard")
         router.push("/admin")
       } else {
-        console.log("Customer logged in, redirecting to dashboard")
-        router.push("/dashboard")
+        console.log("Customer logged in, redirecting to customer dashboard")
+        router.push("/customer")
       }
 
       return response

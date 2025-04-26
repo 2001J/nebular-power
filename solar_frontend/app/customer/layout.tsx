@@ -17,7 +17,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 
-export default function DashboardLayout({
+export default function CustomerLayout({
   children,
 }: {
   children: React.ReactNode
@@ -30,37 +30,37 @@ export default function DashboardLayout({
 
   const navItems = [
     {
-      href: "/dashboard",
+      href: "/customer",
       label: "Dashboard",
       icon: Home,
     },
     {
-      href: "/dashboard/layout",
+      href: "/customer/layout",
       label: "Layout",
       icon: LayoutGrid,
     },
     {
-      href: "/dashboard/charts",
+      href: "/customer/charts",
       label: "Charts",
       icon: BarChart3,
     },
     {
-      href: "/dashboard/reports",
+      href: "/customer/reports",
       label: "Reports",
       icon: FileText,
     },
     {
-      href: "/dashboard/alerts",
+      href: "/customer/alerts",
       label: "Alerts",
       icon: AlertTriangle,
     },
     {
-      href: "/dashboard/profile",
+      href: "/customer/profile",
       label: "Profile",
       icon: User,
     },
     {
-      href: "/dashboard/settings",
+      href: "/customer/settings",
       label: "Settings",
       icon: Settings,
     },
@@ -118,8 +118,8 @@ export default function DashboardLayout({
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => handleNavigation("/dashboard/profile")}>Profile</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleNavigation("/dashboard/settings")}>Settings</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleNavigation("/customer/profile")}>Profile</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleNavigation("/customer/settings")}>Settings</DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={logout}>Log out</DropdownMenuItem>
             </DropdownMenuContent>
