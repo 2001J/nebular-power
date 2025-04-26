@@ -40,11 +40,6 @@ export default function CustomerLayout({
       icon: BarChart3,
     },
     {
-      href: "/customer/analytics",
-      label: "Analytics",
-      icon: FileText,
-    },
-    {
       href: "/customer/alerts",
       label: "System Alerts",
       icon: AlertTriangle,
@@ -53,16 +48,6 @@ export default function CustomerLayout({
       href: "/customer/reports",
       label: "Reports",
       icon: FileText,
-    },
-    {
-      href: "/customer/payments",
-      label: "Payments",
-      icon: Settings,
-    },
-    {
-      href: "/customer/profile",
-      label: "Profile",
-      icon: User,
     },
   ]
 
