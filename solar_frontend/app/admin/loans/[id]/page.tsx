@@ -89,12 +89,26 @@ export default function LoanDetailsPage({ params }: { params: LoanParams }) {
         
         // First try to get active payment plans that match this ID
         try {
+          // Try to get both active and completed payment plans
+          const allPlans = [];
+          
+          // Fetch active plans
           const activePlans = await paymentComplianceApi.getPaymentPlansByStatusReport("ACTIVE");
-          if (activePlans && Array.isArray(activePlans) && activePlans.length > 0) {
-            // Find the plan that matches our ID
-            const matchingPlan = activePlans.find(plan => plan.id === parseInt(params.id));
+          if (activePlans && Array.isArray(activePlans)) {
+            allPlans.push(...activePlans);
+          }
+          
+          // Fetch completed plans
+          const completedPlans = await paymentComplianceApi.getPaymentPlansByStatusReport("COMPLETED");
+          if (completedPlans && Array.isArray(completedPlans)) {
+            allPlans.push(...completedPlans);
+          }
+          
+          // Find the plan that matches our ID among all plans
+          if (allPlans.length > 0) {
+            const matchingPlan = allPlans.find(plan => plan.id === parseInt(params.id));
             if (matchingPlan) {
-              console.log("Found matching active plan:", matchingPlan);
+              console.log("Found matching plan:", matchingPlan);
               
               // Enhance the loan data with customer information
               const enhancedPlan = {
@@ -104,21 +118,39 @@ export default function LoanDetailsPage({ params }: { params: LoanParams }) {
                 createdAt: matchingPlan.createdAt || matchingPlan.startDate
               };
               
-              setLoan(enhancedPlan);
-              
-              // If payment data is available, set it
-              if (matchingPlan.payments && Array.isArray(matchingPlan.payments) && matchingPlan.payments.length > 0) {
-                setPayments(matchingPlan.payments);
-                setLoadingPayments(false);
-              } else {
+              // Try to fetch payments for this loan to determine more accurate status
+              // and retain customer information
+              try {
                 // Try to fetch payments separately
-                fetchPaymentsForLoan(matchingPlan.id, matchingPlan.installationId);
+                await fetchPaymentsForLoan(matchingPlan.id, matchingPlan.installationId);
+                
+                // Now that we have payments, determine the correct status
+                const correctStatus = determineLoanStatus(enhancedPlan, payments);
+                
+                // Apply further customer info enhancements and set next payment date
+                const fullyEnhancedPlan = enhanceCustomerInfo(
+                  { 
+                    ...enhancedPlan, 
+                    status: correctStatus,
+                    nextPaymentDate: determineNextPaymentDate(
+                      { ...enhancedPlan, status: correctStatus },
+                      payments
+                    )
+                  }, 
+                  payments
+                );
+                
+                setLoan(fullyEnhancedPlan);
+                return;
+              } catch (paymentsError) {
+                console.error("Error fetching payments for status determination:", paymentsError);
+                setLoan(enhancedPlan);
+                return;
               }
-              return;
             }
           }
         } catch (activePlansError) {
-          console.error("Error fetching active plans:", activePlansError);
+          console.error("Error fetching plans:", activePlansError);
         }
         
         // If we couldn't find the plan in active plans, try the regular payment plan report
@@ -140,7 +172,22 @@ export default function LoanDetailsPage({ params }: { params: LoanParams }) {
                                  getNextPaymentDate(firstPayment.paymentPlan),
                 createdAt: firstPayment.paymentPlan.createdAt || firstPayment.paymentPlan.startDate
               };
-              setLoan(enhancedPlan);
+
+              // Determine correct status and enhance customer info
+              const correctStatus = determineLoanStatus(enhancedPlan, paymentData);
+              const fullyEnhancedPlan = enhanceCustomerInfo(
+                { 
+                  ...enhancedPlan, 
+                  status: correctStatus,
+                  nextPaymentDate: determineNextPaymentDate(
+                    { ...enhancedPlan, status: correctStatus },
+                    paymentData
+                  )
+                }, 
+                paymentData
+              );
+              
+              setLoan(fullyEnhancedPlan);
               setPayments(paymentData);
             } else {
               // Just set payments - we'll need to fetch loan info separately
@@ -177,7 +224,22 @@ export default function LoanDetailsPage({ params }: { params: LoanParams }) {
               nextPaymentDate: paymentData.nextPaymentDate || getNextUnpaidDueDate(paymentData.payments) || getNextPaymentDate(paymentData),
               createdAt: paymentData.createdAt || paymentData.startDate
             };
-            setLoan(enhancedPlan);
+            
+            // Determine correct status and enhance customer info
+            const correctStatus = determineLoanStatus(enhancedPlan, paymentData.payments);
+            const fullyEnhancedPlan = enhanceCustomerInfo(
+              { 
+                ...enhancedPlan, 
+                status: correctStatus,
+                nextPaymentDate: determineNextPaymentDate(
+                  { ...enhancedPlan, status: correctStatus },
+                  paymentData.payments
+                )
+              }, 
+              paymentData.payments
+            );
+            
+            setLoan(fullyEnhancedPlan);
             setPayments(paymentData.payments);
           } else {
             // If paymentData is the loan object itself, enhance it with derived fields
@@ -187,12 +249,42 @@ export default function LoanDetailsPage({ params }: { params: LoanParams }) {
               nextPaymentDate: paymentData.nextPaymentDate || getNextPaymentDate(paymentData),
               createdAt: paymentData.createdAt || paymentData.startDate
             };
-            setLoan(enhancedPlan);
             
             // Try to fetch payments separately if they're not included
             if (!paymentData.payments || paymentData.payments.length === 0) {
-              fetchPaymentsForLoan(paymentData.id, paymentData.installationId);
+              await fetchPaymentsForLoan(paymentData.id, paymentData.installationId);
+              
+              // Now determine the correct status with the fetched payments
+              const correctStatus = determineLoanStatus(enhancedPlan, payments);
+              const fullyEnhancedPlan = enhanceCustomerInfo(
+                { 
+                  ...enhancedPlan, 
+                  status: correctStatus,
+                  nextPaymentDate: determineNextPaymentDate(
+                    { ...enhancedPlan, status: correctStatus },
+                    payments
+                  )
+                }, 
+                payments
+              );
+              
+              setLoan(fullyEnhancedPlan);
             } else {
+              // Determine correct status and enhance customer info
+              const correctStatus = determineLoanStatus(enhancedPlan, paymentData.payments);
+              const fullyEnhancedPlan = enhanceCustomerInfo(
+                { 
+                  ...enhancedPlan, 
+                  status: correctStatus,
+                  nextPaymentDate: determineNextPaymentDate(
+                    { ...enhancedPlan, status: correctStatus },
+                    paymentData.payments
+                  )
+                }, 
+                paymentData.payments
+              );
+              
+              setLoan(fullyEnhancedPlan);
               setPayments(paymentData.payments);
               setLoadingPayments(false);
             }
@@ -221,7 +313,42 @@ export default function LoanDetailsPage({ params }: { params: LoanParams }) {
       try {
         // Try to get payments via the installation ID first
         if (installationId) {
-          const paymentsData = await paymentComplianceApi.getCustomerInstallationPayments(installationId);
+          // Create date range - use a wide range to get all payments
+          const startDate = new Date();
+          startDate.setFullYear(startDate.getFullYear() - 5); // 5 years ago
+          const endDate = new Date();
+          endDate.setFullYear(endDate.getFullYear() + 5); // 5 years in future
+          
+          // Use the formatted dates for the API call
+          const formattedStartDate = startDate.toISOString().split('T')[0];
+          const formattedEndDate = endDate.toISOString().split('T')[0];
+          
+          // Add timestamp to prevent caching
+          const timestamp = new Date().getTime();
+          
+          // Get payment history with date range and timestamp
+          const paymentHistoryData = await paymentComplianceApi.getPaymentHistoryReport(
+            installationId, 
+            formattedStartDate,
+            formattedEndDate,
+            timestamp
+          );
+          
+          if (paymentHistoryData && Array.isArray(paymentHistoryData) && paymentHistoryData.length > 0) {
+            // Filter to only show payments for this specific plan if needed
+            const filteredPayments = paymentHistoryData.filter(payment => 
+              !payment.paymentPlanId || payment.paymentPlanId === parseInt(params.id)
+            );
+            
+            if (filteredPayments.length > 0) {
+              setPayments(filteredPayments);
+              setLoadingPayments(false);
+              return;
+            }
+          }
+          
+          // If no payments found in history, try customer installation payments as fallback
+          const paymentsData = await paymentComplianceApi.getCustomerInstallationPayments(installationId, new Date().getTime());
           if (paymentsData && Array.isArray(paymentsData)) {
             // Filter payments for this specific plan if paymentPlanId is available
             const filteredPayments = paymentsData.filter(payment => 
@@ -236,10 +363,13 @@ export default function LoanDetailsPage({ params }: { params: LoanParams }) {
           }
         }
         
-        // Fallback to trying other endpoints
-        const paymentHistoryData = await paymentComplianceApi.getPaymentHistoryReport(installationId);
-        if (paymentHistoryData && Array.isArray(paymentHistoryData) && paymentHistoryData.length > 0) {
-          setPayments(paymentHistoryData);
+        // Last resort: try payment plan report directly
+        const planPayments = await paymentComplianceApi.getPaymentPlanReport(params.id, new Date().getTime());
+        if (planPayments && planPayments.payments && planPayments.payments.length > 0) {
+          setPayments(planPayments.payments);
+        } else {
+          console.log("No payments found for this loan through any method");
+          setPayments([]);
         }
       } catch (paymentsError) {
         console.error("Error fetching payments:", paymentsError);
@@ -309,22 +439,123 @@ export default function LoanDetailsPage({ params }: { params: LoanParams }) {
       return unpaidFuturePayments.length > 0 ? unpaidFuturePayments[0].dueDate : null;
     };
 
+    // Helper function to determine loan status based on payment data
+    const determineLoanStatus = (loan, paymentsData) => {
+      // If the loan has a defined status and it's not ACTIVE, return it
+      if (loan.status && loan.status !== 'ACTIVE') {
+        return loan.status;
+      }
+      
+      // If remaining amount is 0 or less, mark as completed
+      if (loan.remainingAmount <= 0) {
+        return 'COMPLETED';
+      }
+      
+      // If all payments are paid, mark as completed
+      if (paymentsData && Array.isArray(paymentsData) && paymentsData.length > 0) {
+        const allPaid = paymentsData.every(payment => payment.status === 'PAID');
+        if (allPaid) {
+          return 'COMPLETED';
+        }
+        
+        // If any payment is overdue, mark as late
+        const anyOverdue = paymentsData.some(payment => 
+          payment.status === 'OVERDUE' || 
+          payment.status === 'GRACE_PERIOD' || 
+          payment.status === 'SUSPENSION_PENDING'
+        );
+        if (anyOverdue) {
+          return 'DEFAULTED';
+        }
+      }
+      
+      // Default to active if no other condition matches
+      return 'ACTIVE';
+    };
+    
+    // Helper function to determine the next payment due date
+    const determineNextPaymentDate = (loan, paymentsData) => {
+      // If loan is completed or paid, there is no next payment
+      if (loan.status === 'COMPLETED' || loan.status === 'PAID' || loan.remainingAmount <= 0) {
+        return null;
+      }
+      
+      // If we have payment data, find the first unpaid/scheduled payment
+      if (paymentsData && Array.isArray(paymentsData) && paymentsData.length > 0) {
+        // Sort payments by due date
+        const sortedPayments = [...paymentsData].sort((a, b) => 
+          new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime()
+        );
+        
+        // Find the first payment that's not paid
+        const nextUnpaidPayment = sortedPayments.find(payment => 
+          payment.status === 'PENDING' || 
+          payment.status === 'SCHEDULED' || 
+          payment.status === 'DUE_TODAY'
+        );
+        
+        if (nextUnpaidPayment) {
+          return nextUnpaidPayment.dueDate;
+        }
+      }
+      
+      // If no specific next payment, return null
+      return null;
+    };
+    
+    // Helper function to preserve and enhance customer information
+    const enhanceCustomerInfo = (loan, paymentsData) => {
+      if (!loan) return loan;
+      
+      // Ensure we have customer name and email
+      const enhancedLoan = { ...loan };
+      
+      // Try to extract customer info from payments if not in loan
+      if ((!enhancedLoan.customerName || !enhancedLoan.customerEmail) && 
+          paymentsData && paymentsData.length > 0) {
+        
+        // Find the first payment with customer info
+        const paymentWithCustomerInfo = paymentsData.find(
+          payment => payment.customerName || payment.customerEmail
+        );
+        
+        if (paymentWithCustomerInfo) {
+          enhancedLoan.customerName = enhancedLoan.customerName || 
+                                    paymentWithCustomerInfo.customerName || 
+                                    `Customer #${enhancedLoan.customerId || enhancedLoan.installationId || "Unknown"}`;
+          
+          enhancedLoan.customerEmail = enhancedLoan.customerEmail || 
+                                    paymentWithCustomerInfo.customerEmail;
+        }
+      }
+      
+      // Ensure we have a customer name
+      if (!enhancedLoan.customerName) {
+        enhancedLoan.customerName = `Customer #${enhancedLoan.customerId || enhancedLoan.installationId || "Unknown"}`;
+      }
+      
+      return enhancedLoan;
+    };
+
     fetchLoanDetails();
   }, [params.id])
 
-  // Format status badge display
+  // Format status badge display - update to handle "COMPLETED" status more visibly
   const getStatusBadge = (status: string) => {
-    switch (status) {
+    // Convert status to uppercase for case-insensitive comparison
+    const normalizedStatus = status.toUpperCase();
+    
+    switch (normalizedStatus) {
       case "ACTIVE":
         return <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">Active</Badge>
       case "COMPLETED":
-        return <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">Completed</Badge>
+      case "PAID":
+        return <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 font-bold">Completed</Badge>
       case "CANCELLED":
         return <Badge variant="outline" className="bg-gray-50 text-gray-700 border-gray-200">Cancelled</Badge>
       case "DEFAULTED":
+      case "LATE":
         return <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">Defaulted</Badge>
-      case "PAID":
-        return <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">Paid</Badge>
       case "PENDING":
         return <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">Pending</Badge>
       case "SCHEDULED":
@@ -518,7 +749,25 @@ export default function LoanDetailsPage({ params }: { params: LoanParams }) {
                 
                 <div>
                   <h4 className="text-sm font-medium">Next Payment Due</h4>
-                  <p className="mt-1">{loan.nextPaymentDate ? format(new Date(loan.nextPaymentDate), 'PPP') : 'N/A'}</p>
+                  <p className="mt-1">
+                    {loan.nextPaymentDate ? format(new Date(loan.nextPaymentDate), 'PPP') : 
+                      payments && payments.length > 0 ? (
+                        (() => {
+                          // Check for the first unpaid/scheduled payment
+                          const sortedPayments = [...payments]
+                            .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
+                          
+                          const nextUnpaidPayment = sortedPayments.find(payment => 
+                            payment.status === 'PENDING' || 
+                            payment.status === 'SCHEDULED' || 
+                            payment.status === 'DUE_TODAY'
+                          );
+                          
+                          return nextUnpaidPayment ? format(new Date(nextUnpaidPayment.dueDate), 'PPP') : 'N/A';
+                        })()
+                      ) : 'N/A'
+                    }
+                  </p>
                 </div>
                 
                 <div>

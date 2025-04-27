@@ -79,88 +79,59 @@ export default function LoanManagementPage() {
       try {
         setLoading(true)
 
-        // Fetch active payment plans to use as loans
+        // Fetch payment plans to use as loans - include all statuses
         try {
-          // Fetch payment plans that are in ACTIVE status
+          // Create an array to store all loans
+          let allLoans = [];
+
+          // Fetch active payment plans
           const activePlans = await paymentComplianceApi.getPaymentPlansByStatusReport("ACTIVE");
+          if (activePlans && Array.isArray(activePlans)) {
+            const activeLoans = activePlans.map(plan => ({
+              id: plan.id,
+              customer: plan.customerName || `Customer #${plan.customerId || "Unknown"}`,
+              customerId: plan.customerId,
+              loanAmount: plan.totalAmount || 0,
+              remainingAmount: plan.remainingAmount || 0,
+              monthlyPayment: plan.installmentAmount || 0,
+              status: plan.status === "ACTIVE" ? "Current" : plan.status,
+              nextPayment: plan.nextPaymentDate || new Date().toISOString(),
+              term: `${plan.numberOfPayments || 0} months`,
+              startDate: plan.startDate || new Date().toISOString(),
+              installationId: plan.installationId,
+              installationName: plan.installationName || `Installation #${plan.installationId}`
+            }));
+            allLoans = [...allLoans, ...activeLoans];
+          }
           
-          // Also fetch overdue payments to count overdue loans
-          const overduePayments = await paymentComplianceApi.getOverduePaymentsReport();
-          
-          if (activePlans && activePlans.length > 0) {
-            // Create loan objects from active payment plans
-            const loansData: Loan[] = [];
-            
-            // Keep track of overdue installations
-            const overdueInstallationIds = new Set();
-            
-            // Process overdue payments to identify which installations have overdue payments
-            if (overduePayments && Array.isArray(overduePayments) && overduePayments.length > 0) {
-              overduePayments.forEach(payment => {
-                if (payment.installationId) {
-                  overdueInstallationIds.add(payment.installationId.toString());
-                }
-              });
-            }
-
-            for (const plan of activePlans) {
-              try {
-                // Get customer details if available (installation has user info)
-                let customerName = `Customer #${plan.installationId}`;
-                let customerId = plan.installationId?.toString();
-
-                // If we have customer information, use it
-                if (plan.customerName) {
-                  customerName = plan.customerName;
-                }
-                
-                // Check if this installation has overdue payments
-                const isOverdue = overdueInstallationIds.has(plan.installationId?.toString());
-
-                // For each payment plan, create a loan
-                loansData.push({
-                  id: plan.id,
-                  customer: customerName,
-                  customerId: customerId,
-                  loanAmount: plan.totalAmount || 0,
-                  remainingAmount: plan.remainingAmount || 0,
-                  monthlyPayment: plan.monthlyPayment || 0,
-                  status: isOverdue ? 'Late' : (plan.status || 'Current'),
-                  nextPayment: plan.nextPaymentDate || new Date().toISOString(),
-                  term: `${plan.termMonths || 60} months`,
-                  startDate: plan.startDate || new Date().toISOString(),
-                  installationId: plan.installationId?.toString(),
-                  installationName: plan.installationName || `Installation #${plan.installationId}`,
-                });
-              } catch (error) {
-                console.error(`Error processing payment plan ${plan.id}:`, error);
-              }
-            }
-
-            // If we found loans, use them
-            if (loansData.length > 0) {
-              setLoans(loansData);
-              setPaymentPlans(activePlans);
-
-              // Also fetch upcoming payments
-              try {
-                const upcomingPaymentsData = await paymentComplianceApi.getUpcomingPaymentsReport(30);
-                if (upcomingPaymentsData && upcomingPaymentsData.length > 0) {
-                  setUpcomingPayments(upcomingPaymentsData);
-                }
-              } catch (error) {
-                console.error('Error fetching upcoming payments:', error);
-              }
-
-              return; // Skip the fallback mock data
-            }
+          // Fetch completed/paid payment plans
+          const completedPlans = await paymentComplianceApi.getPaymentPlansByStatusReport("COMPLETED");
+          if (completedPlans && Array.isArray(completedPlans)) {
+            const completedLoans = completedPlans.map(plan => ({
+              id: plan.id,
+              customer: plan.customerName || `Customer #${plan.customerId || "Unknown"}`,
+              customerId: plan.customerId,
+              loanAmount: plan.totalAmount || 0,
+              remainingAmount: 0, // Paid loans have no remaining amount
+              monthlyPayment: plan.installmentAmount || 0,
+              status: "Paid",
+              nextPayment: "N/A",
+              term: `${plan.numberOfPayments || 0} months`,
+              startDate: plan.startDate || new Date().toISOString(),
+              installationId: plan.installationId,
+              installationName: plan.installationName || `Installation #${plan.installationId}`
+            }));
+            allLoans = [...allLoans, ...completedLoans];
           }
 
-          // If no plans found or the API failed, continue to mock data
-          console.log('No active payment plans found or API failed, using sample data');
-
+          // If we have any loans, set them
+          if (allLoans.length > 0) {
+            setLoans(allLoans);
+            setLoading(false);
+            return;
+          }
         } catch (error) {
-          console.error("Error fetching active payment plans:", error);
+          console.error("Error fetching payment plans:", error);
           // Continue to mock data
         }
 
@@ -185,7 +156,7 @@ export default function LoanManagementPage() {
         // Show toast notification about no data
         toast({
           title: "No Loan Data Available",
-          description: "No active payment plans were found. The system will display loans when payment plans are created.",
+          description: "No payment plans were found. The system will display loans when payment plans are created.",
           variant: "warning",
         });
       } catch (error) {
@@ -204,7 +175,10 @@ export default function LoanManagementPage() {
       !searchTerm ||
       loan.customer.toLowerCase().includes(searchTerm.toLowerCase())
 
-    const matchesStatus = statusFilter === "all" || loan.status === statusFilter
+    // Make status comparison case-insensitive
+    const matchesStatus = 
+      statusFilter === "all" || 
+      loan.status.toLowerCase() === statusFilter.toLowerCase()
 
     return matchesSearch && matchesStatus
   }).sort((a, b) => {
@@ -248,6 +222,89 @@ export default function LoanManagementPage() {
   const activePercentage = loans.length > 0 ? Math.round((totalCurrentLoans / loans.length) * 100) : 0
   const overduePercentage = loans.length > 0 ? Math.round((totalOverdueLoans / loans.length) * 100) : 0
 
+  // Add refresh button and function
+  const refreshData = async () => {
+    try {
+      setLoading(true);
+      
+      // Create an array to store all loans
+      let allLoans = [];
+      
+      // Get timestamp to prevent caching
+      const timestamp = new Date().getTime();
+
+      // Fetch active payment plans
+      try {
+        // Add timestamp to prevent caching
+        const activePlans = await paymentComplianceApi.getPaymentPlansByStatusReport("ACTIVE", null, null, timestamp);
+        if (activePlans && Array.isArray(activePlans)) {
+          const activeLoans = activePlans.map(plan => ({
+            id: plan.id,
+            customer: plan.customerName || `Customer #${plan.customerId || "Unknown"}`,
+            customerId: plan.customerId,
+            loanAmount: plan.totalAmount || 0,
+            remainingAmount: plan.remainingAmount || 0,
+            monthlyPayment: plan.installmentAmount || 0,
+            status: plan.status === "ACTIVE" ? "Current" : plan.status,
+            nextPayment: plan.nextPaymentDate || new Date().toISOString(),
+            term: `${plan.numberOfPayments || 0} months`,
+            startDate: plan.startDate || new Date().toISOString(),
+            installationId: plan.installationId,
+            installationName: plan.installationName || `Installation #${plan.installationId}`
+          }));
+          allLoans = [...allLoans, ...activeLoans];
+        }
+        
+        // Fetch completed/paid payment plans
+        const completedPlans = await paymentComplianceApi.getPaymentPlansByStatusReport("COMPLETED", null, null, timestamp);
+        if (completedPlans && Array.isArray(completedPlans)) {
+          const completedLoans = completedPlans.map(plan => ({
+            id: plan.id,
+            customer: plan.customerName || `Customer #${plan.customerId || "Unknown"}`,
+            customerId: plan.customerId,
+            loanAmount: plan.totalAmount || 0,
+            remainingAmount: 0, // Paid loans have no remaining amount
+            monthlyPayment: plan.installmentAmount || 0,
+            status: "Paid",
+            nextPayment: "N/A",
+            term: `${plan.numberOfPayments || 0} months`,
+            startDate: plan.startDate || new Date().toISOString(),
+            installationId: plan.installationId,
+            installationName: plan.installationName || `Installation #${plan.installationId}`
+          }));
+          allLoans = [...allLoans, ...completedLoans];
+        }
+        
+        // Update state if we found loans
+        if (allLoans.length > 0) {
+          setLoans(allLoans);
+          toast({
+            title: "Data Refreshed",
+            description: `Successfully loaded ${allLoans.length} loans`,
+          });
+        } else {
+          toast({
+            title: "No Loans Found",
+            description: "No payment plans were found",
+            variant: "warning",
+          });
+        }
+      } catch (error) {
+        console.error("Error refreshing loans:", error);
+        toast({
+          title: "Error",
+          description: "Failed to refresh loan data",
+          variant: "destructive",
+        });
+      } finally {
+        setLoading(false);
+      }
+    } catch (error) {
+      console.error("Error in refreshData:", error);
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="container mx-auto py-6">
       <Breadcrumb className="mb-4">
@@ -270,10 +327,16 @@ export default function LoanManagementPage() {
           </p>
         </div>
 
-        <Button onClick={() => router.push("/admin/loans/new")}>
-          <Plus className="mr-2 h-4 w-4" />
-          New Loan
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={refreshData} disabled={loading}>
+            {loading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+            Refresh
+          </Button>
+          <Button onClick={() => router.push("/admin/loans/new")}>
+            <Plus className="mr-2 h-4 w-4" />
+            New Loan
+          </Button>
+        </div>
       </div>
 
       {loading ? (

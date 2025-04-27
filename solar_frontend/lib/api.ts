@@ -1272,11 +1272,8 @@ export const paymentApi = {
       return response.data;
     } catch (error: any) {
       console.error(`Error fetching payment plan for user ${userId}:`, error);
-      // Return default payment plan in case of error
-      return {
-        name: "Standard",
-        amount: 149.99
-      };
+      // Return null instead of dummy data to avoid confusion
+      return null;
     }
   },
 
@@ -1587,6 +1584,92 @@ export const paymentApi = {
       };
     }
   },
+
+  // Get payment history report
+  getPaymentHistoryReport: async (installationId: string, startDate?: string, endDate?: string, timestamp?: number) => {
+    try {
+      const params: any = {};
+      
+      if (startDate) params.startDate = startDate;
+      if (endDate) params.endDate = endDate;
+      if (timestamp) params._t = timestamp;
+      
+      const response = await apiClient.get(`/api/admin/payments/reports/history/${installationId}`, {
+        params,
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache'
+        }
+      });
+      return response.data;
+    } catch (error) {
+      console.error(`Error fetching payment history for installation ${installationId} report:`, error);
+      throw error;
+    }
+  },
+
+  // Get customer installation payments
+  getCustomerInstallationPayments: async (installationId: string, timestamp?: number) => {
+    try {
+      const params: any = {};
+      if (timestamp) params._t = timestamp;
+      
+      const response = await apiClient.get(`/api/admin/payments/installations/${installationId}`, {
+        params,
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache'
+        }
+      });
+      return response.data;
+    } catch (error) {
+      console.error(`Error fetching payments for installation ${installationId}:`, error);
+      throw error;
+    }
+  },
+
+  // Get payment plan report
+  getPaymentPlanReport: async (paymentPlanId: string, timestamp?: number) => {
+    try {
+      const params: any = {};
+      if (timestamp) params._t = timestamp;
+      
+      const response = await apiClient.get(`/api/admin/payments/reports/payment-plan/${paymentPlanId}`, {
+        params,
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache'
+        }
+      });
+      return response.data;
+    } catch (error) {
+      console.error(`Error fetching payment plan ${paymentPlanId} report:`, error);
+      throw error;
+    }
+  },
+
+  // Get payment plans by status report
+  getPaymentPlansByStatusReport: async (status: string, startDate?: string, endDate?: string, timestamp?: number) => {
+    try {
+      const params: any = {};
+      
+      if (startDate) params.startDate = startDate;
+      if (endDate) params.endDate = endDate;
+      if (timestamp) params._t = timestamp;
+      
+      const response = await apiClient.get(`/api/admin/payments/reports/payment-plans/status/${status}`, {
+        params,
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache'
+        }
+      });
+      return response.data;
+    } catch (error) {
+      console.error(`Error fetching payment plans by status ${status} report:`, error);
+      throw error;
+    }
+  },
 };
 
 // Payment Compliance API
@@ -1768,13 +1851,22 @@ export const paymentComplianceApi = {
   },
 
   // Get customer installation payments
-  getCustomerInstallationPayments: async (installationId: string) => {
+  getCustomerInstallationPayments: async (installationId: string, timestamp?: number) => {
     try {
-      const response = await apiClient.get(`/api/admin/payments/customers/${installationId}/payments`);
-      return response.data || [];
+      const params: any = {};
+      if (timestamp) params._t = timestamp;
+      
+      const response = await apiClient.get(`/api/admin/payments/installations/${installationId}`, {
+        params,
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache'
+        }
+      });
+      return response.data;
     } catch (error) {
       console.error(`Error fetching payments for installation ${installationId}:`, error);
-      return [];
+      throw error;
     }
   },
 
@@ -1810,10 +1902,20 @@ export const paymentComplianceApi = {
   },
 
   // Get payment plans by status report
-  getPaymentPlansByStatusReport: async (status: string, startDate: string, endDate: string) => {
+  getPaymentPlansByStatusReport: async (status: string, startDate: string, endDate: string, timestamp?: number) => {
     try {
+      const params: any = {};
+      
+      if (startDate) params.startDate = startDate;
+      if (endDate) params.endDate = endDate;
+      if (timestamp) params._t = timestamp;
+      
       const response = await apiClient.get(`/api/admin/payments/reports/payment-plans/status/${status}`, {
-        params: { startDate, endDate }
+        params,
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache'
+        }
       });
       return response.data;
     } catch (error) {
@@ -1823,9 +1925,18 @@ export const paymentComplianceApi = {
   },
 
   // Get payment plan report
-  getPaymentPlanReport: async (paymentPlanId: string) => {
+  getPaymentPlanReport: async (paymentPlanId: string, timestamp?: number) => {
     try {
-      const response = await apiClient.get(`/api/admin/payments/reports/payment-plan/${paymentPlanId}`);
+      const params: any = {};
+      if (timestamp) params._t = timestamp;
+      
+      const response = await apiClient.get(`/api/admin/payments/reports/payment-plan/${paymentPlanId}`, {
+        params,
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache'
+        }
+      });
       return response.data;
     } catch (error) {
       console.error(`Error fetching payment plan ${paymentPlanId} report:`, error);
@@ -1858,9 +1969,12 @@ export const paymentComplianceApi = {
   },
 
   // Get payment history report
-  getPaymentHistoryReport: async (installationId: string) => {
+  getPaymentHistoryReport: async (installationId: string, startDate?: string, endDate?: string) => {
     try {
-      const response = await apiClient.get(`/api/admin/payments/reports/history/${installationId}`);
+      const params = {};
+      if (startDate) params.startDate = startDate;
+      if (endDate) params.endDate = endDate;
+      const response = await apiClient.get(`/api/admin/payments/reports/history/${installationId}`, { params });
       return response.data;
     } catch (error) {
       console.error(`Error fetching payment history for installation ${installationId} report:`, error);

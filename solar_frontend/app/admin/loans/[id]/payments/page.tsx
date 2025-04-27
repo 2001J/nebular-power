@@ -10,7 +10,8 @@ import {
   Plus,
   Receipt,
   Loader2,
-  Download
+  Download,
+  RefreshCw
 } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -37,49 +38,163 @@ export default function LoanPaymentsPage({ params }: { params: PaymentParams }) 
   const [loan, setLoan] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [payments, setPayments] = useState<any[]>([])
+  const [refreshing, setRefreshing] = useState(false)
+  const [showOnlyPaid, setShowOnlyPaid] = useState(true)
+
+  // Function to fetch payments
+  const fetchPayments = async (installationId, timestamp) => {
+    try {
+      // First try direct payment history report approach
+      // Create date range - use a wide range to get all payments
+      const startDate = new Date();
+      startDate.setFullYear(startDate.getFullYear() - 5); // 5 years ago
+      const endDate = new Date();
+      endDate.setFullYear(endDate.getFullYear() + 5); // 5 years in future
+      
+      // Use the formatted dates for the API call
+      const formattedStartDate = startDate.toISOString().split('T')[0];
+      const formattedEndDate = endDate.toISOString().split('T')[0];
+      
+      // Get payment history with date range and timestamp
+      const paymentHistoryData = await paymentComplianceApi.getPaymentHistoryReport(
+        installationId, 
+        formattedStartDate,
+        formattedEndDate,
+        timestamp
+      );
+      
+      if (paymentHistoryData && Array.isArray(paymentHistoryData) && paymentHistoryData.length > 0) {
+        // Filter to only show payments for this specific payment plan if needed
+        const filteredPayments = paymentHistoryData.filter(payment => 
+          !payment.paymentPlanId || payment.paymentPlanId === parseInt(params.id)
+        );
+        
+        if (filteredPayments.length > 0) {
+          console.log("Found payments via paymentHistoryReport:", filteredPayments);
+          return filteredPayments;
+        }
+      }
+      
+      // Try alternate endpoint as fallback
+      const altPaymentData = await paymentComplianceApi.getCustomerInstallationPayments(installationId, timestamp);
+      if (altPaymentData && Array.isArray(altPaymentData) && altPaymentData.length > 0) {
+        // Filter to only show payments for this specific payment plan if needed
+        const filteredPayments = altPaymentData.filter(payment => 
+          !payment.paymentPlanId || payment.paymentPlanId === parseInt(params.id)
+        );
+        
+        if (filteredPayments.length > 0) {
+          console.log("Found payments via getCustomerInstallationPayments:", filteredPayments);
+          return filteredPayments;
+        }
+      }
+      
+      // Last resort: check if loan data itself has payments
+      const paymentPlanData = await paymentComplianceApi.getPaymentPlanReport(params.id, timestamp);
+      if (paymentPlanData && paymentPlanData.payments && Array.isArray(paymentPlanData.payments) && paymentPlanData.payments.length > 0) {
+        console.log("Found payments in payment plan data:", paymentPlanData.payments);
+        return paymentPlanData.payments;
+      }
+      
+      // If all methods failed, return empty array
+      return [];
+    } catch (error) {
+      console.error("Error fetching payments:", error);
+      return [];
+    }
+  };
+
+  // Refresh function to force reload of payment data
+  const refreshPaymentData = async () => {
+    try {
+      setRefreshing(true);
+      
+      if (!loan || !loan.installationId) {
+        toast({
+          title: "Error",
+          description: "Missing installation information. Cannot refresh payments.",
+          variant: "destructive",
+        });
+        setRefreshing(false);
+        return;
+      }
+      
+      const timestamp = new Date().getTime();
+      const refreshedPayments = await fetchPayments(loan.installationId, timestamp);
+      
+      if (refreshedPayments.length > 0) {
+        setPayments(refreshedPayments);
+        toast({
+          title: "Refreshed",
+          description: `Found ${refreshedPayments.length} payments`,
+        });
+      } else {
+        toast({
+          title: "No payments found",
+          description: "Could not find any payment records",
+          variant: "warning",
+        });
+      }
+    } catch (error) {
+      console.error("Error refreshing payment data:", error);
+      toast({
+        title: "Error",
+        description: "Failed to refresh payment data",
+        variant: "destructive",
+      });
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   // Fetch loan details
   useEffect(() => {
     const fetchLoanDetails = async () => {
       try {
-        setLoading(true)
+        setLoading(true);
         
-        // Get the payment plan details
-        const loanData = await paymentComplianceApi.getPaymentPlanReport(params.id)
+        // Get the payment plan details with timestamp to avoid caching
+        const timestamp = new Date().getTime();
+        const loanData = await paymentComplianceApi.getPaymentPlanReport(params.id, timestamp);
         
         if (loanData) {
-          setLoan(loanData)
+          setLoan(loanData);
           
-          // Try to get payments for the loan
-          try {
-            const paymentData = await paymentComplianceApi.getPaymentPlanReport(params.id)
-            if (paymentData && paymentData.payments) {
-              setPayments(paymentData.payments)
+          // Only try to fetch payments if we have an installation ID
+          if (loanData.installationId) {
+            const paymentData = await fetchPayments(loanData.installationId, timestamp);
+            setPayments(paymentData);
+          } else {
+            // Try to get payments directly from the loan data
+            if (loanData.payments && Array.isArray(loanData.payments) && loanData.payments.length > 0) {
+              setPayments(loanData.payments);
+            } else {
+              // Last try: get payments by ID only
+              const backupPaymentData = await fetchPayments(params.id, timestamp);
+              setPayments(backupPaymentData);
             }
-          } catch (error) {
-            console.error("Error fetching payment data:", error)
           }
         } else {
           toast({
             title: "Error",
             description: "Could not find loan details",
             variant: "destructive",
-          })
+          });
         }
       } catch (error) {
-        console.error("Error fetching loan details:", error)
+        console.error("Error fetching loan details:", error);
         toast({
           title: "Error",
           description: "Failed to load loan details",
           variant: "destructive",
-        })
+        });
       } finally {
-        setLoading(false)
+        setLoading(false);
       }
-    }
+    };
 
-    fetchLoanDetails()
-  }, [params.id])
+    fetchLoanDetails();
+  }, [params.id]);
 
   // Format status badge display
   const getStatusBadge = (status: string) => {
@@ -96,6 +211,11 @@ export default function LoanPaymentsPage({ params }: { params: PaymentParams }) 
         return <Badge variant="outline">{status}</Badge>
     }
   }
+
+  // Filter payments based on the showOnlyPaid state
+  const filteredPayments = showOnlyPaid 
+    ? payments.filter(payment => payment.status === "PAID")
+    : payments;
 
   if (loading) {
     return (
@@ -151,6 +271,16 @@ export default function LoanPaymentsPage({ params }: { params: PaymentParams }) 
         </div>
 
         <div className="flex gap-2">
+          <Button 
+            variant="outline" 
+            onClick={() => setShowOnlyPaid(!showOnlyPaid)}
+          >
+            {showOnlyPaid ? "Show All" : "Show Paid Only"}
+          </Button>
+          <Button variant="outline" onClick={refreshPaymentData} disabled={refreshing}>
+            {refreshing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />}
+            Refresh
+          </Button>
           <Button onClick={() => router.push(`/admin/loans/${params.id}/payments/new`)}>
             <Plus className="mr-2 h-4 w-4" />
             Record Payment
@@ -166,26 +296,61 @@ export default function LoanPaymentsPage({ params }: { params: PaymentParams }) 
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
-              <CardTitle>Payment Schedule</CardTitle>
-              <CardDescription>All payments for this loan</CardDescription>
+              <CardTitle>Payment History</CardTitle>
+              <CardDescription>
+                {showOnlyPaid ? "Showing paid payments only" : "All payments for this loan"}
+              </CardDescription>
             </div>
-            <Button variant="outline" size="sm">
-              <Download className="mr-2 h-4 w-4" />
-              Export
-            </Button>
+            <div className="flex gap-2">
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={() => setShowOnlyPaid(!showOnlyPaid)}
+              >
+                {showOnlyPaid ? "Show All" : "Show Paid Only"}
+              </Button>
+              <Button variant="outline" size="sm">
+                <Download className="mr-2 h-4 w-4" />
+                Export
+              </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent>
-          {payments.length === 0 ? (
+          {filteredPayments.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-8">
-              <p className="text-muted-foreground">No payment records found</p>
-              <Button 
-                variant="outline" 
-                className="mt-4"
-                onClick={() => router.push(`/admin/loans/${params.id}/payments/new`)}
-              >
-                Record Payment
-              </Button>
+              {payments.length > 0 && showOnlyPaid ? (
+                <>
+                  <p className="text-muted-foreground">No paid payments found</p>
+                  <Button 
+                    variant="outline" 
+                    className="mt-4"
+                    onClick={() => setShowOnlyPaid(false)}
+                  >
+                    Show All Payments
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <p className="text-muted-foreground">No payment records found</p>
+                  <div className="flex gap-2 mt-4">
+                    <Button 
+                      variant="outline" 
+                      onClick={refreshPaymentData}
+                      disabled={refreshing}
+                    >
+                      {refreshing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />}
+                      Refresh Data
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      onClick={() => router.push(`/admin/loans/${params.id}/payments/new`)}
+                    >
+                      Record Payment
+                    </Button>
+                  </div>
+                </>
+              )}
             </div>
           ) : (
             <Table>
@@ -200,7 +365,7 @@ export default function LoanPaymentsPage({ params }: { params: PaymentParams }) 
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {payments.map((payment) => (
+                {filteredPayments.map((payment) => (
                   <TableRow key={payment.id}>
                     <TableCell>#{payment.id}</TableCell>
                     <TableCell>

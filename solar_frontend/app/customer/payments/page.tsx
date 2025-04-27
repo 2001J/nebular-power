@@ -142,35 +142,19 @@ export default function PaymentsPage() {
               const customerPlan = await paymentApi.getCustomerPaymentPlan(user.id);
               console.log("Customer payment plan:", customerPlan);
               
+              // If we have a valid plan, use it, otherwise don't create dummy data
               if (customerPlan && (customerPlan.name || customerPlan.amount)) {
-                // Create a compatible plan object from the customer plan data
-                const formattedPlan = {
-                  id: customerPlan.id || 1,
-                  installationId: customerInstallations[0]?.id || 1,
-                  name: customerPlan.name || "Standard Plan",
-                  description: "",
-                  totalAmount: customerPlan.totalAmount || parseFloat(customerPlan.amount) * 24 || 0,
-                  remainingAmount: customerPlan.remainingAmount || parseFloat(customerPlan.amount) * 18 || 0,
-                  numberOfPayments: customerPlan.numberOfPayments || 24,
-                  totalInstallments: customerPlan.totalInstallments || 24,
-                  remainingInstallments: customerPlan.remainingInstallments || 18,
-                  installmentAmount: parseFloat(customerPlan.amount) || 0,
-                  monthlyPayment: parseFloat(customerPlan.amount) || 0,
-                  frequency: customerPlan.frequency || "MONTHLY",
-                  startDate: customerPlan.startDate || new Date().toISOString(),
-                  endDate: customerPlan.endDate || calculateEndDate(customerPlan.startDate, customerPlan.frequency || "MONTHLY", customerPlan.numberOfPayments || 24),
-                  status: customerPlan.status || "ACTIVE",
-                  interestRate: 0,
-                  lateFeeAmount: 0,
-                  gracePeriodDays: 0,
-                  nextPaymentDate: customerPlan.nextPaymentDate || "",
-                  createdAt: "",
-                  updatedAt: ""
-                };
-                
-                console.log("Created formatted plan:", formattedPlan);
-                setActiveLoan(formattedPlan);
-                setAllPaymentPlans([formattedPlan]);
+                setActiveLoan(customerPlan);
+                if (Array.isArray(customerPlan)) {
+                  setAllPaymentPlans(customerPlan);
+                } else {
+                  setAllPaymentPlans([customerPlan]);
+                }
+              } else {
+                // If no payment plan is found, set states to empty/null
+                setActiveLoan(null);
+                setAllPaymentPlans([]);
+                console.log("No payment plan found for this user");
               }
             }
           } catch (planError) {
@@ -853,6 +837,13 @@ const createPlanFromDashboard = (paymentDashboardData) => {
     return paymentDashboardData.activePlan;
   }
   
+  // If there's no significant data to create a plan, return null
+  if (!paymentDashboardData.totalAmount || 
+      (!paymentDashboardData.upcomingPayments && !paymentDashboardData.totalInstallments)) {
+    console.log("Insufficient data to create a payment plan", paymentDashboardData);
+    return null;
+  }
+
   // Calculate end date based on upcoming payments if available
   let endDate = paymentDashboardData.endDate || "";
   if (!endDate && paymentDashboardData.upcomingPayments && paymentDashboardData.upcomingPayments.length > 0) {
@@ -868,110 +859,60 @@ const createPlanFromDashboard = (paymentDashboardData) => {
     }
   }
   
-  // Determine the next payment date
-  let nextPaymentDate = null;
-  
-  // First check if dashboard has a nextPaymentDueDate
-  if (paymentDashboardData.nextPaymentDueDate) {
-    nextPaymentDate = paymentDashboardData.nextPaymentDueDate;
-  } 
-  // Then check if there are upcoming payments
-  else if (paymentDashboardData.upcomingPayments && paymentDashboardData.upcomingPayments.length > 0) {
+  // Determine next payment date
+  let nextPaymentDate = "";
+  if (paymentDashboardData.upcomingPayments && paymentDashboardData.upcomingPayments.length > 0) {
     // Sort upcoming payments by date (ascending)
-    const sortedUpcoming = [...paymentDashboardData.upcomingPayments].sort((a, b) => 
+    const sortedPayments = [...paymentDashboardData.upcomingPayments].sort((a, b) => 
       new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime()
     );
     
-    // Use the earliest upcoming payment as the next payment date
-    nextPaymentDate = sortedUpcoming[0].dueDate;
-  }
-  // If still no next payment date but we have recent payments and there's remaining amount
-  else if (paymentDashboardData.recentPayments && 
-          paymentDashboardData.recentPayments.length > 0 && 
-          paymentDashboardData.remainingAmount > 0) {
+    // Use the first upcoming payment date
+    const nextPayment = sortedPayments[0];
+    if (nextPayment && nextPayment.dueDate) {
+      nextPaymentDate = nextPayment.dueDate;
+    }
+  } else if (paymentDashboardData.recentPayments && paymentDashboardData.recentPayments.length > 0) {
+    // If no upcoming payments, try to infer from recent payments + frequency
+    // This is a fallback and may not be accurate
+    const mostRecent = [...paymentDashboardData.recentPayments].sort((a, b) => 
+      new Date(b.date).getTime() - new Date(a.date).getTime()
+    )[0];
     
-    // Find the most recent paid payment
-    const sortedRecent = [...paymentDashboardData.recentPayments]
-      .filter(p => p.status === 'PAID')
-      .sort((a, b) => new Date(b.dueDate).getTime() - new Date(a.dueDate).getTime());
-    
-    if (sortedRecent.length > 0) {
-      // Calculate the next payment date based on frequency and the last paid payment
-      const lastPaidDate = new Date(sortedRecent[0].dueDate);
-      const frequency = paymentDashboardData.frequency || 'MONTHLY';
-      
-      // Add the appropriate time based on frequency
-      const nextDate = new Date(lastPaidDate);
-      switch (frequency) {
-        case 'WEEKLY':
-          nextDate.setDate(nextDate.getDate() + 7);
-          break;
-        case 'BI_WEEKLY':
-        case 'BIWEEKLY':
-          nextDate.setDate(nextDate.getDate() + 14);
-          break;
-        case 'MONTHLY':
-          nextDate.setMonth(nextDate.getMonth() + 1);
-          break;
-        case 'QUARTERLY':
-          nextDate.setMonth(nextDate.getMonth() + 3);
-          break;
-        case 'SEMI_ANNUALLY':
-        case 'SEMIANNUALLY':
-          nextDate.setMonth(nextDate.getMonth() + 6);
-          break;
-        case 'ANNUALLY':
-          nextDate.setFullYear(nextDate.getFullYear() + 1);
-          break;
-        default:
-          // Default to monthly
-          nextDate.setMonth(nextDate.getMonth() + 1);
-      }
-      
-      nextPaymentDate = nextDate.toISOString();
+    if (mostRecent && mostRecent.date && paymentDashboardData.frequency) {
+      const lastDate = new Date(mostRecent.date);
+      // Add frequency days to last payment date
+      lastDate.setDate(lastDate.getDate() + parseInt(paymentDashboardData.frequency, 10));
+      nextPaymentDate = lastDate.toISOString().split('T')[0];
     }
   }
   
-  // If we couldn't determine end date from payments, calculate it based on frequency and number of payments
-  if (!endDate && nextPaymentDate && paymentDashboardData.totalInstallments) {
-    const startDate = new Date(nextPaymentDate);
-    const remainingInstallments = paymentDashboardData.remainingInstallments || 
-                                  (paymentDashboardData.totalInstallments - paymentDashboardData.completedInstallments) || 
-                                  1;
-    const monthsToAdd = remainingInstallments - 1; // Subtract 1 because we start from next payment
-    const calculatedEndDate = new Date(startDate);
-    calculatedEndDate.setMonth(calculatedEndDate.getMonth() + monthsToAdd);
-    endDate = calculatedEndDate.toISOString();
+  // If we couldn't determine a next payment date, return null instead of creating an incomplete plan
+  if (!nextPaymentDate) {
+    console.log("Unable to determine next payment date, cannot create plan");
+    return null;
   }
-  
-  // Create a payment plan from dashboard data
+
   return {
-    id: paymentDashboardData.paymentPlanId || 1,
-    installationId: paymentDashboardData.installationId || customerInstallations[0]?.id || 1,
-    name: "Solar Payment Plan",
-    description: "Payment plan for your solar installation",
+    id: paymentDashboardData.id || `plan-${Math.random().toString(36).substring(2, 11)}`,
+    installationId: paymentDashboardData.installationId || "",
+    name: paymentDashboardData.name || "Payment Plan",
     totalAmount: paymentDashboardData.totalAmount || 0,
-    remainingAmount: paymentDashboardData.remainingAmount || 0,
-    numberOfPayments: paymentDashboardData.totalInstallments || 
-                     (paymentDashboardData.upcomingPayments?.length + paymentDashboardData.completedInstallments) || 0,
+    amountPaid: paymentDashboardData.amountPaid || 0,
+    remainingAmount: paymentDashboardData.remainingAmount || (paymentDashboardData.totalAmount - (paymentDashboardData.amountPaid || 0)),
+    status: paymentDashboardData.status || "Active",
+    frequency: paymentDashboardData.frequency || "30", // Default to monthly
+    startDate: paymentDashboardData.startDate || "",
+    endDate: endDate,
+    nextPaymentDate: nextPaymentDate,
+    nextPaymentAmount: paymentDashboardData.nextPaymentAmount || 
+                     (paymentDashboardData.upcomingPayments && paymentDashboardData.upcomingPayments.length > 0 
+                      ? paymentDashboardData.upcomingPayments[0].amount : 0),
     totalInstallments: paymentDashboardData.totalInstallments || 0,
+    paidInstallments: paymentDashboardData.paidInstallments || 0,
     remainingInstallments: paymentDashboardData.remainingInstallments || 0,
-    installmentAmount: paymentDashboardData.installmentAmount || paymentDashboardData.nextPaymentAmount || 0,
-    monthlyPayment: paymentDashboardData.installmentAmount || paymentDashboardData.nextPaymentAmount || 0,
-    frequency: paymentDashboardData.frequency || "MONTHLY",
-    startDate: paymentDashboardData.startDate || paymentDashboardData.nextPaymentDueDate || new Date().toISOString(),
-    endDate: endDate || calculateEndDate(nextPaymentDate || new Date().toISOString(), 
-                                         paymentDashboardData.frequency || "MONTHLY", 
-                                         paymentDashboardData.remainingInstallments || 
-                                         (paymentDashboardData.totalInstallments - paymentDashboardData.completedInstallments) || 
-                                         1),
-    status: "ACTIVE",
-    interestRate: 0,
-    lateFeeAmount: 0,
-    gracePeriodDays: 0,
-    nextPaymentDate: nextPaymentDate || new Date(new Date().setMonth(new Date().getMonth() + 1)).toISOString(),
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString()
+    createdAt: paymentDashboardData.createdAt || new Date().toISOString(),
+    updatedAt: paymentDashboardData.updatedAt || new Date().toISOString(),
   };
 };
 
