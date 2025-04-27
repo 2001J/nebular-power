@@ -1,520 +1,907 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from "react"
-import { ArrowUpDown, Calendar, CreditCard, Download, MoreHorizontal, Search, AlertCircle, Clock } from "lucide-react"
+import { useState, useEffect } from "react";
+import { useAuth } from "@/components/auth-provider";
+import { paymentApi, installationApi } from "@/lib/api";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import PaymentDialog from "./payment-dialog";
+import { 
+  AlertCircle, 
+  ArrowLeft,
+  CreditCard,
+  Home, 
+  Receipt,
+  Wallet,
+} from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Progress } from "@/components/ui/progress";
+import { Separator } from "@/components/ui/separator";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { useRouter } from "next/navigation";
+import { format } from "date-fns";
 
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { Badge } from "@/components/ui/badge"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert"
-import { Progress } from "@/components/ui/progress"
-import { toast } from "@/components/ui/use-toast"
-import { format, parseISO } from "date-fns"
-import { useAuth } from "@/hooks/auth"
-import { paymentApi, serviceControlApi } from "@/lib/api"
+// Interface for payment plan
+interface PaymentPlan {
+  id: number;
+  installationId: number;
+  name: string;
+  description: string;
+  totalAmount: number;
+  remainingAmount: number;
+  numberOfPayments: number;
+  totalInstallments: number;
+  remainingInstallments: number;
+  installmentAmount: number;
+  monthlyPayment: number;
+  frequency: string;
+  startDate: string;
+  endDate: string;
+  status: string;
+  interestRate: number;
+  lateFeeAmount: number;
+  gracePeriodDays: number;
+  nextPaymentDate: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// Interface for payments
+interface Payment {
+  id: number;
+  dueDate: string;
+  amount: number;
+  status: string;
+  paymentMethod?: string;
+  paymentDate?: string;
+  installationId?: number;
+  description?: string;
+}
+
+// Interface for installation
+interface Installation {
+  id: number;
+  name: string;
+  address?: string;
+  status?: string;
+}
+
+// Interface for payment dashboard data
+interface PaymentDashboard {
+  nextPaymentDueDate: string;
+  nextPaymentAmount: number;
+  paymentHistory: Payment[];
+  upcomingPayments: Payment[];
+  activePlan?: PaymentPlan;
+  totalPaid: number;
+  remainingBalance: number;
+  paymentStatus: string;
+}
 
 export default function PaymentsPage() {
-  const { user } = useAuth()
-  const [searchTerm, setSearchTerm] = useState("")
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
+  const router = useRouter();
+  const { user } = useAuth();
+  const [activeLoan, setActiveLoan] = useState<PaymentPlan | null>(null);
+  const [paymentHistory, setPaymentHistory] = useState<Payment[]>([]);
+  const [upcomingPayments, setUpcomingPayments] = useState<Payment[]>([]);
+  const [installations, setInstallations] = useState<Installation[]>([]);
+  const [allPaymentPlans, setAllPaymentPlans] = useState<PaymentPlan[]>([]);
+  const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
+  const [selectedPayment, setSelectedPayment] = useState(null);
+  const [selectedInstallation, setSelectedInstallation] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [loadingPayments, setLoadingPayments] = useState(true);
+  const [dashboardData, setDashboardData] = useState<PaymentDashboard | null>(null);
 
-  // Payment data
-  const [paymentHistory, setPaymentHistory] = useState([])
-  const [upcomingPayments, setUpcomingPayments] = useState([])
-  const [paymentMethod, setPaymentMethod] = useState({ type: "Credit Card", lastFour: "4242", expiry: "12/2025" })
-  const [paymentPlan, setPaymentPlan] = useState({ name: "Standard", amount: 149.99 })
-  const [totalPaid, setTotalPaid] = useState(0)
-
-  // Service status
-  const [serviceStatus, setServiceStatus] = useState(null)
-  const [gracePeriod, setGracePeriod] = useState(7)
-  const [daysUntilSuspension, setDaysUntilSuspension] = useState(null)
-  const [hasOverduePayments, setHasOverduePayments] = useState(false)
-
-  // Fetch payment data
   useEffect(() => {
-    const fetchData = async () => {
-      if (!user) return
-
+    if (!user) return;
+    
+    const fetchPaymentData = async () => {
+      setLoading(true);
       try {
-        setLoading(true)
-        setError(null)
-
-        // Fetch payment history
-        const historyResponse = await paymentApi.getPaymentHistory()
-        setPaymentHistory(historyResponse.content || [])
-
-        // Calculate total paid
-        const total = historyResponse.content?.reduce((sum, payment) => {
-          return payment.status === "PAID" ? sum + payment.amount : sum
-        }, 0) || 0
-        setTotalPaid(total)
-
-        // Fetch upcoming payments
-        const upcomingResponse = await paymentApi.getUpcomingPayments()
-        setUpcomingPayments(upcomingResponse.content || [])
-
-        // Fetch payment dashboard data
-        try {
-          const dashboardResponse = await paymentApi.getPaymentDashboard()
-          if (dashboardResponse) {
-            // If dashboard data includes payment method and plan, use it
-            if (dashboardResponse.paymentMethod) {
-              setPaymentMethod(dashboardResponse.paymentMethod)
-            }
-            if (dashboardResponse.paymentPlan) {
-              setPaymentPlan(dashboardResponse.paymentPlan)
-            }
-          }
-        } catch (err) {
-          console.error("Error fetching payment dashboard:", err)
-
-          // Fall back to separate API calls for payment methods and plan
-          try {
-            const paymentMethodResponse = await paymentApi.getCustomerPaymentMethods(user.id)
-            if (paymentMethodResponse.defaultMethod) {
-              setPaymentMethod(paymentMethodResponse.defaultMethod)
-            }
-          } catch (methodErr) {
-            console.error("Error fetching payment methods:", methodErr)
-          }
-
-          try {
-            const paymentPlanResponse = await paymentApi.getCustomerPaymentPlan(user.id)
-            if (paymentPlanResponse) {
-              setPaymentPlan(paymentPlanResponse)
-            }
-          } catch (planErr) {
-            console.error("Error fetching payment plan:", planErr)
-          }
+        // Fetch installations 
+        const installationsRes = await installationApi.getCustomerInstallations(user.id);
+        const customerInstallations = Array.isArray(installationsRes) ? installationsRes : [];
+        setInstallations(customerInstallations);
+        
+        if (customerInstallations.length === 0) {
+          console.log("No installations found for user");
+          setLoading(false);
+          return;
         }
-
-        // Fetch service status for all user installations
-        try {
-          const installationsResponse = await serviceControlApi.getStatusesByUserId(user.id)
-          if (installationsResponse && installationsResponse.length > 0) {
-            const primaryInstallation = installationsResponse[0]
-            setServiceStatus(primaryInstallation)
-
-            // If service is suspended for payment, check details
-            if (primaryInstallation.status === "SUSPENDED_PAYMENT") {
-              setHasOverduePayments(true)
+        
+        // Fetch payment dashboard data - this is a customer-accessible endpoint
+        console.log("Fetching payment dashboard data...");
+        const paymentDashboardData = await paymentApi.getPaymentDashboard();
+        console.log("Dashboard data:", paymentDashboardData);
+        setDashboardData(paymentDashboardData);
+        
+        // If dashboard has all needed data, create a complete payment plan
+        if (paymentDashboardData && paymentDashboardData.totalAmount && paymentDashboardData.remainingAmount) {
+          console.log("Creating payment plan from dashboard data");
+          const planFromDashboard = createPlanFromDashboard(paymentDashboardData);
+          console.log("Created plan from dashboard:", planFromDashboard);
+          setActiveLoan(planFromDashboard);
+          setAllPaymentPlans([planFromDashboard]);
+        } 
+        // Otherwise try to directly fetch the payment plan
+        else {
+          console.log("No complete dashboard data, fetching payment plan directly...");
+          try {
+            // First try getting a payment plan directly
+            const plansResponse = await paymentApi.getCustomerPaymentPlan(customerInstallations[0]?.id);
+            if (Array.isArray(plansResponse) && plansResponse.length > 0) {
+              console.log("Found payment plans:", plansResponse);
+              const activePlan = plansResponse.find(plan => plan.status === "ACTIVE") || plansResponse[0];
+              setActiveLoan(activePlan);
+              setAllPaymentPlans(plansResponse);
             } else {
-              // Check if there are overdue payments
-              const installation = primaryInstallation.installation.id
-              const overdueCheck = await serviceControlApi.hasOverduePayments(installation)
-              setHasOverduePayments(overdueCheck)
-
-              if (overdueCheck) {
-                // Get days until suspension
-                const daysResponse = await serviceControlApi.getDaysUntilSuspension(installation)
-                setDaysUntilSuspension(daysResponse)
-
-                // Get grace period
-                const gracePeriodResponse = await serviceControlApi.getGracePeriod(installation)
-                setGracePeriod(gracePeriodResponse)
+              // Fallback to simplified customer payment plan
+              const customerPlan = await paymentApi.getCustomerPaymentPlan(user.id);
+              console.log("Customer payment plan:", customerPlan);
+              
+              if (customerPlan && (customerPlan.name || customerPlan.amount)) {
+                // Create a compatible plan object from the customer plan data
+                const formattedPlan = {
+                  id: customerPlan.id || 1,
+                  installationId: customerInstallations[0]?.id || 1,
+                  name: customerPlan.name || "Standard Plan",
+                  description: "",
+                  totalAmount: customerPlan.totalAmount || parseFloat(customerPlan.amount) * 24 || 0,
+                  remainingAmount: customerPlan.remainingAmount || parseFloat(customerPlan.amount) * 18 || 0,
+                  numberOfPayments: customerPlan.numberOfPayments || 24,
+                  totalInstallments: customerPlan.totalInstallments || 24,
+                  remainingInstallments: customerPlan.remainingInstallments || 18,
+                  installmentAmount: parseFloat(customerPlan.amount) || 0,
+                  monthlyPayment: parseFloat(customerPlan.amount) || 0,
+                  frequency: customerPlan.frequency || "MONTHLY",
+                  startDate: customerPlan.startDate || new Date().toISOString(),
+                  endDate: customerPlan.endDate || calculateEndDate(customerPlan.startDate, customerPlan.frequency || "MONTHLY", customerPlan.numberOfPayments || 24),
+                  status: customerPlan.status || "ACTIVE",
+                  interestRate: 0,
+                  lateFeeAmount: 0,
+                  gracePeriodDays: 0,
+                  nextPaymentDate: customerPlan.nextPaymentDate || "",
+                  createdAt: "",
+                  updatedAt: ""
+                };
+                
+                console.log("Created formatted plan:", formattedPlan);
+                setActiveLoan(formattedPlan);
+                setAllPaymentPlans([formattedPlan]);
               }
             }
+          } catch (planError) {
+            console.error("Error fetching payment plan details:", planError);
           }
-        } catch (err) {
-          console.error("Error fetching service status:", err)
         }
-
+        
+        // Use upcoming payments from dashboard data or fetch them
+        let upcomingPaymentsData = [];
+        let paymentHistoryData = [];
+        
+        if (paymentDashboardData?.upcomingPayments && paymentDashboardData.upcomingPayments.length > 0) {
+          console.log("Using upcoming payments from dashboard data");
+          upcomingPaymentsData = paymentDashboardData.upcomingPayments;
+        }
+        
+        if (paymentDashboardData?.recentPayments && paymentDashboardData.recentPayments.length > 0) {
+          console.log("Using recent payments from dashboard data");
+          paymentHistoryData = paymentDashboardData.recentPayments;
+        }
+        
+        // If we don't have payments in dashboard data, fetch them separately
+        if (upcomingPaymentsData.length === 0 || paymentHistoryData.length === 0) {
+          console.log("Fetching payment history and upcoming payments separately...");
+          try {
+            const [historyRes, upcomingRes] = await Promise.all([
+              paymentApi.getPaymentHistory(),
+              paymentApi.getUpcomingPayments()
+            ]);
+            
+            console.log("Payment history from API:", historyRes);
+            console.log("Upcoming payments from API:", upcomingRes);
+            
+            if (upcomingPaymentsData.length === 0 && upcomingRes?.content) {
+              upcomingPaymentsData = upcomingRes.content;
+            }
+            
+            if (paymentHistoryData.length === 0 && historyRes?.content) {
+              paymentHistoryData = historyRes.content;
+            }
+          } catch (error) {
+            console.error("Error fetching payments separately:", error);
+          }
+        }
+        
+        setUpcomingPayments(upcomingPaymentsData);
+        setPaymentHistory(paymentHistoryData);
+        setLoadingPayments(false);
+        
+        setError(null);
       } catch (err) {
-        console.error("Error fetching payment data:", err)
-        setError("Failed to load payment information. Please try again later.")
-        toast({
-          title: "Error",
-          description: "Failed to load payment information",
-          variant: "destructive",
-        })
+        console.error("Error fetching payment data:", err);
+        setError("Failed to load payment information. Please try again later.");
       } finally {
-        setLoading(false)
+        setLoading(false);
       }
-    }
+    };
 
-    fetchData()
-  }, [user])
+    fetchPaymentData();
+  }, [user]);
 
-  // Filter payments based on search
-  const filteredPayments = paymentHistory.filter(
-    (payment) =>
-      payment.invoiceNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      payment.date?.includes(searchTerm)
-  )
+  const handleOpenPaymentDialog = (payment = null, installationId = null) => {
+    setSelectedPayment(payment);
+    setSelectedInstallation(installationId);
+    setIsPaymentDialogOpen(true);
+  };
 
-  // Format currency
-  const formatCurrency = (amount) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-    }).format(amount)
-  }
-
-  // Format date
-  const formatDate = (dateString) => {
+  const handlePaymentSuccess = async () => {
+    // Refresh payment data after successful payment
+    if (!user) return;
+    
     try {
-      return format(new Date(dateString), "MMM d, yyyy")
-    } catch (e) {
-      return dateString
+      // Refresh using customer endpoints
+      const [historyRes, upcomingRes, dashboardData] = await Promise.all([
+        paymentApi.getPaymentHistory(),
+        paymentApi.getUpcomingPayments(),
+        paymentApi.getPaymentDashboard()
+      ]);
+      
+      // Fix - Check and handle array vs object structure for consistent state updates
+      const historyContent = historyRes?.content || historyRes || [];
+      const upcomingContent = upcomingRes?.content || upcomingRes || [];
+      
+      // Update all relevant state variables properly
+      setPaymentHistory(Array.isArray(historyContent) ? historyContent : []);
+      setUpcomingPayments(Array.isArray(upcomingContent) ? upcomingContent : []);
+      setDashboardData(dashboardData);
+      setLoadingPayments(false); // Ensure loading indicator is off
+      
+      // Update active loan if provided in dashboard
+      if (dashboardData?.activePlan) {
+        setActiveLoan(dashboardData.activePlan);
+      } else if (dashboardData) {
+        // If we don't have an active plan but have dashboard data,
+        // create a plan from the dashboard data
+        const planFromDashboard = createPlanFromDashboard(dashboardData);
+        if (planFromDashboard) {
+          setActiveLoan(planFromDashboard);
+          setAllPaymentPlans([planFromDashboard]);
+        }
+      }
+      
+      console.log("Payment data refreshed successfully:", {
+        history: Array.isArray(historyContent) ? historyContent.length : 0,
+        upcoming: Array.isArray(upcomingContent) ? upcomingContent.length : 0
+      });
+      
+    } catch (err) {
+      console.error("Error refreshing payment data:", err);
+      // Even on error, ensure we don't show loading state
+      setLoadingPayments(false);
     }
-  }
+  };
 
-  // Get status badge
+  const downloadReceipt = async (paymentId) => {
+    try {
+      // Use customer endpoint to get receipt
+      const receipt = await paymentApi.getPaymentReceipt(paymentId);
+      // Create a blob and download link
+      const blob = new Blob([JSON.stringify(receipt)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `receipt-${paymentId}.json`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (err) {
+      console.error("Error downloading receipt:", err);
+    }
+  };
+
   const getStatusBadge = (status) => {
-    switch (status) {
+    const statusUpper = status?.toUpperCase();
+    switch (statusUpper) {
       case "PAID":
-        return <Badge variant="success">Paid</Badge>
+        return <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">Paid</Badge>;
       case "PENDING":
-        return <Badge variant="outline">Pending</Badge>
+        return <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">Pending</Badge>;
       case "OVERDUE":
-        return <Badge variant="destructive">Overdue</Badge>
-      case "FAILED":
-        return <Badge variant="destructive">Failed</Badge>
-      default:
-        return <Badge variant="secondary">{status}</Badge>
-    }
-  }
-
-  // Get service status badge
-  const getServiceStatusBadge = () => {
-    if (!serviceStatus) return null
-
-    switch (serviceStatus.status) {
+        return <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">Overdue</Badge>;
+      case "SCHEDULED":
+        return <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">Scheduled</Badge>;
       case "ACTIVE":
-        return <Badge variant="success">Active</Badge>
-      case "SUSPENDED_PAYMENT":
-        return <Badge variant="destructive">Suspended (Payment)</Badge>
-      case "SUSPENDED_SECURITY":
-        return <Badge variant="destructive">Suspended (Security)</Badge>
-      case "SUSPENDED_MAINTENANCE":
-        return <Badge variant="outline">Suspended (Maintenance)</Badge>
+        return <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">Active</Badge>;
+      case "CURRENT":
+        return <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">Current</Badge>;
       default:
-        return <Badge variant="secondary">{serviceStatus.status}</Badge>
+        return <Badge variant="outline">{status}</Badge>;
     }
-  }
+  };
+  
+  const getInstallationById = (id) => {
+    return installations.find(installation => installation.id === id) || { name: `Installation #${id}`, id };
+  };
+  
+  // Format frequency display
+  const formatFrequency = (frequency) => {
+    switch (frequency) {
+      case "WEEKLY":
+        return "Weekly";
+      case "MONTHLY":
+        return "Monthly";
+      case "QUARTERLY":
+        return "Quarterly";
+      case "SEMI_ANNUALLY":
+        return "Semi-Annually";
+      case "ANNUALLY":
+        return "Annually";
+      default:
+        return frequency || "Monthly";
+    }
+  };
+
+  // Calculate progress percentage
+  const getProgressPercentage = (loan) => {
+    if (!loan) return 0;
+    
+    // Handle edge case to avoid division by zero
+    if (loan.totalAmount === 0) return 100;
+    
+    return 100 - Math.round((loan.remainingAmount / loan.totalAmount) * 100);
+  };
+
+  // Switch active loan
+  const handleSwitchLoan = (loanId) => {
+    // Since we're using customer endpoints only and might not have multiple loan plans
+    // this function may be simplified or less needed
+    const loan = allPaymentPlans.find(plan => plan.id === loanId);
+    if (loan) {
+      setActiveLoan(loan);
+    }
+  };
 
   if (loading) {
     return (
-      <div className="flex flex-col gap-6">
-        <div className="flex flex-col gap-2">
-          <h1 className="text-3xl font-bold tracking-tight">Payments</h1>
-          <p className="text-muted-foreground">Loading payment information...</p>
-        </div>
-        <div className="flex items-center justify-center p-8">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent"></div>
+      <div className="container mx-auto p-6 mt-4">
+        <h1 className="text-2xl font-bold mb-6">Loan & Payment Management</h1>
+        <div className="flex items-center justify-center h-64">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-700"></div>
         </div>
       </div>
-    )
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="container mx-auto p-6 mt-4">
+        <h1 className="text-2xl font-bold mb-6">Loan & Payment Management</h1>
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Error</AlertTitle>
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
+
+  // No active loans condition - improved check to ensure we correctly identify when there's no active loan
+  if ((!activeLoan || 
+      (activeLoan && (!activeLoan.installmentAmount || activeLoan.installmentAmount === 0))) && 
+     (!dashboardData || !dashboardData.activePlan) && 
+     allPaymentPlans.length === 0 && 
+     !loading) {
+    return (
+      <div className="container mx-auto p-6 mt-4">
+        <h1 className="text-2xl font-bold mb-6">Loan & Payment Management</h1>
+        <Card>
+          <CardHeader>
+            <CardTitle>No Active Loan Plans</CardTitle>
+            <CardDescription>You don't have any active payment plans for your solar installations</CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-col items-center justify-center p-6">
+            <Home className="h-16 w-16 text-gray-300 mb-4" />
+            <p className="text-center text-gray-500 mb-4">
+              There are no active payment plans associated with your installations.
+            </p>
+            {upcomingPayments.length > 0 && (
+              <Alert className="mb-4">
+                <AlertCircle className="h-4 w-4" />
+                <AlertTitle>You have upcoming payments</AlertTitle>
+                <AlertDescription>
+                  Although no payment plan is found, you have {upcomingPayments.length} upcoming payments.
+                </AlertDescription>
+              </Alert>
+            )}
+            <div className="space-y-2">
+              <Button variant="outline" onClick={() => router.push('/customer')}>
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                Return to Dashboard
+              </Button>
+              {installations.length > 0 && (
+                <Button 
+                  variant="default" 
+                  className="ml-2"
+                  onClick={() => handleOpenPaymentDialog(null, installations[0]?.id)}
+                >
+                  <Wallet className="mr-2 h-4 w-4" />
+                  Make a Payment
+                </Button>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Use the active loan from the dashboard data if available, or use data from upcoming payments
+  const loanToDisplay = activeLoan || dashboardData?.activePlan;
+  
+  // If we have upcoming payments but no loan details, create a minimal plan to display
+  if (!loanToDisplay && upcomingPayments.length > 0 && installations.length > 0) {
+    // Calculate total amount from upcoming payments
+    const totalAmount = upcomingPayments.reduce((sum, payment) => sum + payment.amount, 0);
+    const nextPayment = upcomingPayments[0];
+    
+    const minimalPlan = {
+      id: 1,
+      installationId: nextPayment.installationId || installations[0]?.id || 1,
+      name: "Payment Plan",
+      description: "Based on your upcoming payments",
+      totalAmount: totalAmount,
+      remainingAmount: totalAmount,
+      numberOfPayments: upcomingPayments.length,
+      totalInstallments: upcomingPayments.length,
+      remainingInstallments: upcomingPayments.length,
+      installmentAmount: nextPayment.amount || 0,
+      monthlyPayment: nextPayment.amount || 0,
+      frequency: "MONTHLY",
+      startDate: nextPayment.dueDate || new Date().toISOString(),
+      endDate: upcomingPayments[upcomingPayments.length - 1]?.dueDate || "",
+      status: "ACTIVE",
+      interestRate: 0,
+      lateFeeAmount: 0,
+      gracePeriodDays: 0,
+      nextPaymentDate: nextPayment.dueDate || "",
+      createdAt: "",
+      updatedAt: ""
+    };
+    
+    // Update state to use this minimal plan
+    if (!activeLoan) {
+      setActiveLoan(minimalPlan);
+      setAllPaymentPlans([minimalPlan]);
+    }
   }
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-2">
-        <h1 className="text-3xl font-bold tracking-tight">Payments</h1>
-        <p className="text-muted-foreground">Manage your payment history and upcoming payments.</p>
-      </div>
-
-      {/* Service status warning */}
-      {serviceStatus?.status === "SUSPENDED_PAYMENT" && (
-        <Alert variant="destructive" className="mb-4">
-          <AlertCircle className="h-4 w-4" />
-          <AlertTitle>Service Suspended</AlertTitle>
-          <AlertDescription>
-            Your solar service has been suspended due to overdue payments. Please make a payment to restore your service immediately.
-          </AlertDescription>
-          <Button variant="destructive" className="mt-2" size="sm" asChild>
-            <a href="#pay-now">Pay Now</a>
+    <div className="container mx-auto p-6 mt-4">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+        <div>
+          <h1 className="text-2xl font-bold">Loan Details</h1>
+          <p className="text-muted-foreground">
+            {loanToDisplay ? `${loanToDisplay.name || `Loan #${loanToDisplay.id}`}` : "Payment Overview"}
+          </p>
+        </div>
+        
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" onClick={() => handleOpenPaymentDialog()}>
+            <Wallet className="mr-2 h-4 w-4" />
+            Make a Payment
           </Button>
-        </Alert>
-      )}
-
-      {/* Grace period warning */}
-      {hasOverduePayments && serviceStatus?.status !== "SUSPENDED_PAYMENT" && daysUntilSuspension !== null && (
-        <Alert variant="warning" className="mb-4 border-amber-500 text-amber-800">
-          <Clock className="h-4 w-4" />
-          <AlertTitle>Payment Overdue</AlertTitle>
-          <AlertDescription>
-            <p>Your payment is overdue. Service will be automatically suspended in {daysUntilSuspension} days if payment is not received.</p>
-            <div className="mt-2">
-              <div className="flex items-center justify-between mb-1 text-xs">
-                <span>Grace Period</span>
-                <span>{daysUntilSuspension} of {gracePeriod} days remaining</span>
-              </div>
-              <Progress value={(gracePeriod - daysUntilSuspension) / gracePeriod * 100} className="h-2" />
+          
+          {allPaymentPlans.length > 1 && (
+            <div className="relative">
+              <select 
+                className="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50"
+                value={loanToDisplay?.id || ""}
+                onChange={(e) => handleSwitchLoan(Number(e.target.value))}
+              >
+                {allPaymentPlans.map(plan => (
+                  <option key={plan.id} value={plan.id}>
+                    {plan.name || `Loan #${plan.id}`}
+                  </option>
+                ))}
+              </select>
             </div>
-          </AlertDescription>
-          <Button variant="outline" className="mt-2" size="sm" asChild>
-            <a href="#pay-now">Pay Now</a>
-          </Button>
-        </Alert>
-      )}
-
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Next Payment</CardTitle>
-            <Calendar className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {upcomingPayments.length > 0
-                ? formatCurrency(upcomingPayments[0].amount)
-                : formatCurrency(paymentPlan.amount)}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Due on {upcomingPayments.length > 0
-                ? formatDate(upcomingPayments[0].dueDate)
-                : "N/A"}
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Payment Method</CardTitle>
-            <CreditCard className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{paymentMethod.type} ****{paymentMethod.lastFour}</div>
-            <p className="text-xs text-muted-foreground">Expires {paymentMethod.expiry}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Monthly Plan</CardTitle>
-            <Calendar className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{paymentPlan.name}</div>
-            <p className="text-xs text-muted-foreground">{formatCurrency(paymentPlan.amount)}/month</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Service Status</CardTitle>
-            <AlertCircle className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{getServiceStatusBadge()}</div>
-            <p className="text-xs text-muted-foreground">
-              {serviceStatus?.status === "ACTIVE"
-                ? "Your service is active"
-                : serviceStatus?.statusReason || "Status information"}
-            </p>
-          </CardContent>
-        </Card>
+          )}
+        </div>
       </div>
+      
+      {loanToDisplay && (
+        <div className="flex flex-col gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium">Total Amount</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">${loanToDisplay.totalAmount?.toLocaleString() || 0}</div>
+                <div className="mt-2">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-sm font-medium">Repayment Progress</span>
+                    <span className="text-sm font-medium">{getProgressPercentage(loanToDisplay)}%</span>
+                  </div>
+                  <Progress value={getProgressPercentage(loanToDisplay)} className="h-2" />
+                </div>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium">Monthly Payment</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">${loanToDisplay.monthlyPayment?.toLocaleString() || loanToDisplay.installmentAmount?.toLocaleString() || 0}</div>
+                <p className="text-xs text-muted-foreground">
+                  {formatFrequency(loanToDisplay.frequency)} installments
+                </p>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium">Remaining Balance</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">${loanToDisplay.remainingAmount?.toLocaleString() || 0}</div>
+                <p className="text-xs text-muted-foreground">
+                  {loanToDisplay.totalAmount > 0 ? Math.round((loanToDisplay.remainingAmount / loanToDisplay.totalAmount) * 100) : 0}% of total loan
+                </p>
+              </CardContent>
+            </Card>
+          </div>
 
-      <Tabs defaultValue="history" className="w-full">
-        <TabsList>
-          <TabsTrigger value="history">Payment History</TabsTrigger>
-          <TabsTrigger value="upcoming">Upcoming Payments</TabsTrigger>
-        </TabsList>
-        <TabsContent value="history" className="mt-4">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <Card className="lg:col-span-2">
+              <CardHeader>
+                <CardTitle>Loan Details</CardTitle>
+                <CardDescription>Complete information about your loan</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <h4 className="text-sm font-medium">Status</h4>
+                    <div className="mt-1">{getStatusBadge(loanToDisplay.status || dashboardData?.status)}</div>
+                  </div>
+                  
+                  <div>
+                    <h4 className="text-sm font-medium">Interest Rate</h4>
+                    <p className="mt-1">{loanToDisplay.interestRate || 0}%</p>
+                  </div>
+                  
+                  <div>
+                    <h4 className="text-sm font-medium">Start Date</h4>
+                    <p className="mt-1">{loanToDisplay.startDate ? format(new Date(loanToDisplay.startDate), 'PPP') : 'N/A'}</p>
+                  </div>
+                  
+                  <div>
+                    <h4 className="text-sm font-medium">End Date</h4>
+                    <p className="mt-1">{loanToDisplay.endDate ? format(new Date(loanToDisplay.endDate), 'PPP') : 'N/A'}</p>
+                  </div>
+                  
+                  <div>
+                    <h4 className="text-sm font-medium">Next Payment Due</h4>
+                    <p className="mt-1">{loanToDisplay.nextPaymentDate ? format(new Date(loanToDisplay.nextPaymentDate), 'PPP') : dashboardData?.nextPaymentDueDate ? format(new Date(dashboardData.nextPaymentDueDate), 'PPP') : 'N/A'}</p>
+                  </div>
+                  
+                  <div>
+                    <h4 className="text-sm font-medium">Payment Frequency</h4>
+                    <p className="mt-1">{formatFrequency(loanToDisplay.frequency)}</p>
+                  </div>
+                  
+                  {loanToDisplay.numberOfPayments > 0 && (
+                    <div>
+                      <h4 className="text-sm font-medium">Total Installments</h4>
+                      <p className="mt-1">{(loanToDisplay.numberOfPayments || 0)}</p>
+                    </div>
+                  )}
+                  
+                  {loanToDisplay.remainingInstallments > 0 && (
+                    <div>
+                      <h4 className="text-sm font-medium">Remaining Installments</h4>
+                      <p className="mt-1">{loanToDisplay.remainingInstallments || 0}</p>
+                    </div>
+                  )}
+                  
+                  {loanToDisplay.lateFeeAmount > 0 && (
+                    <div>
+                      <h4 className="text-sm font-medium">Late Fee</h4>
+                      <p className="mt-1">${loanToDisplay.lateFeeAmount || 0}</p>
+                    </div>
+                  )}
+                  
+                  {loanToDisplay.gracePeriodDays > 0 && (
+                    <div>
+                      <h4 className="text-sm font-medium">Grace Period</h4>
+                      <p className="mt-1">{loanToDisplay.gracePeriodDays || 0} days</p>
+                    </div>
+                  )}
+
+                  {loanToDisplay.installmentAmount > 0 && (
+                    <div>
+                      <h4 className="text-sm font-medium">Installment Amount</h4>
+                      <p className="mt-1">${loanToDisplay.installmentAmount || 0}</p>
+                    </div>
+                  )}
+
+                  {loanToDisplay.createdAt && (
+                    <div>
+                      <h4 className="text-sm font-medium">Created Date</h4>
+                      <p className="mt-1">{loanToDisplay.createdAt ? format(new Date(loanToDisplay.createdAt), 'PPP') : 'N/A'}</p>
+                    </div>
+                  )}
+                </div>
+                
+                {loanToDisplay.description && (
+                  <>
+                    <Separator />
+                    <div>
+                      <h4 className="text-sm font-medium mb-2">Description</h4>
+                      <p className="text-sm">{loanToDisplay.description}</p>
+                    </div>
+                  </>
+                )}
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader>
+                <CardTitle>Installation Information</CardTitle>
+                <CardDescription>Linked to this payment plan</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {loanToDisplay && loanToDisplay.installationId && (
+                  <>
+                    <div>
+                      <h4 className="text-sm font-medium">Installation Name</h4>
+                      <p className="mt-1">{getInstallationById(loanToDisplay.installationId).name}</p>
+                    </div>
+                    
+                    <div>
+                      <h4 className="text-sm font-medium">Installation ID</h4>
+                      <p className="mt-1">#{loanToDisplay.installationId || 'N/A'}</p>
+                    </div>
+                  </>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+          
           <Card>
-            <CardHeader>
-              <CardTitle>Payment History</CardTitle>
-              <CardDescription>View all your past payments.</CardDescription>
-              <div className="flex items-center gap-2">
-                <Search className="h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search by invoice number or date..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="max-w-sm"
-                />
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle>Payment Schedule</CardTitle>
+                <CardDescription>Your upcoming and past payment installments</CardDescription>
               </div>
             </CardHeader>
             <CardContent>
-              {paymentHistory.length === 0 ? (
-                <div className="text-center py-8">
-                  <p className="text-muted-foreground">No payment history found.</p>
+              {loadingPayments ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-700"></div>
+                </div>
+              ) : (upcomingPayments.length === 0 && paymentHistory.length === 0) ? (
+                <div className="flex flex-col items-center justify-center py-8">
+                  <p className="text-muted-foreground">No payment records found</p>
+                  <Button 
+                    variant="outline" 
+                    className="mt-4"
+                    onClick={() => handleOpenPaymentDialog(null, loanToDisplay.installationId)}
+                  >
+                    Make Payment
+                  </Button>
                 </div>
               ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>
-                        <Button variant="ghost" className="p-0 hover:bg-transparent">
-                          <span>Date</span>
-                          <ArrowUpDown className="ml-2 h-4 w-4" />
-                        </Button>
-                      </TableHead>
-                      <TableHead>Invoice</TableHead>
-                      <TableHead>Amount</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Method</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredPayments.map((payment) => (
-                      <TableRow key={payment.id}>
-                        <TableCell>{formatDate(payment.date)}</TableCell>
-                        <TableCell>{payment.invoiceNumber}</TableCell>
-                        <TableCell>{formatCurrency(payment.amount)}</TableCell>
-                        <TableCell>
-                          {getStatusBadge(payment.status)}
-                        </TableCell>
-                        <TableCell>{payment.method}</TableCell>
-                        <TableCell className="text-right">
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" className="h-8 w-8 p-0">
-                                <span className="sr-only">Open menu</span>
-                                <MoreHorizontal className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                              <DropdownMenuItem
-                                onClick={() => navigator.clipboard.writeText(payment.invoiceNumber)}
-                              >
-                                Copy Invoice ID
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onClick={async () => {
-                                  try {
-                                    // Show loading toast
-                                    toast({
-                                      title: "Downloading Receipt",
-                                      description: "Please wait while we prepare your receipt...",
-                                    });
-
-                                    // Get receipt from API
-                                    const receipt = await paymentApi.getPaymentReceipt(payment.id);
-
-                                    // In a real implementation, this would create a download
-                                    // For demo purposes, show success toast instead
-                                    toast({
-                                      title: "Receipt Ready",
-                                      description: `Receipt for payment #${payment.invoiceNumber} downloaded.`,
-                                      variant: "success",
-                                    });
-                                  } catch (error) {
-                                    toast({
-                                      title: "Error",
-                                      description: "Could not download receipt. Please try again later.",
-                                      variant: "destructive",
-                                    });
-                                  }
-                                }}
-                              >
-                                Download Receipt
-                              </DropdownMenuItem>
-                              <DropdownMenuItem>View Details</DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </TableCell>
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Due Date</TableHead>
+                        <TableHead>Amount</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                    </TableHeader>
+                    <TableBody>
+                      {/* Show upcoming payments but avoid duplicates */}
+                      {(() => {
+                        // Create a Set to track which payment IDs we've seen
+                        const displayedPaymentIds = new Set();
+                        // Combined array for all payments to display
+                        const paymentsToDisplay = [];
+                        
+                        // Add upcoming payments first
+                        upcomingPayments.slice(0, 5).forEach(payment => {
+                          if (!displayedPaymentIds.has(payment.id)) {
+                            displayedPaymentIds.add(payment.id);
+                            paymentsToDisplay.push({
+                              ...payment,
+                              type: 'upcoming'
+                            });
+                          }
+                        });
+                        
+                        // Add payment history (but avoid duplicates)
+                        if (paymentHistory.length > 0) {
+                          paymentHistory.slice(0, 5).forEach(payment => {
+                            if (!displayedPaymentIds.has(payment.id)) {
+                              displayedPaymentIds.add(payment.id);
+                              paymentsToDisplay.push({
+                                ...payment,
+                                type: 'history'
+                              });
+                            }
+                          });
+                        }
+                        
+                        // Sort by date (ascending)
+                        paymentsToDisplay.sort((a, b) => {
+                          if (!a.dueDate) return 1;
+                          if (!b.dueDate) return -1;
+                          return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
+                        });
+                        
+                        // Return the JSX for the payment rows
+                        return paymentsToDisplay.map((payment) => (
+                          <TableRow key={`payment-${payment.id}`}>
+                            <TableCell>
+                              {payment.dueDate ? format(new Date(payment.dueDate), 'PP') : 'N/A'}
+                            </TableCell>
+                            <TableCell>${payment.amount?.toLocaleString() || 0}</TableCell>
+                            <TableCell>
+                              {getStatusBadge(payment.status)}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {payment.status?.toUpperCase() === "PAID" ? (
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm"
+                                  onClick={() => downloadReceipt(payment.id)}
+                                >
+                                  <Receipt className="mr-1 h-4 w-4" />
+                                  Receipt
+                                </Button>
+                              ) : (
+                                <Button 
+                                  variant="outline" 
+                                  size="sm"
+                                  onClick={() => handleOpenPaymentDialog(payment)}
+                                  disabled={payment.status?.toUpperCase() === "PAID"}
+                                >
+                                  Pay Now
+                                </Button>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        ));
+                      })()}
+                    </TableBody>
+                  </Table>
+                </div>
               )}
             </CardContent>
           </Card>
-        </TabsContent>
-        <TabsContent value="upcoming" className="mt-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Upcoming Payments</CardTitle>
-              <CardDescription>View your scheduled payments.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {upcomingPayments.length === 0 ? (
-                <div className="text-center py-8">
-                  <p className="text-muted-foreground">No upcoming payments found.</p>
-                </div>
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Due Date</TableHead>
-                      <TableHead>Invoice</TableHead>
-                      <TableHead>Amount</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Method</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {upcomingPayments.map((payment) => (
-                      <TableRow key={payment.id}>
-                        <TableCell>{formatDate(payment.dueDate)}</TableCell>
-                        <TableCell>{payment.invoiceNumber}</TableCell>
-                        <TableCell>{formatCurrency(payment.amount)}</TableCell>
-                        <TableCell>
-                          {getStatusBadge(payment.status)}
-                        </TableCell>
-                        <TableCell>{payment.method}</TableCell>
-                        <TableCell className="text-right">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            id="pay-now"
-                            onClick={async () => {
-                              try {
-                                toast({
-                                  title: "Processing Payment",
-                                  description: "Please wait while we process your payment...",
-                                })
+        </div>
+      )}
 
-                                // Call the make payment API
-                                await paymentApi.makePayment({
-                                  paymentId: payment.id,
-                                  amount: payment.amount,
-                                  method: paymentMethod.type,
-                                  description: `Payment for invoice #${payment.invoiceNumber}`
-                                });
-
-                                // In a real implementation, this would redirect to a payment processor
-                                // For demo purposes, show success toast and refresh data
-                                toast({
-                                  title: "Payment Successful",
-                                  description: `Payment of ${formatCurrency(payment.amount)} was processed successfully.`,
-                                  variant: "success",
-                                })
-
-                                // Refresh data
-                                window.location.reload();
-                              } catch (error) {
-                                toast({
-                                  title: "Payment Failed",
-                                  description: "There was an error processing your payment. Please try again.",
-                                  variant: "destructive",
-                                })
-                              }
-                            }}
-                          >
-                            Pay Now
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              )}
-            </CardContent>
-            <CardFooter className="flex justify-between">
-              <div className="text-xs text-muted-foreground">
-                Automatic payments will be processed on the due date using your default payment method.
-              </div>
-            </CardFooter>
-          </Card>
-        </TabsContent>
-      </Tabs>
+      {/* Payment Dialog */}
+      <PaymentDialog 
+        open={isPaymentDialogOpen} 
+        onOpenChange={setIsPaymentDialogOpen}
+        payment={selectedPayment}
+        installationId={selectedInstallation || (loanToDisplay?.installationId)}
+        installations={installations}
+        paymentPlans={allPaymentPlans}
+        onSuccess={handlePaymentSuccess}
+        userId={user?.id}
+      />
     </div>
-  )
+  );
 }
+
+// Helper function to calculate end date based on frequency and number of payments
+const calculateEndDate = (startDateStr, frequency, numberOfPayments) => {
+  if (!startDateStr || !frequency || !numberOfPayments) {
+    return new Date(new Date().setFullYear(new Date().getFullYear() + 2)).toISOString();
+  }
+  
+  const startDate = new Date(startDateStr);
+  const endDate = new Date(startDate);
+  
+  // Calculate end date based on frequency
+  switch (frequency.toUpperCase()) {
+    case "WEEKLY":
+      endDate.setDate(startDate.getDate() + (numberOfPayments * 7));
+      break;
+    case "BI_WEEKLY":
+    case "BIWEEKLY":
+      endDate.setDate(startDate.getDate() + (numberOfPayments * 14));
+      break;
+    case "MONTHLY":
+      endDate.setMonth(startDate.getMonth() + numberOfPayments);
+      break;
+    case "QUARTERLY":
+      endDate.setMonth(startDate.getMonth() + (numberOfPayments * 3));
+      break;
+    case "SEMI_ANNUALLY":
+    case "SEMIANNUALLY":
+      endDate.setMonth(startDate.getMonth() + (numberOfPayments * 6));
+      break;
+    case "ANNUALLY":
+      endDate.setFullYear(startDate.getFullYear() + numberOfPayments);
+      break;
+    default:
+      // Default to monthly if frequency is unknown
+      endDate.setMonth(startDate.getMonth() + numberOfPayments);
+  }
+  
+  return endDate.toISOString();
+};
+
+// Create a payment plan from dashboard data if available
+const createPlanFromDashboard = (paymentDashboardData) => {
+  if (!paymentDashboardData) return null;
+  
+  // If we have a complete activePlan object in the dashboard, use it directly
+  if (paymentDashboardData.activePlan) {
+    console.log("Using activePlan directly from dashboard:", paymentDashboardData.activePlan);
+    return paymentDashboardData.activePlan;
+  }
+  
+  // Calculate end date based on upcoming payments if available
+  let endDate = paymentDashboardData.endDate || "";
+  if (!endDate && paymentDashboardData.upcomingPayments && paymentDashboardData.upcomingPayments.length > 0) {
+    // Sort upcoming payments by date (ascending)
+    const sortedPayments = [...paymentDashboardData.upcomingPayments].sort((a, b) => 
+      new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime()
+    );
+    
+    // Use the last payment date as the end date
+    const lastPayment = sortedPayments[sortedPayments.length - 1];
+    if (lastPayment && lastPayment.dueDate) {
+      endDate = lastPayment.dueDate;
+    }
+  }
+  
+  // If we couldn't determine end date from payments, calculate it based on frequency and number of payments
+  if (!endDate && paymentDashboardData.nextPaymentDueDate && paymentDashboardData.totalInstallments) {
+    const startDate = new Date(paymentDashboardData.nextPaymentDueDate);
+    const monthsToAdd = paymentDashboardData.totalInstallments - 1; // Subtract 1 because we start from next payment
+    const calculatedEndDate = new Date(startDate);
+    calculatedEndDate.setMonth(calculatedEndDate.getMonth() + monthsToAdd);
+    endDate = calculatedEndDate.toISOString();
+  }
+  
+  // Create a payment plan from dashboard data
+  return {
+    id: paymentDashboardData.paymentPlanId || 1,
+    installationId: paymentDashboardData.installationId || customerInstallations[0]?.id || 1,
+    name: "Solar Payment Plan",
+    description: "Payment plan for your solar installation",
+    totalAmount: paymentDashboardData.totalAmount || 0,
+    remainingAmount: paymentDashboardData.remainingAmount || 0,
+    numberOfPayments: paymentDashboardData.totalInstallments || 
+                     (paymentDashboardData.upcomingPayments?.length + paymentDashboardData.completedInstallments) || 0,
+    totalInstallments: paymentDashboardData.totalInstallments || 0,
+    remainingInstallments: paymentDashboardData.remainingInstallments || 0,
+    installmentAmount: paymentDashboardData.installmentAmount || paymentDashboardData.nextPaymentAmount || 0,
+    monthlyPayment: paymentDashboardData.installmentAmount || paymentDashboardData.nextPaymentAmount || 0,
+    frequency: paymentDashboardData.frequency || "MONTHLY",
+    startDate: paymentDashboardData.startDate || paymentDashboardData.nextPaymentDueDate || new Date().toISOString(),
+    endDate: endDate || calculateEndDate(paymentDashboardData.nextPaymentDueDate, "MONTHLY", paymentDashboardData.totalInstallments),
+    status: "ACTIVE",
+    interestRate: 0,
+    lateFeeAmount: 0,
+    gracePeriodDays: 0,
+    nextPaymentDate: paymentDashboardData.nextPaymentDueDate || 
+                    (paymentDashboardData.upcomingPayments?.length > 0 ? paymentDashboardData.upcomingPayments[0].dueDate : null),
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  };
+};
 

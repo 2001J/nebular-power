@@ -35,6 +35,7 @@ import {
 } from "@/components/ui/breadcrumb"
 import { paymentApi, paymentComplianceApi, installationApi } from "@/lib/api"
 import { format } from "date-fns"
+import PaymentStatusCard from "@/components/payment-status-card"
 
 // Define types for our installation and payment plan data
 interface Installation {
@@ -474,7 +475,7 @@ export default function CustomerInstallationsPage() {
         </TabsList>
         
         <TabsContent value="overview" className="space-y-6">
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">
@@ -521,6 +522,9 @@ export default function CustomerInstallationsPage() {
                 </p>
               </CardContent>
             </Card>
+            
+            {/* Payment Status Card */}
+            <PaymentStatusCard userId={user?.id} />
           </div>
           
           <div className="grid gap-6 md:grid-cols-2">
@@ -555,7 +559,7 @@ export default function CustomerInstallationsPage() {
                 </Button>
               </CardFooter>
             </Card>
-                </div>
+          </div>
         </TabsContent>
         
         <TabsContent value="installations" className="space-y-6">

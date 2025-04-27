@@ -5,6 +5,7 @@ import com.solar.core_services.energy_monitoring.repository.SolarInstallationRep
 import com.solar.core_services.payment_compliance.dto.MakePaymentRequest;
 import com.solar.core_services.payment_compliance.dto.PaymentDTO;
 import com.solar.core_services.payment_compliance.dto.PaymentDashboardDTO;
+import com.solar.core_services.payment_compliance.dto.PaymentPlanDTO;
 import com.solar.core_services.payment_compliance.model.Payment;
 import com.solar.core_services.payment_compliance.model.PaymentPlan;
 import com.solar.core_services.payment_compliance.model.PaymentReminder;
@@ -123,6 +124,14 @@ public class PaymentServiceImpl implements PaymentService {
                 .count();
         int remainingInstallments = totalInstallments - completedInstallments;
 
+        // Convert active plan to DTO
+        PaymentPlanDTO activePlanDTO = paymentPlanService.getPaymentPlanById(activePlan.getId());
+        
+        // Remove grace period details from customer view
+        if (activePlanDTO != null) {
+            activePlanDTO.setGracePeriodDays(null);
+        }
+
         // Build the dashboard DTO
         return PaymentDashboardDTO.builder()
                 .installationId(installation.getId())
@@ -136,6 +145,14 @@ public class PaymentServiceImpl implements PaymentService {
                 .hasOverduePayments(hasOverduePayments)
                 .recentPayments(recentPayments.stream().map(this::mapToDTO).collect(Collectors.toList()))
                 .upcomingPayments(upcomingPayments.stream().map(this::mapToDTO).collect(Collectors.toList()))
+                // Add payment plan details
+                .activePlan(activePlanDTO)
+                .paymentPlanId(activePlan.getId())
+                .startDate(activePlan.getStartDate())
+                .endDate(activePlan.getEndDate())
+                .frequency(activePlan.getFrequency() != null ? activePlan.getFrequency().name() : "MONTHLY")
+                .installmentAmount(activePlan.getInstallmentAmount())
+                .status(activePlan.getStatus() != null ? activePlan.getStatus().name() : "ACTIVE")
                 .build();
     }
 
@@ -167,12 +184,16 @@ public class PaymentServiceImpl implements PaymentService {
         // For simplicity, we'll use the first installation
         SolarInstallation installation = installations.get(0);
 
-        LocalDateTime futureDate = LocalDateTime.now().plusMonths(3);
+        // Only get payments for next 7 days rather than 3 months
+        LocalDateTime cutoffDate = LocalDateTime.now().plusDays(7);
         List<Payment> upcomingPayments = paymentRepository.findUpcomingPayments(
-                futureDate,
+                cutoffDate,
                 Payment.PaymentStatus.SCHEDULED);
 
+        // Filter to ensure we're only returning this customer's payments
         return upcomingPayments.stream()
+                .filter(payment -> payment.getInstallation().getId().equals(installation.getId()))
+                .sorted((p1, p2) -> p1.getDueDate().compareTo(p2.getDueDate()))
                 .map(this::mapToDTO)
                 .collect(Collectors.toList());
     }

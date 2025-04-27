@@ -25,4 +25,15 @@ public class PaymentDashboardDTO {
     private boolean hasOverduePayments;
     private List<PaymentDTO> recentPayments;
     private List<PaymentDTO> upcomingPayments;
-} 
+    
+    // Added field for active payment plan details
+    private PaymentPlanDTO activePlan;
+    
+    // Additional payment plan fields to expose directly at the dashboard level
+    private LocalDateTime startDate;
+    private LocalDateTime endDate;
+    private String frequency;
+    private Long paymentPlanId;
+    private BigDecimal installmentAmount;
+    private String status; // Added status field
+}

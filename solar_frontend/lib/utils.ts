@@ -28,6 +28,22 @@ export function formatDate(dateString?: string | null, fallback = 'N/A'): string
 }
 
 /**
+ * Formats a number as currency with dollar sign
+ */
+export function formatCurrency(value: number | string | null | undefined, fallback = '$0.00'): string {
+  if (value === null || value === undefined) return fallback;
+  const num = typeof value === 'string' ? parseFloat(value) : value;
+  if (isNaN(num)) return fallback;
+  
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  }).format(num);
+}
+
+/**
  * Safely parses a string to a number with fallback
  */
 export function parseNumber(value: any, fallback = 0): number {

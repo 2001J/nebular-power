@@ -2,7 +2,7 @@
 
 import type React from "react"
 import { usePathname, useRouter } from "next/navigation"
-import { AlertTriangle, BarChart3, FileText, Home, LayoutGrid, Settings, Sun, User } from "lucide-react"
+import { AlertTriangle, BarChart3, CreditCard, Home, Sun, } from "lucide-react"
 
 import { useAuth } from "@/components/auth-provider"
 import { cn } from "@/lib/utils"
@@ -40,14 +40,14 @@ export default function CustomerLayout({
       icon: BarChart3,
     },
     {
+      href: "/customer/payments",
+      label: "Payments",
+      icon: CreditCard,
+    },
+    {
       href: "/customer/alerts",
       label: "System Alerts",
       icon: AlertTriangle,
-    },
-    {
-      href: "/customer/reports",
-      label: "Reports",
-      icon: FileText,
     },
   ]
 
@@ -66,7 +66,7 @@ export default function CustomerLayout({
         </div>
 
         <nav className="hidden md:flex items-center space-x-4">
-          {navItems.slice(0, 5).map((item) => (
+          {navItems.slice(0, 4).map((item) => (
             <button
               key={item.href}
               onClick={() => handleNavigation(item.href)}
@@ -119,7 +119,7 @@ export default function CustomerLayout({
 
       {/* Mobile navigation */}
       <div className="fixed bottom-0 left-0 right-0 md:hidden bg-white border-t flex justify-around py-2">
-        {navItems.slice(0, 4).map((item) => (
+        {navItems.map((item) => (
           <button
             key={item.href}
             onClick={() => handleNavigation(item.href)}
