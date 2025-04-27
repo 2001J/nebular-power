@@ -868,10 +868,77 @@ const createPlanFromDashboard = (paymentDashboardData) => {
     }
   }
   
+  // Determine the next payment date
+  let nextPaymentDate = null;
+  
+  // First check if dashboard has a nextPaymentDueDate
+  if (paymentDashboardData.nextPaymentDueDate) {
+    nextPaymentDate = paymentDashboardData.nextPaymentDueDate;
+  } 
+  // Then check if there are upcoming payments
+  else if (paymentDashboardData.upcomingPayments && paymentDashboardData.upcomingPayments.length > 0) {
+    // Sort upcoming payments by date (ascending)
+    const sortedUpcoming = [...paymentDashboardData.upcomingPayments].sort((a, b) => 
+      new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime()
+    );
+    
+    // Use the earliest upcoming payment as the next payment date
+    nextPaymentDate = sortedUpcoming[0].dueDate;
+  }
+  // If still no next payment date but we have recent payments and there's remaining amount
+  else if (paymentDashboardData.recentPayments && 
+          paymentDashboardData.recentPayments.length > 0 && 
+          paymentDashboardData.remainingAmount > 0) {
+    
+    // Find the most recent paid payment
+    const sortedRecent = [...paymentDashboardData.recentPayments]
+      .filter(p => p.status === 'PAID')
+      .sort((a, b) => new Date(b.dueDate).getTime() - new Date(a.dueDate).getTime());
+    
+    if (sortedRecent.length > 0) {
+      // Calculate the next payment date based on frequency and the last paid payment
+      const lastPaidDate = new Date(sortedRecent[0].dueDate);
+      const frequency = paymentDashboardData.frequency || 'MONTHLY';
+      
+      // Add the appropriate time based on frequency
+      const nextDate = new Date(lastPaidDate);
+      switch (frequency) {
+        case 'WEEKLY':
+          nextDate.setDate(nextDate.getDate() + 7);
+          break;
+        case 'BI_WEEKLY':
+        case 'BIWEEKLY':
+          nextDate.setDate(nextDate.getDate() + 14);
+          break;
+        case 'MONTHLY':
+          nextDate.setMonth(nextDate.getMonth() + 1);
+          break;
+        case 'QUARTERLY':
+          nextDate.setMonth(nextDate.getMonth() + 3);
+          break;
+        case 'SEMI_ANNUALLY':
+        case 'SEMIANNUALLY':
+          nextDate.setMonth(nextDate.getMonth() + 6);
+          break;
+        case 'ANNUALLY':
+          nextDate.setFullYear(nextDate.getFullYear() + 1);
+          break;
+        default:
+          // Default to monthly
+          nextDate.setMonth(nextDate.getMonth() + 1);
+      }
+      
+      nextPaymentDate = nextDate.toISOString();
+    }
+  }
+  
   // If we couldn't determine end date from payments, calculate it based on frequency and number of payments
-  if (!endDate && paymentDashboardData.nextPaymentDueDate && paymentDashboardData.totalInstallments) {
-    const startDate = new Date(paymentDashboardData.nextPaymentDueDate);
-    const monthsToAdd = paymentDashboardData.totalInstallments - 1; // Subtract 1 because we start from next payment
+  if (!endDate && nextPaymentDate && paymentDashboardData.totalInstallments) {
+    const startDate = new Date(nextPaymentDate);
+    const remainingInstallments = paymentDashboardData.remainingInstallments || 
+                                  (paymentDashboardData.totalInstallments - paymentDashboardData.completedInstallments) || 
+                                  1;
+    const monthsToAdd = remainingInstallments - 1; // Subtract 1 because we start from next payment
     const calculatedEndDate = new Date(startDate);
     calculatedEndDate.setMonth(calculatedEndDate.getMonth() + monthsToAdd);
     endDate = calculatedEndDate.toISOString();
@@ -893,13 +960,16 @@ const createPlanFromDashboard = (paymentDashboardData) => {
     monthlyPayment: paymentDashboardData.installmentAmount || paymentDashboardData.nextPaymentAmount || 0,
     frequency: paymentDashboardData.frequency || "MONTHLY",
     startDate: paymentDashboardData.startDate || paymentDashboardData.nextPaymentDueDate || new Date().toISOString(),
-    endDate: endDate || calculateEndDate(paymentDashboardData.nextPaymentDueDate, "MONTHLY", paymentDashboardData.totalInstallments),
+    endDate: endDate || calculateEndDate(nextPaymentDate || new Date().toISOString(), 
+                                         paymentDashboardData.frequency || "MONTHLY", 
+                                         paymentDashboardData.remainingInstallments || 
+                                         (paymentDashboardData.totalInstallments - paymentDashboardData.completedInstallments) || 
+                                         1),
     status: "ACTIVE",
     interestRate: 0,
     lateFeeAmount: 0,
     gracePeriodDays: 0,
-    nextPaymentDate: paymentDashboardData.nextPaymentDueDate || 
-                    (paymentDashboardData.upcomingPayments?.length > 0 ? paymentDashboardData.upcomingPayments[0].dueDate : null),
+    nextPaymentDate: nextPaymentDate || new Date(new Date().setMonth(new Date().getMonth() + 1)).toISOString(),
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString()
   };

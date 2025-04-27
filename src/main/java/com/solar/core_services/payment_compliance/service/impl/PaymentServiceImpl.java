@@ -37,6 +37,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -115,6 +116,38 @@ public class PaymentServiceImpl implements PaymentService {
         if (nextPayment != null) {
             nextPaymentDueDate = nextPayment.getDueDate();
             nextPaymentAmount = nextPayment.getAmount();
+        } else if (activePlan.getRemainingAmount().compareTo(BigDecimal.ZERO) > 0) {
+            // If no upcoming payments but there's still a remaining amount, calculate the next due date
+            // based on the last paid payment and payment frequency
+            
+            // Find the last paid payment
+            Payment lastPaidPayment = paymentRepository.findByPaymentPlan(activePlan).stream()
+                    .filter(p -> p.getStatus() == Payment.PaymentStatus.PAID)
+                    .max(Comparator.comparing(Payment::getDueDate))
+                    .orElse(null);
+            
+            if (lastPaidPayment != null) {
+                // Calculate the next due date based on the payment frequency
+                LocalDateTime lastDueDate = lastPaidPayment.getDueDate();
+                nextPaymentDueDate = calculateNextDueDate(lastDueDate, activePlan.getFrequency());
+                nextPaymentAmount = activePlan.getInstallmentAmount();
+                
+                // Create a new scheduled payment if one doesn't exist for this date
+                if (paymentRepository.findByPaymentPlanAndDueDate(activePlan, nextPaymentDueDate).isEmpty()) {
+                    log.info("Creating new scheduled payment for date: {}", nextPaymentDueDate);
+                    Payment newPayment = new Payment();
+                    newPayment.setPaymentPlan(activePlan);
+                    newPayment.setInstallation(installation);
+                    newPayment.setAmount(nextPaymentAmount);
+                    newPayment.setDueDate(nextPaymentDueDate);
+                    newPayment.setStatus(Payment.PaymentStatus.SCHEDULED);
+                    newPayment.setStatusReason("Payment scheduled as part of payment plan");
+                    paymentRepository.save(newPayment);
+                    
+                    // Add to upcoming payments list
+                    upcomingPayments.add(newPayment);
+                }
+            }
         }
 
         // Calculate installment counts
@@ -500,14 +533,64 @@ public class PaymentServiceImpl implements PaymentService {
         updatePaymentStatus(payment, newStatus, statusReason);
 
         // Update payment plan remaining amount
-        paymentPlanService.updateRemainingAmount(payment.getPaymentPlan().getId(), request.getAmount());
+        PaymentPlan paymentPlan = payment.getPaymentPlan();
+        paymentPlanService.updateRemainingAmount(paymentPlan.getId(), request.getAmount());
 
         // If payment was overdue and service was suspended, restore service
         if (payment.getInstallation().getStatus() == SolarInstallation.InstallationStatus.SUSPENDED) {
+            // Restore the installation service
+            payment.getInstallation().setStatus(SolarInstallation.InstallationStatus.ACTIVE);
+            installationRepository.save(payment.getInstallation());
+
+            // Notify service control
             paymentEventPublisher.publishPaymentReceived(payment);
+            log.info("Service restored for installation ID: {}", payment.getInstallation().getId());
         }
 
-        log.info("Successfully processed payment for payment ID: {}", payment.getId());
+        // Check if this was the last payment in the payment plan
+        boolean isLastPayment = paymentPlan.getRemainingAmount().compareTo(BigDecimal.ZERO) <= 0;
+        if (isLastPayment) {
+            // Mark the payment plan as completed
+            paymentPlan.setStatus(PaymentPlan.PaymentPlanStatus.COMPLETED);
+            paymentPlanRepository.save(paymentPlan);
+            log.info("Payment plan ID: {} marked as completed", paymentPlan.getId());
+            paymentEventPublisher.publishPaymentPlanUpdated(paymentPlan);
+        } else {
+            // Ensure there are upcoming payments scheduled
+            // First, check if there are any SCHEDULED payments left
+            List<Payment> upcomingPayments = paymentRepository.findByPaymentPlanAndStatus(
+                    paymentPlan, Payment.PaymentStatus.SCHEDULED);
+            
+            if (upcomingPayments.isEmpty()) {
+                // No upcoming payments, so generate the next one
+                LocalDateTime nextDueDate = calculateNextDueDate(payment.getDueDate(), paymentPlan.getFrequency());
+                
+                // Check if a payment already exists for this date
+                if (paymentRepository.findByPaymentPlanAndDueDate(paymentPlan, nextDueDate).isEmpty()) {
+                    log.info("Creating new scheduled payment for date: {}", nextDueDate);
+                    
+                    // Calculate the amount for the next payment
+                    BigDecimal nextAmount = paymentPlan.getInstallmentAmount();
+                    // If the remaining amount is less than the installment amount, use the remaining amount
+                    if (paymentPlan.getRemainingAmount().compareTo(nextAmount) < 0) {
+                        nextAmount = paymentPlan.getRemainingAmount();
+                    }
+                    
+                    // Create a new payment
+                    Payment nextPayment = new Payment();
+                    nextPayment.setPaymentPlan(paymentPlan);
+                    nextPayment.setInstallation(payment.getInstallation());
+                    nextPayment.setAmount(nextAmount);
+                    nextPayment.setDueDate(nextDueDate);
+                    nextPayment.setStatus(Payment.PaymentStatus.SCHEDULED);
+                    nextPayment.setStatusReason("Payment scheduled after previous payment was made");
+                    paymentRepository.save(nextPayment);
+                }
+            }
+        }
+
+        // Notify payment event
+        paymentEventPublisher.publishPaymentReceived(payment);
 
         return mapToDTO(payment);
     }
@@ -567,5 +650,29 @@ public class PaymentServiceImpl implements PaymentService {
         Page<Payment> overduePayments = new PageImpl<>(pageContent, pageable, overduePaymentsList.size());
 
         return overduePayments.map(this::mapToDTO);
+    }
+
+    // Helper method to calculate the next due date based on payment frequency
+    private LocalDateTime calculateNextDueDate(LocalDateTime lastDueDate, PaymentPlan.PaymentFrequency frequency) {
+        if (lastDueDate == null || frequency == null) {
+            return LocalDateTime.now().plusMonths(1);
+        }
+        
+        switch (frequency) {
+            case MONTHLY:
+                return lastDueDate.plusMonths(1);
+            case QUARTERLY:
+                return lastDueDate.plusMonths(3);
+            case SEMI_ANNUALLY:
+                return lastDueDate.plusMonths(6);
+            case ANNUALLY:
+                return lastDueDate.plusYears(1);
+            case WEEKLY:
+                return lastDueDate.plusWeeks(1);
+            case BI_WEEKLY:
+                return lastDueDate.plusWeeks(2);
+            default:
+                return lastDueDate.plusMonths(1); // fallback to monthly
+        }
     }
 }

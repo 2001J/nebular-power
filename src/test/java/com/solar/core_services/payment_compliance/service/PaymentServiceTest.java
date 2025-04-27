@@ -256,6 +256,14 @@ public class PaymentServiceTest {
         // Mock the payment plan service
         doNothing().when(paymentPlanService).updateRemainingAmount(anyLong(), any(BigDecimal.class));
         
+        // Mock the findByPaymentPlanAndStatus call to return an empty list, so it will create a new payment
+        when(paymentRepository.findByPaymentPlanAndStatus(any(PaymentPlan.class), eq(Payment.PaymentStatus.SCHEDULED)))
+            .thenReturn(Collections.emptyList());
+        
+        // Mock the findByPaymentPlanAndDueDate to return empty list
+        when(paymentRepository.findByPaymentPlanAndDueDate(any(PaymentPlan.class), any(LocalDateTime.class)))
+            .thenReturn(Collections.emptyList());
+        
         // When
         PaymentDTO result = paymentService.makePayment(testUser.getId(), request);
         
@@ -263,8 +271,10 @@ public class PaymentServiceTest {
         assertNotNull(result);
         assertEquals(testPayment2.getId(), result.getId());
         verify(paymentRepository, times(1)).findById(testPayment2.getId());
-        verify(paymentRepository, times(1)).save(any(Payment.class));
-        verify(paymentEventPublisher, times(1)).publishPaymentReceived(any(Payment.class));
+        // Now expect 2 saves: one for updating status, one for the new payment
+        verify(paymentRepository, times(2)).save(any(Payment.class));
+        // Now expect 2 publishPaymentReceived calls: one for service restoration, one for payment notification
+        verify(paymentEventPublisher, times(2)).publishPaymentReceived(any(Payment.class));
     }
 
     @Test
@@ -314,6 +324,14 @@ public class PaymentServiceTest {
         // Mock the payment plan service
         doNothing().when(paymentPlanService).updateRemainingAmount(anyLong(), any(BigDecimal.class));
         
+        // Mock the findByPaymentPlanAndStatus call to return an empty list, so it will create a new payment
+        when(paymentRepository.findByPaymentPlanAndStatus(any(PaymentPlan.class), eq(Payment.PaymentStatus.SCHEDULED)))
+            .thenReturn(Collections.emptyList());
+        
+        // Mock the findByPaymentPlanAndDueDate to return empty list
+        when(paymentRepository.findByPaymentPlanAndDueDate(any(PaymentPlan.class), any(LocalDateTime.class)))
+            .thenReturn(Collections.emptyList());
+        
         // When
         PaymentDTO result = paymentService.recordManualPayment(testPayment2.getId(), request);
         
@@ -321,8 +339,10 @@ public class PaymentServiceTest {
         assertNotNull(result);
         assertEquals(testPayment2.getId(), result.getId());
         verify(paymentRepository, times(1)).findById(testPayment2.getId());
-        verify(paymentRepository, times(1)).save(any(Payment.class));
-        verify(paymentEventPublisher, times(1)).publishPaymentReceived(any(Payment.class));
+        // Now expect 2 saves: one for updating status, one for the new payment
+        verify(paymentRepository, times(2)).save(any(Payment.class));
+        // Now expect 2 publishPaymentReceived calls: one for service restoration, one for payment notification
+        verify(paymentEventPublisher, times(2)).publishPaymentReceived(any(Payment.class));
     }
 
     @Test
