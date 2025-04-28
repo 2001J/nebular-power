@@ -3070,6 +3070,33 @@ export const securityApi = {
       return { content: [], totalElements: 0, totalPages: 0, size, number: page };
     }
   },
+
+  // Add method for security status
+  getInstallationSecurityStatus: async (installationId: string) => {
+    try {
+      // First try to get security status from events endpoint
+      const alerts = await securityApi.getInstallationAlerts(installationId);
+      
+      // Build a security status response
+      return {
+        tamperDetected: alerts.some((alert: any) => alert.type === 'TAMPER_DETECTION' && !alert.resolved),
+        lastCheck: new Date().toISOString(),
+        lastMaintenance: null,
+        alerts: alerts,
+        status: alerts.length > 0 ? 'WARNING' : 'SECURE'
+      };
+    } catch (error: any) {
+      console.error(`Error fetching security status for installation ${installationId}:`, error);
+      // Return a default status to avoid errors
+      return {
+        tamperDetected: false,
+        lastCheck: new Date().toISOString(),
+        lastMaintenance: null,
+        alerts: [],
+        status: 'UNKNOWN'
+      };
+    }
+  },
 };
 
 // Tamper Detection API

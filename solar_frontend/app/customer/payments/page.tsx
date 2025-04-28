@@ -217,6 +217,29 @@ export default function PaymentsPage() {
   }, [user]);
 
   const handleOpenPaymentDialog = (payment = null, installationId = null) => {
+    // If no specific payment was provided, find the next upcoming payment
+    if (!payment) {
+      // Sort upcoming payments by due date
+      const sortedUpcomingPayments = [...upcomingPayments].sort((a, b) => 
+        new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime()
+      );
+      
+      // Find the next payment that is SCHEDULED or UPCOMING
+      const nextPayment = sortedUpcomingPayments.find(p => 
+        p.status === 'SCHEDULED' || p.status === 'UPCOMING' || p.status === 'DUE_TODAY'
+      );
+      
+      if (nextPayment) {
+        console.log("Auto-selecting next scheduled payment:", nextPayment);
+        payment = nextPayment;
+        
+        // If we found an upcoming payment, use its installation ID if none was provided
+        if (!installationId && nextPayment.installationId) {
+          installationId = nextPayment.installationId;
+        }
+      }
+    }
+    
     setSelectedPayment(payment);
     setSelectedInstallation(installationId);
     setIsPaymentDialogOpen(true);
@@ -406,16 +429,6 @@ export default function PaymentsPage() {
                 <ArrowLeft className="mr-2 h-4 w-4" />
                 Return to Dashboard
               </Button>
-              {installations.length > 0 && (
-                <Button 
-                  variant="default" 
-                  className="ml-2"
-                  onClick={() => handleOpenPaymentDialog(null, installations[0]?.id)}
-                >
-                  <Wallet className="mr-2 h-4 w-4" />
-                  Make a Payment
-                </Button>
-              )}
             </div>
           </CardContent>
         </Card>
@@ -675,7 +688,7 @@ export default function PaymentsPage() {
                   <Button 
                     variant="outline" 
                     className="mt-4"
-                    onClick={() => handleOpenPaymentDialog(null, loanToDisplay.installationId)}
+                    onClick={() => handleOpenPaymentDialog()}
                   >
                     Make Payment
                   </Button>

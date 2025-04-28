@@ -10,8 +10,9 @@ import { CircleDollarSign, AlertCircle, ArrowRight, CalendarClock, Percent, Bell
 import { paymentApi, paymentComplianceApi } from "@/lib/api";
 import { Progress } from "@/components/ui/progress";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
 
-export default function PaymentStatusCard({ userId, installationId }) {
+export default function PaymentStatusCard({ userId, installationId, isLarge = false }) {
   const [loading, setLoading] = useState(true);
   const [paymentData, setPaymentData] = useState(null);
   const [error, setError] = useState(null);
@@ -128,15 +129,15 @@ export default function PaymentStatusCard({ userId, installationId }) {
 
   if (loading) {
     return (
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-medium flex items-center gap-2">
-            <CircleDollarSign className="h-4 w-4" />
+      <Card className={cn("overflow-hidden border-0 shadow-md", isLarge ? "w-full" : "")}>
+        <CardHeader className={cn("pb-3 bg-gradient-to-r from-slate-50 to-white", isLarge ? "" : "")}>
+          <CardTitle className={cn("flex items-center gap-2 text-slate-800", isLarge ? "text-xl" : "text-sm")}>
+            <CircleDollarSign className={cn("text-primary", isLarge ? "h-6 w-6" : "h-4 w-4")} />
             Payment Status
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="h-20 flex items-center justify-center">
+          <div className={`${isLarge ? "h-32" : "h-20"} flex items-center justify-center`}>
             <div className="animate-pulse h-4 w-full bg-gray-200 rounded"></div>
           </div>
         </CardContent>
@@ -146,20 +147,20 @@ export default function PaymentStatusCard({ userId, installationId }) {
 
   if (error) {
     return (
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-medium flex items-center gap-2">
-            <CircleDollarSign className="h-4 w-4" />
+      <Card className={cn("overflow-hidden border-0 shadow-md", isLarge ? "w-full" : "")}>
+        <CardHeader className={cn("pb-3 bg-gradient-to-r from-slate-50 to-white", isLarge ? "" : "")}>
+          <CardTitle className={cn("flex items-center gap-2 text-slate-800", isLarge ? "text-xl" : "text-sm")}>
+            <CircleDollarSign className={cn("text-primary", isLarge ? "h-6 w-6" : "h-4 w-4")} />
             Payment Status
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex items-center gap-2 text-red-500">
+          <div className="flex items-center gap-2 text-red-500 justify-center">
             <AlertCircle className="h-4 w-4" />
             <span className="text-sm">{error}</span>
           </div>
         </CardContent>
-        <CardFooter>
+        <CardFooter className="justify-center">
           <Button variant="ghost" size="sm" onClick={handleViewPayments} className="flex items-center gap-1">
             <span>View Payments</span>
             <ArrowRight className="h-4 w-4" />
@@ -184,11 +185,11 @@ export default function PaymentStatusCard({ userId, installationId }) {
   const paymentIsSoon = daysUntilNextPayment !== null && daysUntilNextPayment <= 5;
 
   return (
-    <Card>
-      <CardHeader className="pb-2">
+    <Card className={cn("overflow-hidden border-0 shadow-md", isLarge ? "w-full" : "")}>
+      <CardHeader className={cn("pb-3 bg-gradient-to-r from-slate-50 to-white", isLarge ? "" : "")}>
         <div className="flex justify-between items-center">
-          <CardTitle className="text-sm font-medium flex items-center gap-2">
-            <CircleDollarSign className="h-4 w-4" />
+          <CardTitle className={cn("flex items-center gap-2 text-slate-800", isLarge ? "text-xl" : "text-sm")}>
+            <CircleDollarSign className={cn("text-primary", isLarge ? "h-6 w-6" : "h-4 w-4")} />
             Loan Status
           </CardTitle>
           {(hasOverduePayments || paymentIsSoon) && (
@@ -196,7 +197,7 @@ export default function PaymentStatusCard({ userId, installationId }) {
               <Tooltip>
                 <TooltipTrigger asChild>
                   <div className="flex">
-                    <Bell className={`h-4 w-4 ${hasOverduePayments ? 'text-red-500' : 'text-yellow-500'}`} />
+                    <Bell className={`${isLarge ? "h-5 w-5" : "h-4 w-4"} ${hasOverduePayments ? 'text-red-500' : 'text-amber-500'}`} />
                     {hasOverduePayments && <span className="relative flex h-2 w-2">
                       <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
                       <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
@@ -210,67 +211,83 @@ export default function PaymentStatusCard({ userId, installationId }) {
             </TooltipProvider>
           )}
         </div>
-        <CardDescription>
+        <CardDescription className={cn("text-slate-500", isLarge ? "text-base" : "")}>
           {paymentPlan ? `Installation #${paymentPlan.installationId}` : "Payment information"}
         </CardDescription>
       </CardHeader>
-      <CardContent>
-        <div className="space-y-3">
+      <CardContent className={isLarge ? "pt-5" : "pt-3"}>
+        <div className={isLarge ? "space-y-5" : "space-y-4"}>
           {paymentPlan && (
             <>
               <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-500">Loan:</span>
-                <div className="flex items-center gap-1">
-                  <span className="font-medium">{paymentPlan.name || `Loan #${paymentPlan.id}`}</span>
-                  {getStatusBadge(paymentPlan.status)}
-                </div>
+                <span className={cn("text-slate-500", isLarge ? "text-base" : "text-sm")}>Loan:</span>
+                <span className={cn("font-semibold text-slate-800", isLarge ? "text-lg" : "")}>
+                  {paymentPlan.name || `Loan #${paymentPlan.id}`}
+                </span>
               </div>
               
               {/* Display loan description if available */}
               {paymentPlan.description && (
-                <div className="text-xs text-gray-500 italic">
+                <div className={cn("text-slate-500 italic", isLarge ? "text-sm" : "text-xs")}>
                   {paymentPlan.description}
                 </div>
               )}
               
               {/* Loan Progress Section */}
-              <div className="space-y-1.5">
-                <div className="flex justify-between items-center text-sm">
-                  <span className="text-gray-500">Loan Progress:</span>
-                  <span className="font-medium">{loanProgress.toFixed(0)}% Completed</span>
+              <div className="space-y-2">
+                <div className="flex justify-between items-center">
+                  <span className={cn("text-slate-500", isLarge ? "text-base" : "text-sm")}>Loan Progress:</span>
+                  <span className={cn("font-semibold text-slate-800", isLarge ? "text-lg" : "")}>
+                    {loanProgress.toFixed(0)}% Completed
+                  </span>
                 </div>
-                <Progress value={loanProgress} className="h-2" />
-                <div className="flex justify-between text-xs text-gray-500">
-                  <span>Paid: {formatCurrency(paymentPlan.totalAmount - paymentPlan.remainingAmount)}</span>
-                  <span>Total: {formatCurrency(paymentPlan.totalAmount)}</span>
+                <Progress 
+                  value={loanProgress} 
+                  className={cn("h-2.5 rounded-full bg-slate-100", isLarge ? "h-3" : "h-2")} 
+                />
+                <div className="flex justify-between text-slate-500">
+                  <span className={isLarge ? "text-sm" : "text-xs"}>
+                    Paid: {formatCurrency(paymentPlan.totalAmount - paymentPlan.remainingAmount)}
+                  </span>
+                  <span className={isLarge ? "text-sm" : "text-xs"}>
+                    Total: {formatCurrency(paymentPlan.totalAmount)}
+                  </span>
                 </div>
               </div>
               
               <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-500">Payment Amount:</span>
-                <span className="font-medium">{formatCurrency(paymentPlan.installmentAmount || paymentPlan.monthlyPayment)}</span>
+                <span className={cn("text-slate-500", isLarge ? "text-base" : "text-sm")}>Payment Amount:</span>
+                <span className={cn("font-semibold text-primary", isLarge ? "text-lg" : "")}>
+                  {formatCurrency(paymentPlan.installmentAmount || paymentPlan.monthlyPayment)}
+                </span>
               </div>
               
               <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-500">Frequency:</span>
-                <div className="flex items-center gap-1">
-                  <CalendarClock className="h-3 w-3 text-gray-400" />
-                  <span className="font-medium">{paymentPlan.frequency || "Monthly"}</span>
+                <span className={cn("text-slate-500", isLarge ? "text-base" : "text-sm")}>Frequency:</span>
+                <div className="flex items-center gap-1.5">
+                  <CalendarClock className={cn("text-slate-400", isLarge ? "h-4 w-4" : "h-3.5 w-3.5")} />
+                  <span className={cn("font-medium uppercase text-slate-700", isLarge ? "text-base" : "")}>
+                    {paymentPlan.frequency || "Monthly"}
+                  </span>
                 </div>
               </div>
               
               {/* Loan Term / End Date */}
               <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-500">End Date:</span>
-                <span className="font-medium">{paymentPlan.endDate ? formatDate(paymentPlan.endDate) : "N/A"}</span>
+                <span className={cn("text-slate-500", isLarge ? "text-base" : "text-sm")}>End Date:</span>
+                <span className={cn("font-medium text-slate-800", isLarge ? "text-base" : "")}>
+                  {paymentPlan.endDate ? formatDate(paymentPlan.endDate) : "N/A"}
+                </span>
               </div>
               
               {paymentPlan.interestRate > 0 && (
                 <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-500">Interest Rate:</span>
-                  <div className="flex items-center gap-1">
-                    <Percent className="h-3 w-3 text-gray-400" />
-                    <span className="font-medium">{paymentPlan.interestRate}%</span>
+                  <span className={cn("text-slate-500", isLarge ? "text-base" : "text-sm")}>Interest Rate:</span>
+                  <div className="flex items-center gap-1.5">
+                    <Percent className={cn("text-slate-400", isLarge ? "h-4 w-4" : "h-3.5 w-3.5")} />
+                    <span className={cn("font-medium text-slate-800", isLarge ? "text-base" : "")}>
+                      {paymentPlan.interestRate}%
+                    </span>
                   </div>
                 </div>
               )}
@@ -279,61 +296,68 @@ export default function PaymentStatusCard({ userId, installationId }) {
           
           {nextPayment && (
             <>
-              <div className="border-t border-gray-100 my-2 pt-2">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-500">Next Payment:</span>
-                  <div className="flex items-center gap-1">
-                    <span className="font-medium">{formatDate(nextPayment.dueDate)}</span>
-                    {daysUntilNextPayment !== null && daysUntilNextPayment <= 5 && 
-                      <Badge variant={daysUntilNextPayment <= 0 ? "destructive" : "warning"} className="text-xs">
-                        {daysUntilNextPayment <= 0 ? 'Due today' : `${daysUntilNextPayment} days`}
-                      </Badge>
-                    }
-                  </div>
+              <div className={cn(
+                "border-t border-slate-100 pt-4", 
+                isLarge ? "mt-5 pt-5" : "mt-3 pt-3"
+              )}>
+                <div className={cn(
+                  "flex justify-between items-center mb-3",
+                  isLarge ? "mb-4" : "mb-3"
+                )}>
+                  <span className={cn(
+                    "text-slate-500 font-medium", 
+                    isLarge ? "text-base" : "text-sm"
+                  )}>Next Payment:</span>
+                  <span className={cn(
+                    "font-semibold text-slate-800", 
+                    isLarge ? "text-lg" : ""
+                  )}>
+                    {formatDate(nextPayment.dueDate)}
+                  </span>
+                </div>
+                
+                <div className="flex justify-between items-center mb-2">
+                  <span className={cn("text-slate-500", isLarge ? "text-base" : "text-sm")}>Amount Due:</span>
+                  <span className={cn(
+                    "font-semibold text-primary", 
+                    isLarge ? "text-lg" : ""
+                  )}>
+                    {formatCurrency(nextPayment.amount)}
+                  </span>
                 </div>
                 
                 <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-500">Amount Due:</span>
-                  <span className="font-medium">{formatCurrency(nextPayment.amount)}</span>
-                </div>
-                
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-500">Status:</span>
+                  <span className={cn("text-slate-500", isLarge ? "text-base" : "text-sm")}>Status:</span>
                   {getStatusBadge(nextPayment.status)}
                 </div>
-                
-                {/* Payment Description if available */}
-                {nextPayment.description && (
-                  <div className="mt-1 text-xs text-gray-500 italic">
-                    {nextPayment.description}
-                  </div>
-                )}
               </div>
             </>
           )}
           
           {!paymentPlan && !nextPayment && (
-            <div className="py-2 text-sm text-center text-gray-500">
+            <div className={cn(
+              "py-6 text-center text-slate-500",
+              isLarge ? "text-base" : "text-sm"
+            )}>
               No active payment plans found
             </div>
           )}
         </div>
       </CardContent>
-      <CardFooter className="flex justify-between">
-        <Button variant="ghost" size="sm" onClick={handleViewPayments} className="flex items-center gap-1">
+      <CardFooter className={cn(
+        "flex justify-center bg-slate-50 border-t border-slate-100",
+        isLarge ? "pt-4 pb-4" : "pt-3 pb-3"
+      )}>
+        <Button 
+          onClick={handleViewPayments} 
+          className={cn(
+            "rounded-full shadow-sm hover:shadow-md transition-all",
+            isLarge ? "px-6" : "px-4"
+          )}
+        >
           <span>View Payments</span>
-          <ArrowRight className="h-4 w-4" />
+          <ArrowRight className="h-4 w-4 ml-2" />
         </Button>
-        {nextPayment && nextPayment.status !== "PAID" && (
-          <Button 
-            size="sm" 
-            variant="default" 
-            onClick={() => router.push('/customer/payments')}
-            className={nextPayment.status === "OVERDUE" ? "bg-red-500 hover:bg-red-600" : ""}
-          >
-            Pay Now
-          </Button>
-        )}
       </CardFooter>
     </Card>
   );

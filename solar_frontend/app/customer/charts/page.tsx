@@ -3,7 +3,7 @@
 import type React from "react"
 
 import { useState, useEffect } from "react"
-import { AlertCircle, ArrowRight, Battery, Check, Download, Home, Info, Shield, Sun, Zap, ArrowUp, ArrowDown, RefreshCw } from "lucide-react"
+import { AlertCircle, ArrowRight, Battery, Check, Download, Home, Info, Shield, Sun, Zap, ArrowUp, ArrowDown, RefreshCw, BarChart3 } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
@@ -653,8 +653,11 @@ export default function DashboardPage() {
         const hourLabel = `${hour}:00`
         
         // Apply normalization factors
-        hourlyData[hourLabel].production += (reading.powerGenerationWatts / 1000) * generationNormalizationFactor
-        hourlyData[hourLabel].consumption += (reading.powerConsumptionWatts / 1000) * consumptionNormalizationFactor
+        const normalizedGeneration = (reading.powerGenerationWatts / 1000) * generationNormalizationFactor
+        const normalizedConsumption = (reading.powerConsumptionWatts / 1000) * consumptionNormalizationFactor
+        
+        hourlyData[hourLabel].production += normalizedGeneration
+        hourlyData[hourLabel].consumption += normalizedConsumption
         hourlyData[hourLabel].count += 1
       })
       
@@ -663,8 +666,8 @@ export default function DashboardPage() {
         if (hourlyData[hour].count > 0) {
           chartData.push({
             time: hour,
-            production: hourlyData[hour].production / hourlyData[hour].count,
-            consumption: hourlyData[hour].consumption / hourlyData[hour].count
+            production: hourlyData[hour].production,
+            consumption: hourlyData[hour].consumption
           })
         } else {
           chartData.push({
@@ -854,122 +857,137 @@ export default function DashboardPage() {
     return chartData
   }
 
-  // Use the processed data for charts
-  const powerData = getProcessedChartData()
-
-  // Calculate totals as numbers first
-  const totalProduction = powerData.reduce((sum, item) => sum + item.production, 0)
-  const totalConsumption = powerData.reduce((sum, item) => sum + item.consumption, 0)
+  // Get the processed chart data
+  const chartData = getProcessedChartData()
+  
+  // Calculate totals for the charts
+  const totalProduction = chartData.reduce((sum, item) => sum + item.production, 0)
+  const totalConsumption = chartData.reduce((sum, item) => sum + item.consumption, 0)
 
   // Determine the right chart type based on selectedPeriod
   const renderEnergyChart = () => {
-    if (powerData.length === 0) {
+    if (chartData.length === 0) {
       return (
         <div className="flex flex-col items-center justify-center h-full py-12">
-          <p className="text-gray-500">No energy data available for the selected period</p>
+          <div className="text-muted-foreground mb-4">
+            <BarChart3 className="h-12 w-12" />
+          </div>
+          <h3 className="text-lg font-medium">No Energy Data Available</h3>
+          <p className="text-sm text-muted-foreground max-w-md mt-2 text-center">
+            There is no energy data available for the selected time period or installation.
+          </p>
         </div>
       )
     }
 
-    // Unit based on period
-    const unit = selectedPeriod === 'day' ? 'kW' : 'kWh'
-    const yAxisLabel = selectedPeriod === 'day' ? 'Power (kW)' : 'Energy (kWh)'
-    
     if (selectedPeriod === 'day') {
-      // Area chart for day view - shows continuous time series
       return (
-        <ResponsiveContainer width="100%" height="100%">
-          <AreaChart
-            data={powerData}
-            margin={{
-              top: 10,
-              right: 10,
-              left: 0,
-              bottom: 20,
-            }}
-          >
-            <CartesianGrid strokeDasharray="3 3" vertical={false} />
-            <XAxis dataKey="time" />
-            <YAxis 
-              label={{ value: yAxisLabel, angle: -90, position: "insideLeft" }} 
-              tickFormatter={(value) => `${value}`} 
-            />
-            <Tooltip 
-              formatter={(value) => [`${value.toFixed(2)} ${unit}`, ""]}
-              labelFormatter={(label) => `Time: ${label}`}
-            />
-            <Legend content={<CustomLegend />} />
-            {visibleSeries.production && (
-              <Area
-                type="monotone"
-                dataKey="production"
-                name="Production"
-                stroke="#10b981"
-                fill="#10b981"
-                fillOpacity={0.5}
+        <div className="w-full" style={{ height: 350 }}>
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart
+              data={chartData}
+              margin={{
+                top: 10,
+                right: 30,
+                left: 10,
+                bottom: 20,
+              }}
+            >
+              <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.1} />
+              <XAxis 
+                dataKey="time" 
+                tick={{ fontSize: 12 }}
+                tickFormatter={(time) => time.split(':')[0]}
+                label={{ value: "Hour", position: "insideBottom", offset: -10 }}
               />
-            )}
-            {visibleSeries.consumption && (
-              <Area
-                type="monotone"
-                dataKey="consumption"
-                name="Consumption"
-                stroke="#ef4444"
-                fill="#ef4444"
-                fillOpacity={0.5}
+              <YAxis 
+                tick={{ fontSize: 12 }}
+                label={{ value: "Power (kW)", angle: -90, position: "insideLeft" }}
               />
-            )}
-          </AreaChart>
-        </ResponsiveContainer>
+              <Tooltip 
+                formatter={(value: number) => [`${value.toFixed(2)} kW`, ""]} 
+                labelFormatter={(label) => `${label} (Hour)`}
+              />
+              <Legend content={<CustomLegend />} />
+              {visibleSeries.production && (
+                <Area
+                  type="monotone"
+                  dataKey="production"
+                  name="Generation"
+                  stackId="1"
+                  stroke="#16a34a"
+                  fill="#16a34a"
+                  fillOpacity={0.3}
+                />
+              )}
+              {visibleSeries.consumption && (
+                <Area
+                  type="monotone"
+                  dataKey="consumption"
+                  name="Consumption"
+                  stackId="2"
+                  stroke="#ef4444"
+                  fill="#ef4444"
+                  fillOpacity={0.3}
+                />
+              )}
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
       )
     } else {
-      // Bar chart for week/month/year views
+      // For week, month, and year views, use a bar chart
       return (
-        <ResponsiveContainer width="100%" height="100%">
-          <BarChart
-            data={powerData}
-            margin={{
-              top: 10,
-              right: 10,
-              left: 0,
-              bottom: 20,
-            }}
-          >
-            <CartesianGrid strokeDasharray="3 3" vertical={false} />
-            <XAxis dataKey="time" />
-            <YAxis 
-              label={{ value: yAxisLabel, angle: -90, position: "insideLeft" }} 
-            />
-            <Tooltip 
-              formatter={(value) => [`${value.toFixed(2)} ${unit}`, ""]}
-              labelFormatter={(label) => {
-                if (selectedPeriod === 'week') return `Day: ${label}`
-                if (selectedPeriod === 'month') return `Date: ${label}`
-                if (selectedPeriod === 'year') return `Month: ${label}`
-                return label
+        <div className="w-full" style={{ height: 350 }}>
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart
+              data={chartData}
+              margin={{
+                top: 10,
+                right: 30,
+                left: 10,
+                bottom: 20,
               }}
-            />
-            <Legend content={<CustomLegend />} />
-            {visibleSeries.production && (
-              <Bar
-                dataKey="production"
-                name="Production"
-                fill="#10b981"
-                radius={[4, 4, 0, 0]}
-                barSize={selectedPeriod === 'year' ? 20 : 30}
+            >
+              <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.1} />
+              <XAxis 
+                dataKey="time" 
+                tick={{ fontSize: 12 }}
+                label={{ 
+                  value: selectedPeriod === 'week' ? "Day" : 
+                         selectedPeriod === 'month' ? "Day of Month" : "Month", 
+                  position: "insideBottom", 
+                  offset: -10 
+                }}
               />
-            )}
-            {visibleSeries.consumption && (
-              <Bar
-                dataKey="consumption"
-                name="Consumption"
-                fill="#ef4444"
-                radius={[4, 4, 0, 0]}
-                barSize={selectedPeriod === 'year' ? 20 : 30}
+              <YAxis 
+                tick={{ fontSize: 12 }}
+                label={{ value: "Energy (kWh)", angle: -90, position: "insideLeft" }}
               />
-            )}
-          </BarChart>
-        </ResponsiveContainer>
+              <Tooltip 
+                formatter={(value: number) => [`${value.toFixed(2)} kWh`, ""]} 
+              />
+              <Legend content={<CustomLegend />} />
+              {visibleSeries.production && (
+                <Bar
+                  dataKey="production"
+                  name="Generation"
+                  fill="#16a34a"
+                  radius={[4, 4, 0, 0]}
+                />
+              )}
+              {visibleSeries.consumption && (
+                <Bar
+                  dataKey="consumption"
+                  name="Consumption"
+                  fill="#ef4444"
+                  radius={[4, 4, 0, 0]}
+                />
+              )}
+              <ReferenceLine y={0} stroke="#000" />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
       )
     }
   }
@@ -1212,25 +1230,25 @@ export default function DashboardPage() {
                     <div className="flex items-center">
                       <Sun className="h-4 w-4 text-orange-500 mr-2" />
                       <span>Production</span>
-                </div>
+                    </div>
                     <span className="font-bold text-green-500">
                       {selectedPeriod === 'day' 
-                        ? `${totalProduction.toFixed(2)} kW` 
+                        ? `${totalProduction.toFixed(2)} kWh` 
                         : `${totalProduction.toFixed(2)} kWh`}
                     </span>
-                </div>
+                  </div>
                   
                   <div className="flex justify-between items-center py-2 border-b">
                     <div className="flex items-center">
                       <Home className="h-4 w-4 text-gray-500 mr-2" />
                       <span>Consumption</span>
-                </div>
+                    </div>
                     <span className="font-bold text-red-500">
                       {selectedPeriod === 'day' 
-                        ? `${totalConsumption.toFixed(2)} kW` 
+                        ? `${totalConsumption.toFixed(2)} kWh` 
                         : `${totalConsumption.toFixed(2)} kWh`}
                     </span>
-                </div>
+                  </div>
                   
                   <div className="flex justify-between items-center py-2">
                     <div className="flex items-center">
