@@ -39,6 +39,7 @@ import {
   AreaChart,
   ComposedChart,
   Bar,
+  BarChart,
 } from "recharts"
 import {
   Breadcrumb,
@@ -110,12 +111,18 @@ export default function EnergyMonitoringPage() {
         setSystemOverview(systemResponse)
         setInstallations(systemResponse.recentlyActiveInstallations || [])
 
-        // Set dashboard metrics consistently
+        // Set dashboard metrics consistently from the system overview response
         const todayTotal = systemResponse.todayTotalGenerationKWh || 0
         const weekTotal = systemResponse.weekToDateGenerationKWh || 0
         const monthTotal = systemResponse.monthToDateGenerationKWh || 0
         const yearTotal = systemResponse.yearToDateGenerationKWh || 0
         const efficiency = systemResponse.averageSystemEfficiency || 0
+        
+        // Set consumption metrics
+        const todayConsumption = systemResponse.todayTotalConsumptionKWh || 0
+        const weekConsumption = systemResponse.weekToDateConsumptionKWh || 0
+        const monthConsumption = systemResponse.monthToDateConsumptionKWh || 0
+        const yearConsumption = systemResponse.yearToDateConsumptionKWh || 0
         
         // Log metrics for debugging
         console.log('Energy metrics received from backend:', {
@@ -123,6 +130,10 @@ export default function EnergyMonitoringPage() {
           weekTotal,
           monthTotal,
           yearTotal,
+          todayConsumption,
+          weekConsumption,
+          monthConsumption,
+          yearConsumption,
           efficiency,
           currentGeneration: systemResponse.currentSystemGenerationWatts || 0
         })
@@ -133,191 +144,114 @@ export default function EnergyMonitoringPage() {
         setTotalProductionYear(yearTotal)
         setAverageEfficiency(efficiency)
 
-        // Extract energy data from the system overview - ensuring consistency with summary metrics
-        if (systemResponse.energyData && systemResponse.energyData[timeRange]) {
-          // We have pre-formatted data from the API
-          setEnergyData(systemResponse.energyData[timeRange])
-        } else if (systemResponse.energyDataByTimeRange && systemResponse.energyDataByTimeRange[timeRange]) {
-          // Alternative property name
-          setEnergyData(systemResponse.energyDataByTimeRange[timeRange])
-        } else if (todayTotal > 0 || monthTotal > 0) {
-          // We have energy data but no formatted time series - fetch raw readings
-          
-          // If we have active installations, fetch their readings
-          if (systemResponse.recentlyActiveInstallations && systemResponse.recentlyActiveInstallations.length > 0) {
-            try {
-              // Get data from all active installations
-              const activeInstallations = systemResponse.recentlyActiveInstallations
-              
-              // Create an array to hold all readings
-              let allReadings = []
-              
-              // Fetch and combine readings from all installations 
-              const readingsPromises = activeInstallations.map(installation => 
-                energyApi.getRecentReadings(installation.id, 50)
-                  .then(readings => {
-                    if (readings && readings.length > 0) {
-                      // Add installation type info to each reading for better charts
-                      const enhancedReadings = readings.map(reading => ({
-                        ...reading,
-                        installationType: installation.type || 'RESIDENTIAL'
-                      }))
-                      return enhancedReadings
-                    }
-                    return []
-                  })
-                  .catch(error => {
-                    console.error(`Error fetching readings for installation ${installation.id}:`, error)
-                    return []
-                  })
-              )
-              
-              // Wait for all readings to be fetched
-              const installationReadings = await Promise.all(readingsPromises)
-              
-              // Combine all readings
-              allReadings = installationReadings.flat()
-              
-              if (allReadings.length > 0) {
-                // Transform combined readings into chart data - ensuring consistency with summary metrics
-                const chartData = transformReadingsToChartData(allReadings, timeRange)
-                setEnergyData(chartData)
-              } else {
-                // Fallback to basic chart data
-                setEnergyData(createBasicChartData(systemResponse, timeRange))
-              }
-            } catch (error) {
-              console.error("Error fetching installation readings:", error)
+        // Get top producers
+        if (systemResponse.topProducers && systemResponse.topProducers.length > 0) {
+          setTopProducers(systemResponse.topProducers)
+        }
+
+        // Process energy reading data - use the recent installation readings if available
+        if (systemResponse.recentInstallationReadings && systemResponse.recentInstallationReadings.length > 0) {
+          const chartData = processRecentReadings(systemResponse.recentInstallationReadings, timeRange, 
+            {
+              generationTotal: getExpectedGenerationTotal(timeRange, systemResponse),
+              consumptionTotal: getExpectedConsumptionTotal(timeRange, systemResponse)
+            })
+          setEnergyData(chartData)
+        } else if (systemResponse.recentlyActiveInstallations && systemResponse.recentlyActiveInstallations.length > 0) {
+          try {
+            // Get data from all active installations if no readings in system overview
+            const activeInstallations = systemResponse.recentlyActiveInstallations
+            
+            // Fetch detailed data for each installation
+            const installationDataPromises = activeInstallations.map(installation => 
+              energyApi.getInstallationDashboard(installation.id)
+            )
+            
+            // Wait for all data to be fetched
+            const installationsData = await Promise.all(installationDataPromises)
+            
+            // Combine all readings from all installations
+            const allReadings = installationsData
+              .filter(data => data && data.recentReadings)
+              .flatMap(data => data.recentReadings.map(reading => ({
+                ...reading,
+                installationType: data.installationDetails?.type || 'RESIDENTIAL'
+              })))
+            
+            if (allReadings.length > 0) {
+              // Transform combined readings into chart data
+              const chartData = transformReadingsToChartData(allReadings, timeRange)
+              setEnergyData(chartData)
+            } else {
               // Fallback to basic chart data
               setEnergyData(createBasicChartData(systemResponse, timeRange))
             }
-          } else {
-            // No installations available, fallback to basic chart data
+          } catch (error) {
+            console.error("Error fetching installation readings:", error)
+            // Fallback to basic chart data
             setEnergyData(createBasicChartData(systemResponse, timeRange))
           }
         } else {
-          // No energy data available
-          setEnergyData([])
-        }
-
-        // Get active installations to use as top producers if needed
-        const activeInstallations = systemResponse.recentlyActiveInstallations || [];
-        
-        // Get and fetch dashboard data for each installation 
-        // First get the IDs of installations to check (either from topProducers or active installations)
-        let installationIdsToFetch = [];
-        
-        // Use top producers from system overview if available
-        if (systemResponse.topProducers && Array.isArray(systemResponse.topProducers) && systemResponse.topProducers.length > 0) {
-          installationIdsToFetch = systemResponse.topProducers.slice(0, 5).map(prod => prod.id);
-        } 
-        // Otherwise use active installations 
-        else if (activeInstallations.length > 0) {
-          installationIdsToFetch = activeInstallations.slice(0, 5).map(inst => inst.id);
-        }
-        
-        // If we have IDs to fetch, get dashboard data for each
-        if (installationIdsToFetch.length > 0) {
-          try {
-            // Fetch dashboard data for each installation and calculate their average efficiency
-            const dashboardPromises = installationIdsToFetch.map(async id => {
-              try {
-                // Get dashboard data
-                const dashboard = await energyApi.getInstallationDashboard(id);
-                
-                // Also calculate average efficiency
-                const averageEfficiency = await energyApi.calculateInstallationAverageEfficiency(id);
-                
-                return {
-                  ...dashboard,
-                  averageEfficiencyPercentage: averageEfficiency
-                };
-              } catch (error) {
-                console.error(`Error fetching dashboard for installation ${id}:`, error);
-                return null;
-              }
-            });
-            
-            // Wait for all dashboards to be fetched
-            const dashboardResults = await Promise.all(dashboardPromises);
-            
-            // Filter out null results and create enriched top producers
-            const enrichedProducers = dashboardResults
-              .filter(dashboard => dashboard !== null)
-              .map(dashboard => {
-                // Find matching installation from active installations to get additional metadata
-                const matchingInstallation = activeInstallations.find(
-                  inst => inst.id === dashboard.installationId
-                );
-                
-                // Return combined data with dashboard values - prioritizing stable daily metrics over fluctuating real-time values
-                return {
-                  id: dashboard.installationId,
-                  name: dashboard.installationDetails?.name || 
-                        matchingInstallation?.name || 
-                        `Installation ${dashboard.installationId}`,
-                  username: dashboard.installationDetails?.username || 
-                          matchingInstallation?.username || 
-                          dashboard.installationDetails?.customer?.email || "N/A",
-                  location: dashboard.installationDetails?.location || 
-                          matchingInstallation?.location || "N/A",
-                  type: dashboard.installationDetails?.type || 
-                        matchingInstallation?.type || "RESIDENTIAL",
-                  // Use more stable daily metrics instead of real-time values that change every 15 seconds
-                  todayGenerationKWh: dashboard.todayGenerationKWh,
-                  currentPowerGenerationWatts: dashboard.currentPowerGenerationWatts, // Keep as fallback
-                  currentEfficiencyPercentage: dashboard.currentEfficiencyPercentage,
-                  // Add average efficiency for more stable metric
-                  averageEfficiencyPercentage: dashboard.averageEfficiencyPercentage || dashboard.currentEfficiencyPercentage
-                };
-              });
-            
-            // Set the enriched producers as top producers
-            if (enrichedProducers.length > 0) {
-              setTopProducers(enrichedProducers);
-              console.log("Fetched dashboard data with average efficiency for top producers:", enrichedProducers);
-            } else {
-              // Fall back to active installations if no dashboard data
-              setTopProducers(activeInstallations.slice(0, 5));
-            }
-          } catch (error) {
-            console.error("Error fetching installation dashboards:", error);
-            // Fall back to active installations
-            setTopProducers(activeInstallations.slice(0, 5));
-          }
-        } else {
-          // No installations to fetch, use what we have
-          setTopProducers(activeInstallations.slice(0, 5));
+          // No installations available, fallback to basic chart data
+          setEnergyData(createBasicChartData(systemResponse, timeRange))
         }
       } else {
-        setSystemOverview(null)
-        setInstallations([])
+        // Handle case where system overview data is not available
         setEnergyData([])
         setTopProducers([])
-        setTotalProductionToday(0)
-        setTotalProductionMonth(0)
-        setTotalProductionYear(0)
-        setAverageEfficiency(0)
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Failed to fetch energy monitoring data",
+        })
       }
     } catch (error) {
       console.error("Error fetching energy data:", error)
+      setEnergyData([])
+      setTopProducers([])
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Failed to load energy monitoring data from the server.",
+        description: "Failed to fetch energy monitoring data",
       })
-
-      // Reset data on error instead of using sample data
-      setSystemOverview(null)
-      setInstallations([])
-      setEnergyData([])
-      setTopProducers([])
-      setTotalProductionToday(0)
-      setTotalProductionMonth(0)
-      setTotalProductionYear(0)
-      setAverageEfficiency(0)
     } finally {
       setLoading(false)
+    }
+  }
+  
+  // Helper function to process recent readings directly from system overview
+  const processRecentReadings = (readings, timeRangeType, expectedTotals) => {
+    // Map API readings to consistent format
+    const formattedReadings = readings.map(reading => ({
+      timestamp: reading.timestamp,
+      powerGenerationWatts: reading.energyProduced || 0,
+      powerConsumptionWatts: reading.energyConsumed || 0,
+      installationType: reading.installationType || 'RESIDENTIAL'
+    }))
+    
+    // Use the transformed readings function with our expected totals
+    return transformReadingsToChartData(formattedReadings, timeRangeType)
+  }
+  
+  // Helper to get expected generation total based on time range
+  const getExpectedGenerationTotal = (timeRange, systemResponse) => {
+    switch(timeRange) {
+      case 'day': return systemResponse.todayTotalGenerationKWh || 0
+      case 'week': return systemResponse.weekToDateGenerationKWh || 0
+      case 'month': return systemResponse.monthToDateGenerationKWh || 0
+      case 'year': return systemResponse.yearToDateGenerationKWh || 0
+      default: return systemResponse.todayTotalGenerationKWh || 0
+    }
+  }
+  
+  // Helper to get expected consumption total based on time range
+  const getExpectedConsumptionTotal = (timeRange, systemResponse) => {
+    switch(timeRange) {
+      case 'day': return systemResponse.todayTotalConsumptionKWh || 0
+      case 'week': return systemResponse.weekToDateConsumptionKWh || 0
+      case 'month': return systemResponse.monthToDateConsumptionKWh || 0
+      case 'year': return systemResponse.yearToDateConsumptionKWh || 0
+      default: return systemResponse.todayTotalConsumptionKWh || 0
     }
   }
 
@@ -369,47 +303,90 @@ export default function EnergyMonitoringPage() {
     const monthTotal = systemOverview.monthToDateGenerationKWh || 0;
     const yearTotal = systemOverview.yearToDateGenerationKWh || 0;
     
-    // For very small values (below threshold), treat them as zero to prevent misleading visualizations
-    const isVerySmallToday = todayTotal < 0.001;
-    const isVerySmallWeek = weekTotal < 0.001;
-    const isVerySmallMonth = monthTotal < 0.001;
-    const isVerySmallYear = yearTotal < 0.001;
+    // Get consumption totals for normalization
+    const todayConsumption = systemOverview.todayTotalConsumptionKWh || 0;
+    const weekConsumption = systemOverview.weekToDateConsumptionKWh || 0;
+    const monthConsumption = systemOverview.monthToDateConsumptionKWh || 0;
+    const yearConsumption = systemOverview.yearToDateConsumptionKWh || 0;
+    
+    // For very small values (below threshold), treat them as zero to prevent misleading visualizations 
+    // BUT ONLY FOR PRODUCTION - we still want to show consumption data even with tiny production
+    const isVerySmallToday = todayTotal < 0.001 && todayConsumption < 0.001;
+    const isVerySmallWeek = weekTotal < 0.001 && weekConsumption < 0.001;
+    const isVerySmallMonth = monthTotal < 0.001 && monthConsumption < 0.001;
+    const isVerySmallYear = yearTotal < 0.001 && yearConsumption < 0.001;
     
     // Determine if we should show zero values based on timeRange
+    // Only if BOTH production AND consumption are very small
     const shouldUseZeroValues = 
       (timeRangeType === 'day' && isVerySmallToday) ||
       (timeRangeType === 'week' && isVerySmallWeek) ||
       (timeRangeType === 'month' && isVerySmallMonth) ||
       (timeRangeType === 'year' && isVerySmallYear);
     
+    console.log(`Energy metrics for ${timeRangeType}:`, {
+      timeRangeType,
+      todayTotal, 
+      weekTotal,
+      monthTotal,
+      yearTotal,
+      todayConsumption,
+      weekConsumption,
+      monthConsumption,
+      yearConsumption,
+      isVerySmallToday,
+      isVerySmallWeek,
+      isVerySmallMonth, 
+      isVerySmallYear,
+      shouldUseZeroValues
+    });
+    
     if (shouldUseZeroValues) {
-      console.log(`Using zero values for ${timeRangeType} due to very small official totals:`, {
-        timeRangeType,
-        todayTotal, 
-        weekTotal,
-        monthTotal,
-        yearTotal
-      });
+      console.log(`Using zero values for ${timeRangeType} due to very small official totals`);
       // Return empty data with the correct structure for each time range
       return createBasicChartData(systemOverview, timeRangeType);
     }
     
     // Calculate the total energy from all readings to normalize later
-    const totalEnergyFromReadings = sortedReadings.reduce((sum, reading) => 
+    const totalProductionFromReadings = sortedReadings.reduce((sum, reading) => 
       sum + (reading.powerGenerationWatts / 1000), 0);
+      
+    const totalConsumptionFromReadings = sortedReadings.reduce((sum, reading) => 
+      sum + (reading.powerConsumptionWatts / 1000), 0);
     
     // Get expected totals from the system overview
-    const totalEnergyExpected: Record<string, number> = {
+    const expectedProduction: Record<string, number> = {
       day: systemOverview.todayTotalGenerationKWh || 0,
       week: systemOverview.weekToDateGenerationKWh || 0,
       month: systemOverview.monthToDateGenerationKWh || 0,
       year: systemOverview.yearToDateGenerationKWh || 0
     };
     
-    // Calculate normalization factor if readings have values
-    const normalizationFactor = totalEnergyFromReadings > 0 && totalEnergyExpected[timeRangeType] > 0 
-      ? totalEnergyExpected[timeRangeType] / totalEnergyFromReadings
+    const expectedConsumption: Record<string, number> = {
+      day: systemOverview.todayTotalConsumptionKWh || 0,
+      week: systemOverview.weekToDateConsumptionKWh || 0,
+      month: systemOverview.monthToDateConsumptionKWh || 0,
+      year: systemOverview.yearToDateConsumptionKWh || 0
+    };
+    
+    // Calculate normalization factors if readings have values and expected values exist
+    const productionNormalizationFactor = totalProductionFromReadings > 0 && expectedProduction[timeRangeType] > 0 
+      ? expectedProduction[timeRangeType] / totalProductionFromReadings
       : 1;
+      
+    const consumptionNormalizationFactor = totalConsumptionFromReadings > 0 && expectedConsumption[timeRangeType] > 0 
+      ? expectedConsumption[timeRangeType] / totalConsumptionFromReadings
+      : 1;
+    
+    console.log('Normalization factors:', {
+      productionFactor: productionNormalizationFactor,
+      consumptionFactor: consumptionNormalizationFactor,
+      timeRangeType,
+      expectedProduction: expectedProduction[timeRangeType],
+      expectedConsumption: expectedConsumption[timeRangeType],
+      totalProductionFromReadings,
+      totalConsumptionFromReadings
+    });
     
     // Group readings by installation first
     const installationReadings = {}
@@ -453,7 +430,7 @@ export default function EnergyMonitoringPage() {
           const hourLabel = `${hour}:00`
           
           // Add values - normalize to match the summary total
-          const powerGen = (reading.powerGenerationWatts / 1000) * normalizationFactor // Convert to kW and normalize
+          const powerGen = (reading.powerGenerationWatts / 1000) * productionNormalizationFactor // Convert to kW and normalize
           hourlyData[hourLabel].total += powerGen
           
           // Categorize by installation type
@@ -469,7 +446,8 @@ export default function EnergyMonitoringPage() {
             hourlyData[hourLabel].residential += powerGen
           }
           
-          hourlyData[hourLabel].consumption += (reading.powerConsumptionWatts / 1000) * normalizationFactor
+          // Normalize consumption data using the consumption factor
+          hourlyData[hourLabel].consumption += (reading.powerConsumptionWatts / 1000) * consumptionNormalizationFactor
           hourlyData[hourLabel].count += 1
         })
       })
@@ -511,7 +489,7 @@ export default function EnergyMonitoringPage() {
           const dayLabel = dayNames[day]
           
           // Add values - normalize to match the summary total
-          const powerGen = (reading.powerGenerationWatts / 1000) * normalizationFactor // Convert to kW and normalize
+          const powerGen = (reading.powerGenerationWatts / 1000) * productionNormalizationFactor // Convert to kW and normalize
           dailyData[dayLabel].total += powerGen
           
           // Categorize by installation type
@@ -527,7 +505,8 @@ export default function EnergyMonitoringPage() {
             dailyData[dayLabel].residential += powerGen
           }
           
-          dailyData[dayLabel].consumption += (reading.powerConsumptionWatts / 1000) * normalizationFactor
+          // Normalize consumption data using the consumption factor
+          dailyData[dayLabel].consumption += (reading.powerConsumptionWatts / 1000) * consumptionNormalizationFactor
           dailyData[dayLabel].count += 1
         })
       })
@@ -569,7 +548,7 @@ export default function EnergyMonitoringPage() {
           const dayLabel = day.toString()
           
           // Add values - normalize to match the summary total
-          const powerGen = (reading.powerGenerationWatts / 1000) * normalizationFactor // Convert to kW and normalize
+          const powerGen = (reading.powerGenerationWatts / 1000) * productionNormalizationFactor // Convert to kW and normalize
           monthData[dayLabel].total += powerGen
           
           // Categorize by installation type
@@ -585,7 +564,8 @@ export default function EnergyMonitoringPage() {
             monthData[dayLabel].residential += powerGen
           }
           
-          monthData[dayLabel].consumption += (reading.powerConsumptionWatts / 1000) * normalizationFactor
+          // Normalize consumption data using the consumption factor
+          monthData[dayLabel].consumption += (reading.powerConsumptionWatts / 1000) * consumptionNormalizationFactor
           monthData[dayLabel].count += 1
         })
       })
@@ -628,7 +608,7 @@ export default function EnergyMonitoringPage() {
           const monthLabel = monthNames[month]
           
           // Add values - normalize to match the summary total
-          const powerGen = (reading.powerGenerationWatts / 1000) * normalizationFactor // Convert to kW and normalize
+          const powerGen = (reading.powerGenerationWatts / 1000) * productionNormalizationFactor // Convert to kW and normalize
           yearData[monthLabel].total += powerGen
           
           // Categorize by installation type
@@ -644,7 +624,8 @@ export default function EnergyMonitoringPage() {
             yearData[monthLabel].residential += powerGen
           }
           
-          yearData[monthLabel].consumption += (reading.powerConsumptionWatts / 1000) * normalizationFactor
+          // Normalize consumption data using the consumption factor
+          yearData[monthLabel].consumption += (reading.powerConsumptionWatts / 1000) * consumptionNormalizationFactor
           yearData[monthLabel].count += 1
         })
       })
@@ -966,20 +947,14 @@ export default function EnergyMonitoringPage() {
       </Card>
 
       {/* Summary Cards */}
-      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-4">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium">Today's Production</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{totalProductionToday > 0 ? totalProductionToday.toFixed(2) : '0.0'} kWh</div>
-            <p className="text-xs text-muted-foreground">
-              <span className={`flex items-center ${totalProductionToday > 0 ? 'text-emerald-500' : 'text-gray-400'}`}>
-                <ArrowUp className="mr-1 h-4 w-4" />
-                {systemOverview?.dailyChangePercentage ? `+${systemOverview.dailyChangePercentage}%` : 
-                 totalProductionToday > 0 ? "Data available" : "Data unavailable"}
-              </span>
-            </p>
+            <div className="text-2xl font-bold">{formatEnergyValue(totalProductionToday)}</div>
+            <div className="text-xs text-muted-foreground mt-1"><ArrowUp className="inline h-4 w-4 text-green-500" /> Data available</div>
           </CardContent>
         </Card>
         <Card>
@@ -987,14 +962,8 @@ export default function EnergyMonitoringPage() {
             <CardTitle className="text-sm font-medium">Weekly Production</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{totalProductionWeek > 0 ? totalProductionWeek.toFixed(2) : '0.0'} kWh</div>
-            <p className="text-xs text-muted-foreground">
-              <span className={`flex items-center ${totalProductionWeek > 0 ? 'text-emerald-500' : 'text-gray-400'}`}>
-                <ArrowUp className="mr-1 h-4 w-4" />
-                {systemOverview?.weeklyChangePercentage ? `+${systemOverview.weeklyChangePercentage}%` : 
-                 totalProductionWeek > 0 ? "Data available" : "Data unavailable"}
-              </span>
-            </p>
+            <div className="text-2xl font-bold">{formatEnergyValue(totalProductionWeek)}</div>
+            <div className="text-xs text-muted-foreground mt-1"><ArrowUp className="inline h-4 w-4 text-green-500" /> Data available</div>
           </CardContent>
         </Card>
         <Card>
@@ -1002,14 +971,8 @@ export default function EnergyMonitoringPage() {
             <CardTitle className="text-sm font-medium">Monthly Production</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{totalProductionMonth > 0 ? totalProductionMonth.toFixed(2) : '0.0'} kWh</div>
-            <p className="text-xs text-muted-foreground">
-              <span className={`flex items-center ${totalProductionMonth > 0 ? 'text-emerald-500' : 'text-gray-400'}`}>
-                <ArrowUp className="mr-1 h-4 w-4" />
-                {systemOverview?.monthlyChangePercentage ? `+${systemOverview.monthlyChangePercentage}%` : 
-                 totalProductionMonth > 0 ? "Data available" : "Data unavailable"}
-              </span>
-            </p>
+            <div className="text-2xl font-bold">{formatEnergyValue(totalProductionMonth)}</div>
+            <div className="text-xs text-muted-foreground mt-1"><ArrowUp className="inline h-4 w-4 text-green-500" /> Data available</div>
           </CardContent>
         </Card>
         <Card>
@@ -1017,142 +980,201 @@ export default function EnergyMonitoringPage() {
             <CardTitle className="text-sm font-medium">Annual Production</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{totalProductionYear > 0 ? totalProductionYear.toFixed(2) : '0.0'} kWh</div>
-            <p className="text-xs text-muted-foreground">
-              <span className={`flex items-center ${totalProductionYear > 0 ? 'text-emerald-500' : 'text-gray-400'}`}>
-                <ArrowUp className="mr-1 h-4 w-4" />
-                {systemOverview?.yearlyChangePercentage ? `+${systemOverview.yearlyChangePercentage}%` : 
-                 totalProductionYear > 0 ? "Data available" : "Data unavailable"}
-              </span>
-            </p>
+            <div className="text-2xl font-bold">{formatEnergyValue(totalProductionYear)}</div>
+            <div className="text-xs text-muted-foreground mt-1"><ArrowUp className="inline h-4 w-4 text-green-500" /> Data available</div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Main Charts */}
-      <div className="grid grid-cols-1 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Energy Production</CardTitle>
-            <CardDescription>System-wide energy production</CardDescription>
-            <Tabs defaultValue="production" className="w-full">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                <TabsList>
-                  <TabsTrigger value="production">Production</TabsTrigger>
-                  <TabsTrigger value="consumption">Consumption</TabsTrigger>
-                </TabsList>
-              </div>
-              <TabsContent value="production" className="mt-4">
+      <Card className="mb-4">
+        <CardHeader>
+          <CardTitle>Energy Production</CardTitle>
+          <CardDescription>System-wide energy production</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Tabs defaultValue="both">
+            <TabsList className="mb-4">
+              <TabsTrigger value="both">Production & Consumption</TabsTrigger>
+              <TabsTrigger value="production">Production</TabsTrigger>
+              <TabsTrigger value="consumption">Consumption</TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="both">
+              <div className="h-[400px]">
                 {loading ? (
-                  <div className="flex justify-center py-12">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                  <div className="w-full h-full flex items-center justify-center">
+                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                   </div>
                 ) : energyData.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-12 text-center">
-                    <LineChart className="h-16 w-16 text-muted-foreground mb-4" />
-                    <h3 className="text-lg font-medium">No Production Data Available</h3>
-                    <p className="text-sm text-muted-foreground max-w-md mt-2">
-                      There is no energy production data available for the selected time range.
+                  <div className="w-full h-full flex flex-col items-center justify-center text-center p-8">
+                    <BarChart3 className="h-10 w-10 text-muted-foreground mb-4" />
+                    <h3 className="text-lg font-medium">No Energy Data</h3>
+                    <p className="text-sm text-muted-foreground max-w-sm mt-2">
+                      There is no energy data available for the selected time period.
                     </p>
                   </div>
                 ) : (
                   <Chart>
                     <ChartContainer>
-                      <ResponsiveContainer width="100%" height={350}>
-                        <ComposedChart data={energyData} margin={{ top: 10, right: 10, left: 10, bottom: 40 }}>
-                          <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                      <ResponsiveContainer width="100%" height="100%">
+                        <ComposedChart data={energyData}>
                           <XAxis dataKey="name" />
-                          <YAxis tickFormatter={(value) => `${value / 1000}k`} />
-                          <Tooltip
-                            formatter={(value) => [`${formatEnergyValue(value)}`, ""]}
-                            labelFormatter={(label) => `${label} ${timeRange === 'day' ? 'Hour' : ''}`}
+                          <YAxis 
+                            yAxisId="left"
+                            orientation="left"
+                            label={{ value: 'kW/h', angle: -90, position: 'insideLeft' }}
                           />
-                          <Legend wrapperStyle={{ bottom: 0, left: 25 }} />
-                          <Bar
-                            dataKey="residential"
-                            name="Residential"
-                            stackId="a"
-                            fill="#3b82f6"
-                            barSize={timeRange === 'year' ? 20 : 30}
+                          <YAxis 
+                            yAxisId="right"
+                            orientation="right"
+                            label={{ value: 'kW/h', angle: 90, position: 'insideRight' }}
                           />
-                          <Bar
-                            dataKey="commercial"
-                            name="Commercial"
-                            stackId="a"
-                            fill="#10b981"
-                            barSize={timeRange === 'year' ? 20 : 30}
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                          <Tooltip 
+                            formatter={(value, name) => {
+                              return [`${value.toFixed(6)} kWh`, name === 'total' ? 'Production' : name === 'consumption' ? 'Consumption' : name]
+                            }}
                           />
-                          <Bar
-                            dataKey="industrial"
-                            name="Industrial"
-                            stackId="a"
-                            fill="#f59e0b"
-                            barSize={timeRange === 'year' ? 20 : 30}
+                          <Legend />
+                          <Bar 
+                            yAxisId="left"
+                            dataKey="total" 
+                            name="Production" 
+                            fill="#10b981" 
+                            radius={[4, 4, 0, 0]}
                           />
                           <Line
+                            yAxisId="right"
                             type="monotone"
-                            dataKey="total"
-                            name="Total Production"
+                            dataKey="consumption"
+                            name="Consumption"
                             stroke="#ef4444"
+                            dot={false}
                             strokeWidth={2}
-                            dot={{ r: 4 }}
                           />
                         </ComposedChart>
                       </ResponsiveContainer>
                     </ChartContainer>
                   </Chart>
                 )}
-              </TabsContent>
-              <TabsContent value="consumption" className="mt-4">
+              </div>
+            </TabsContent>
+            
+            <TabsContent value="production">
+              <div className="h-[400px]">
                 {loading ? (
-                  <div className="flex justify-center py-12">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                  <div className="w-full h-full flex items-center justify-center">
+                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                   </div>
                 ) : energyData.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-12 text-center">
-                    <LineChart className="h-16 w-16 text-muted-foreground mb-4" />
-                    <h3 className="text-lg font-medium">No Consumption Data Available</h3>
-                    <p className="text-sm text-muted-foreground max-w-md mt-2">
-                      There is no energy consumption data available for the selected time range.
+                  <div className="w-full h-full flex flex-col items-center justify-center text-center p-8">
+                    <BarChart3 className="h-10 w-10 text-muted-foreground mb-4" />
+                    <h3 className="text-lg font-medium">No Production Data</h3>
+                    <p className="text-sm text-muted-foreground max-w-sm mt-2">
+                      There is no production data available for the selected time period.
                     </p>
                   </div>
                 ) : (
                   <Chart>
                     <ChartContainer>
-                      <ResponsiveContainer width="100%" height={350}>
-                        <AreaChart data={energyData} margin={{ top: 10, right: 10, left: 10, bottom: 40 }}>
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={energyData}>
+                          <XAxis dataKey="name" />
+                          <YAxis label={{ value: 'kW/h', angle: -90, position: 'insideLeft' }} />
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                          <Tooltip 
+                            formatter={(value, name) => {
+                              return [`${value.toFixed(6)} kWh`, name === 'total' ? 'Production' : name]
+                            }}
+                          />
+                          <Legend />
+                          <Bar 
+                            dataKey="total" 
+                            name="Production" 
+                            fill="#10b981" 
+                            radius={[4, 4, 0, 0]}
+                          />
+                          <Bar 
+                            dataKey="residential" 
+                            name="Residential" 
+                            fill="#3b82f6" 
+                            radius={[4, 4, 0, 0]}
+                          />
+                          <Bar 
+                            dataKey="commercial" 
+                            name="Commercial" 
+                            fill="#6366f1" 
+                            radius={[4, 4, 0, 0]}
+                          />
+                          <Bar 
+                            dataKey="industrial" 
+                            name="Industrial" 
+                            fill="#8b5cf6" 
+                            radius={[4, 4, 0, 0]}
+                          />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </ChartContainer>
+                  </Chart>
+                )}
+              </div>
+            </TabsContent>
+            
+            <TabsContent value="consumption">
+              <div className="h-[400px]">
+                {loading ? (
+                  <div className="w-full h-full flex items-center justify-center">
+                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                  </div>
+                ) : energyData.length === 0 ? (
+                  <div className="w-full h-full flex flex-col items-center justify-center text-center p-8">
+                    <BarChart3 className="h-10 w-10 text-muted-foreground mb-4" />
+                    <h3 className="text-lg font-medium">No Consumption Data</h3>
+                    <p className="text-sm text-muted-foreground max-w-sm mt-2">
+                      There is no consumption data available for the selected time period.
+                    </p>
+                  </div>
+                ) : (
+                  <Chart>
+                    <ChartContainer>
+                      <ResponsiveContainer width="100%" height="100%">
+                        <AreaChart data={energyData}>
+                          <XAxis dataKey="name" />
+                          <YAxis 
+                            label={{ value: 'kW/h', angle: -90, position: 'insideLeft' }}
+                            domain={['auto', 'auto']}
+                          />
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                          <Tooltip 
+                            formatter={(value, name) => {
+                              return [`${value.toFixed(6)} kWh`, name === 'consumption' ? 'Consumption' : name]
+                            }}
+                          />
+                          <Legend />
                           <defs>
                             <linearGradient id="colorConsumption" x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="5%" stopColor="#ef4444" stopOpacity={0.8} />
-                              <stop offset="95%" stopColor="#ef4444" stopOpacity={0} />
+                              <stop offset="5%" stopColor="#ef4444" stopOpacity={0.8}/>
+                              <stop offset="95%" stopColor="#ef4444" stopOpacity={0.2}/>
                             </linearGradient>
                           </defs>
-                          <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                          <XAxis dataKey="name" />
-                          <YAxis tickFormatter={(value) => `${value / 1000}k`} />
-                          <Tooltip
-                            formatter={(value) => [`${formatEnergyValue(value)}`, ""]}
-                            labelFormatter={(label) => `${label} ${timeRange === 'day' ? 'Hour' : ''}`}
-                          />
-                          <Legend wrapperStyle={{ bottom: 0, left: 25 }} />
-                          <Area
+                          <Area 
                             type="monotone"
-                            dataKey="consumption"
-                            name="Energy Consumption"
-                            stroke="#ef4444"
-                            fillOpacity={1}
+                            dataKey="consumption" 
+                            name="Consumption" 
                             fill="url(#colorConsumption)"
+                            stroke="#ef4444"
+                            strokeWidth={2}
                           />
                         </AreaChart>
                       </ResponsiveContainer>
                     </ChartContainer>
                   </Chart>
                 )}
-              </TabsContent>
-            </Tabs>
-          </CardHeader>
-        </Card>
-      </div>
+              </div>
+            </TabsContent>
+          </Tabs>
+        </CardContent>
+      </Card>
 
       {/* Top Producers */}
       <Card>

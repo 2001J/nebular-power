@@ -152,10 +152,12 @@ export default function AnalyticsPage() {
       const dayFactor = Math.sin((i / 30) * Math.PI) * 0.5 + 0.5
       const randomFactor = Math.random() * 0.3 + 0.85
 
+      // Base production determined by the dayFactor (simulates sunlight availability)
       const baseProduction = 20 + dayFactor * 15
       const production = Math.round(baseProduction * randomFactor * 10) / 10
 
-      // Consumption is more consistent but with some peaks
+      // Consumption is more consistent and independent of production levels
+      // This ensures consumption data is visible even when production is low
       const baseConsumption = 25 + Math.random() * 10
       const consumption = Math.round(baseConsumption * 10) / 10
 
@@ -189,14 +191,21 @@ export default function AnalyticsPage() {
         production = Math.sin(((i - 6) / 12) * Math.PI) * 5
       }
 
-      // Consumption has morning and evening peaks
-      let consumption = 0.5
+      // Consumption has morning and evening peaks and a baseload
+      // Ensure consumption is meaningful even when production is zero or low
+      let consumption = 0.5 // Base load
       if (i >= 6 && i <= 9) {
+        // Morning peak (getting ready for work/school)
         consumption = 1.5 + Math.random() * 0.5
       } else if (i >= 17 && i <= 22) {
+        // Evening peak (cooking, entertainment)
         consumption = 2.0 + Math.random() * 1.0
-      } else {
+      } else if (i >= 0 && i <= 5) {
+        // Early morning (mostly baseload)
         consumption = 0.5 + Math.random() * 0.3
+      } else {
+        // Daytime (medium load)
+        consumption = 0.8 + Math.random() * 0.4
       }
 
       // Calculate derived values
@@ -225,10 +234,13 @@ export default function AnalyticsPage() {
     let batteryLevel = 80 // Starting at 80%
 
     return data.map((hour) => {
+      // Calculate energy balance between production and consumption
       const energyBalance = hour.production - hour.consumption
+      
       // Battery charges when production > consumption, discharges otherwise
-      // Limited to 0-100% range
-      batteryLevel = Math.min(100, Math.max(0, batteryLevel + energyBalance * 2))
+      // Limited to 0-100% range with a more gradual response
+      const batteryChange = energyBalance * 1.5 // Adjust sensitivity
+      batteryLevel = Math.min(100, Math.max(0, batteryLevel + batteryChange))
 
       return {
         ...hour,
@@ -245,8 +257,11 @@ export default function AnalyticsPage() {
       const isWeekend = i >= 5
       const production = isWeekend ? 120 + Math.random() * 30 : 100 + Math.random() * 40
 
-      // Weekend has higher consumption too
-      const consumption = isWeekend ? 140 + Math.random() * 30 : 120 + Math.random() * 20
+      // Weekend has different consumption patterns - higher during day, lower in morning
+      // Ensure consumption is meaningful and independent of production
+      const consumption = isWeekend 
+        ? 140 + Math.random() * 30  // Higher weekend consumption
+        : 120 + Math.random() * 20  // Workday consumption
 
       // Calculate derived values
       const selfConsumption = Math.min(production, consumption)
@@ -277,8 +292,10 @@ export default function AnalyticsPage() {
       const production = 300 + seasonFactor * 350
 
       // Winter months have higher consumption
+      // Make consumption independent from production to ensure visibility
       const winterFactor = Math.cos(((i + 3) / 12) * 2 * Math.PI) * 0.5 + 0.5
-      const consumption = 250 + winterFactor * 150 + seasonFactor * 100
+      const baseConsumption = 250 // Ensure base consumption is always visible
+      const consumption = baseConsumption + winterFactor * 150 + Math.random() * 50
 
       // Calculate derived values
       const selfConsumption = Math.min(production, consumption)
@@ -770,6 +787,8 @@ export default function AnalyticsPage() {
                               position: "insideLeft",
                               fontSize: 12,
                             }}
+                            domain={['auto', 'auto']}
+                            allowDataOverflow={false}
                           />
                           {weatherImpactEnabled && (
                             <YAxis
@@ -919,7 +938,12 @@ export default function AnalyticsPage() {
                                   border: "1px solid var(--border)",
                                   boxShadow: "0 2px 4px rgba(0,0,0,0.05)",
                                 }}
-                                formatter={(value) => [`${value}%`, "Battery Level"]}
+                                formatter={(value, name) => {
+                                  if (name === "batteryLevel") return [`${value}%`, "Battery Level"]
+                                  if (name === "production") return [`${value} ${chartData.unit}`, "Production"]
+                                  if (name === "consumption") return [`${value} ${chartData.unit}`, "Consumption"]
+                                  return [value, name]
+                                }}
                                 labelFormatter={(label) => `Time: ${label}`}
                               />
                               <Line
@@ -930,6 +954,44 @@ export default function AnalyticsPage() {
                                 dot={{ r: 2, fill: "#6366f1" }}
                                 name="Battery Level"
                               />
+                              {visibleSeries.production && visibleSeries.consumption && (
+                                <>
+                                  <YAxis
+                                    yAxisId="right"
+                                    orientation="right"
+                                    domain={['auto', 'auto']}
+                                    tick={{ fontSize: 12 }}
+                                    tickLine={{ stroke: "currentColor", opacity: 0.2 }}
+                                    axisLine={{ stroke: "currentColor", opacity: 0.2 }}
+                                    label={{
+                                      value: `Energy (${chartData.unit})`,
+                                      angle: 90,
+                                      position: "insideRight",
+                                      fontSize: 12,
+                                    }}
+                                  />
+                                  <Line
+                                    yAxisId="right"
+                                    type="monotone"
+                                    dataKey="production"
+                                    stroke="#4ade80"
+                                    strokeWidth={1.5}
+                                    strokeDasharray="4 4"
+                                    dot={false}
+                                    name="Production"
+                                  />
+                                  <Line
+                                    yAxisId="right"
+                                    type="monotone"
+                                    dataKey="consumption"
+                                    stroke="#f87171"
+                                    strokeWidth={1.5}
+                                    strokeDasharray="4 4"
+                                    dot={false}
+                                    name="Consumption"
+                                  />
+                                </>
+                              )}
                             </LineChart>
                           </ResponsiveContainer>
                         </ChartContainer>
@@ -967,6 +1029,8 @@ export default function AnalyticsPage() {
                           position: "insideLeft",
                           fontSize: 12,
                         }}
+                        domain={['auto', 'auto']}
+                        allowDataOverflow={false}
                       />
                       {weatherImpactEnabled && (
                         <YAxis

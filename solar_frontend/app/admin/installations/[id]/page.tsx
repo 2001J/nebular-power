@@ -230,7 +230,7 @@ export default function InstallationDetailPage() {
           
           // Transform readings to chart data if available
           if (dashboardData.recentReadings && dashboardData.recentReadings.length > 0) {
-            const chartData = transformReadingsToChartData(dashboardData.recentReadings, timeRange)
+            const chartData = processEnergyData(dashboardData.recentReadings, timeRange, dashboardData)
             setEnergyData(chartData)
           } else {
             // Set empty chart data
@@ -342,269 +342,224 @@ export default function InstallationDetailPage() {
   }, [id, timeRange, toast, router])
   
   // Transform readings to chart data
-  const transformReadingsToChartData = (readings: ReadingData[], timeRangeType: string): ChartDataPoint[] => {
+  const processEnergyData = (
+    readings: any[],
+    timeRangeType: string,
+    dashboardData: any
+  ) => {
     if (!readings || readings.length === 0) {
-      // Return empty data points for each time period based on selected range
-      if (timeRangeType === 'day') {
-        // Return 24 empty hour slots for a day
-        return Array.from({ length: 24 }, (_, i) => ({
-          name: `${i}:00`,
-          generation: 0,
-          consumption: 0
-        }));
-      } else if (timeRangeType === 'week') {
-        // Return 7 empty day slots
-        const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-        return dayNames.map(day => ({
-          name: day,
-          generation: 0,
-          consumption: 0
-        }));
-      } else if (timeRangeType === 'month') {
-        // Return ~30 empty day slots for a month
-        return Array.from({ length: 30 }, (_, i) => ({
-          name: (i + 1).toString(),
-          generation: 0,
-          consumption: 0
-        }));
-      } else {
-        // Return 12 empty month slots for a year
-        const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-        return monthNames.map(month => ({
-          name: month,
-          generation: 0,
-          consumption: 0
-        }));
-      }
+      return []
     }
-    
-    // Get reference values from the installation object for the selected time period
-    const todayGeneration = installation?.todayGenerationKWh || 0;
-    const todayConsumption = installation?.todayConsumptionKWh || 0;
-    const weekGeneration = installation?.weekToDateGenerationKWh || 0;
-    const weekConsumption = installation?.weekToDateConsumptionKWh || 0;
-    const monthGeneration = installation?.monthToDateGenerationKWh || 0;
-    const monthConsumption = installation?.monthToDateConsumptionKWh || 0;
-    const yearGeneration = installation?.yearToDateGenerationKWh || 0;
-    const yearConsumption = installation?.yearToDateConsumptionKWh || 0;
-    
-    // For very small values (below threshold), treat them as zero to prevent misleading visualizations
-    const isVerySmallToday = todayGeneration < 0.001;
-    const isVerySmallWeek = weekGeneration < 0.001;
-    const isVerySmallMonth = monthGeneration < 0.001;
-    const isVerySmallYear = yearGeneration < 0.001;
-    
-    // Determine if we should show zero values based on timeRange
-    const shouldUseZeroValues = 
-      (timeRangeType === 'day' && isVerySmallToday) ||
-      (timeRangeType === 'week' && isVerySmallWeek) ||
-      (timeRangeType === 'month' && isVerySmallMonth) ||
-      (timeRangeType === 'year' && isVerySmallYear);
-    
-    console.log(`Installation ${id} energy metrics:`, {
-      timeRangeType,
-      todayGeneration,
-      todayConsumption,
-      weekGeneration,
-      weekConsumption,
-      monthGeneration,
-      monthConsumption,
-      yearGeneration,
-      yearConsumption,
-      shouldUseZeroValues
-    });
-    
-    // If values are extremely small, return zeros to prevent misleading charts
-    if (shouldUseZeroValues) {
-      // Return zero-valued data for the selected time range with the correct structure
-      if (timeRangeType === 'day') {
-        return Array.from({ length: 24 }, (_, i) => ({
-          name: `${i}:00`,
-          generation: 0,
-          consumption: 0
-        }));
-      } else if (timeRangeType === 'week') {
-        const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-        return dayNames.map(day => ({
-          name: day,
-          generation: 0,
-          consumption: 0
-        }));
-      } else if (timeRangeType === 'month') {
-        return Array.from({ length: 30 }, (_, i) => ({
-          name: (i + 1).toString(),
-          generation: 0,
-          consumption: 0
-        }));
-      } else {
-        const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-        return monthNames.map(month => ({
-          name: month,
-          generation: 0,
-          consumption: 0
-        }));
-      }
-    }
-    
+
     // Sort readings by timestamp
-    const sortedReadings = [...readings].sort((a, b) => 
-      new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+    const sortedReadings = [...readings].sort(
+      (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+    )
+
+    // Get expected totals from the dashboard data for normalization
+    const expectedProduction = {
+      day: dashboardData?.todayGenerationKWh || 0,
+      week: dashboardData?.weekToDateGenerationKWh || 0,
+      month: dashboardData?.monthToDateGenerationKWh || 0,
+      year: dashboardData?.yearToDateGenerationKWh || 0
+    }
+    
+    const expectedConsumption = {
+      day: dashboardData?.todayConsumptionKWh || 0,
+      week: dashboardData?.weekToDateConsumptionKWh || 0,
+      month: dashboardData?.monthToDateConsumptionKWh || 0,
+      year: dashboardData?.yearToDateConsumptionKWh || 0
+    }
+    
+    // Calculate the total energy from readings to normalize later
+    const totalProductionFromReadings = sortedReadings.reduce(
+      (sum, reading) => sum + (reading.powerGenerationWatts / 1000), 0
     )
     
-    if (timeRangeType === 'day') {
-      // Group by hour
+    const totalConsumptionFromReadings = sortedReadings.reduce(
+      (sum, reading) => sum + (reading.powerConsumptionWatts / 1000), 0
+    )
+    
+    // Calculate normalization factors
+    const productionNormalizationFactor = 
+      totalProductionFromReadings > 0 && expectedProduction[timeRangeType] > 0 
+        ? expectedProduction[timeRangeType] / totalProductionFromReadings
+        : 1
+        
+    const consumptionNormalizationFactor = 
+      totalConsumptionFromReadings > 0 && expectedConsumption[timeRangeType] > 0 
+        ? expectedConsumption[timeRangeType] / totalConsumptionFromReadings
+        : 1
+    
+    console.log('Installation normalization factors:', {
+      timeRangeType,
+      productionFactor: productionNormalizationFactor,
+      consumptionFactor: consumptionNormalizationFactor,
+      expectedProduction: expectedProduction[timeRangeType],
+      expectedConsumption: expectedConsumption[timeRangeType],
+      totalProductionFromReadings,
+      totalConsumptionFromReadings
+    })
+
+    // Process data based on time range
+    if (timeRangeType === "day") {
+      // Group by hour for day
       const hourlyData: Record<string, { name: string; generation: number; consumption: number; count: number }> = {}
-      
-      // Initialize all 24 hours with zero values
-      for (let i = 0; i < 24; i++) {
-        const hourLabel = `${i}:00`;
-        hourlyData[hourLabel] = {
-          name: hourLabel,
+
+      // Initialize all hours
+      for (let h = 0; h < 24; h++) {
+        hourlyData[`${h}:00`] = {
+          name: `${h}:00`,
           generation: 0,
           consumption: 0,
-          count: 0
-        };
+          count: 0,
+        }
       }
-      
-      sortedReadings.forEach(reading => {
+
+      sortedReadings.forEach((reading) => {
+        if (!reading.timestamp) return
+
         const date = new Date(reading.timestamp)
         const hour = date.getHours()
-        const hourLabel = `${hour}:00`
-        
-        if (!hourlyData[hourLabel]) {
-          hourlyData[hourLabel] = {
-            name: hourLabel,
-            generation: 0,
-            consumption: 0,
-            count: 0
-          }
+        const hourKey = `${hour}:00`
+
+        if (hourlyData[hourKey]) {
+          // Normalize the values using the calculated factors
+          const normalizedGeneration = (reading.powerGenerationWatts / 1000) * productionNormalizationFactor
+          const normalizedConsumption = (reading.powerConsumptionWatts / 1000) * consumptionNormalizationFactor
+          
+          hourlyData[hourKey].generation += normalizedGeneration
+          hourlyData[hourKey].consumption += normalizedConsumption
+          hourlyData[hourKey].count += 1
         }
-        
-        hourlyData[hourLabel].generation += reading.powerGenerationWatts / 1000
-        hourlyData[hourLabel].consumption += reading.powerConsumptionWatts / 1000
-        hourlyData[hourLabel].count += 1
       })
-      
-      // Calculate hourly averages
-      return Object.values(hourlyData).map(hour => {
-        const avgGeneration = hour.count > 0 ? hour.generation / hour.count : 0
-        const avgConsumption = hour.count > 0 ? hour.consumption / hour.count : 0
-        
-        return {
-          name: hour.name,
-          generation: avgGeneration,
-          consumption: avgConsumption
-        }
-      }).sort((a, b) => {
-        return parseInt(a.name.split(':')[0]) - parseInt(b.name.split(':')[0])
-      })
-    } else if (timeRangeType === 'week') {
-      // Group by day
+
+      return Object.values(hourlyData)
+        .map((hourData) => ({
+          name: hourData.name,
+          generation: hourData.count > 0 ? hourData.generation : 0,
+          consumption: hourData.count > 0 ? hourData.consumption : 0
+        }))
+        .sort((a, b) => {
+          const hourA = parseInt(a.name.split(":")[0])
+          const hourB = parseInt(b.name.split(":")[0])
+          return hourA - hourB
+        })
+    } else if (timeRangeType === "week") {
+      // Group by day of week
       const dailyData: Record<string, { name: string; generation: number; consumption: number; count: number }> = {}
-      const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
-      
-      // Initialize all days with zero values
-      dayNames.forEach(day => {
+      const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+
+      // Initialize all days
+      dayNames.forEach((day) => {
         dailyData[day] = {
           name: day,
           generation: 0,
           consumption: 0,
-          count: 0
-        };
-      });
-      
-      sortedReadings.forEach(reading => {
-        const date = new Date(reading.timestamp)
-        const day = date.getDay()
-        // Convert from Sunday-based (0) to Monday-based (0)
-        const adjustedDay = day === 0 ? 6 : day - 1
-        const dayLabel = dayNames[adjustedDay]
-        
-        dailyData[dayLabel].generation += reading.powerGenerationWatts / 1000
-        dailyData[dayLabel].consumption += reading.powerConsumptionWatts / 1000
-        dailyData[dayLabel].count += 1
-      })
-      
-      // Calculate daily averages
-      return dayNames.map(day => {
-        const dayData = dailyData[day]
-        
-        return {
-          name: day,
-          generation: dayData.count > 0 ? dayData.generation / dayData.count : 0,
-          consumption: dayData.count > 0 ? dayData.consumption / dayData.count : 0
+          count: 0,
         }
       })
-    } else if (timeRangeType === 'month') {
+
+      sortedReadings.forEach((reading) => {
+        if (!reading.timestamp) return
+
+        const date = new Date(reading.timestamp)
+        const day = date.getDay() // 0-6, Sunday is 0
+        const dayName = dayNames[day]
+
+        // Normalize the values using the calculated factors
+        const normalizedGeneration = (reading.powerGenerationWatts / 1000) * productionNormalizationFactor
+        const normalizedConsumption = (reading.powerConsumptionWatts / 1000) * consumptionNormalizationFactor
+        
+        dailyData[dayName].generation += normalizedGeneration
+        dailyData[dayName].consumption += normalizedConsumption
+        dailyData[dayName].count += 1
+      })
+
+      // Rearrange days to start with Monday
+      const orderedDays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+      return orderedDays.map((day) => ({
+        name: day,
+        generation: dailyData[day].count > 0 ? dailyData[day].generation : 0,
+        consumption: dailyData[day].count > 0 ? dailyData[day].consumption : 0
+      }))
+    } else if (timeRangeType === "month") {
       // Group by day of month
       const monthData: Record<string, { name: string; generation: number; consumption: number; count: number }> = {}
-      
-      // Initialize all days with zero values
-      for (let i = 1; i <= 31; i++) {
-        const dayLabel = i.toString();
-        monthData[dayLabel] = {
-          name: dayLabel,
+
+      // Initialize for a 31-day month
+      for (let d = 1; d <= 31; d++) {
+        monthData[d.toString()] = {
+          name: d.toString(),
           generation: 0,
           consumption: 0,
-          count: 0
-        };
+          count: 0,
+        }
       }
-      
-      sortedReadings.forEach(reading => {
+
+      sortedReadings.forEach((reading) => {
+        if (!reading.timestamp) return
+
         const date = new Date(reading.timestamp)
         const day = date.getDate()
-        const dayLabel = day.toString()
+        const dayStr = day.toString()
+
+        // Normalize the values using the calculated factors
+        const normalizedGeneration = (reading.powerGenerationWatts / 1000) * productionNormalizationFactor
+        const normalizedConsumption = (reading.powerConsumptionWatts / 1000) * consumptionNormalizationFactor
         
-        monthData[dayLabel].generation += reading.powerGenerationWatts / 1000
-        monthData[dayLabel].consumption += reading.powerConsumptionWatts / 1000
-        monthData[dayLabel].count += 1
+        monthData[dayStr].generation += normalizedGeneration
+        monthData[dayStr].consumption += normalizedConsumption
+        monthData[dayStr].count += 1
       })
-      
-      // Calculate daily averages
-      return Object.values(monthData)
-        .filter(day => parseInt(day.name) <= 31) // Only include valid days
-        .map(day => {
-          return {
-            name: day.name,
-            generation: day.count > 0 ? day.generation / day.count : 0,
-            consumption: day.count > 0 ? day.consumption / day.count : 0
-          }
-        }).sort((a, b) => parseInt(a.name) - parseInt(b.name))
+
+      return Object.entries(monthData)
+        .filter(([_, data]) => data.count > 0)
+        .map(([_, data]) => ({
+          name: data.name,
+          generation: data.generation,
+          consumption: data.consumption
+        }))
+        .sort((a, b) => parseInt(a.name) - parseInt(b.name))
     } else {
-      // Group by month
+      // Group by month for year
       const yearData: Record<string, { name: string; generation: number; consumption: number; count: number }> = {}
-      const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-      
-      // Initialize all months with zero values
-      monthNames.forEach(month => {
+      const monthNames = [
+        "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+        "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+      ]
+
+      // Initialize all months
+      monthNames.forEach((month) => {
         yearData[month] = {
           name: month,
           generation: 0,
           consumption: 0,
-          count: 0
-        };
-      });
-      
-      sortedReadings.forEach(reading => {
-        const date = new Date(reading.timestamp)
-        const month = date.getMonth()
-        const monthLabel = monthNames[month]
-        
-        yearData[monthLabel].generation += reading.powerGenerationWatts / 1000
-        yearData[monthLabel].consumption += reading.powerConsumptionWatts / 1000
-        yearData[monthLabel].count += 1
-      })
-      
-      // Calculate monthly averages
-      return monthNames.map(month => {
-        const monthData = yearData[month]
-        
-        return {
-          name: month,
-          generation: monthData.count > 0 ? monthData.generation / monthData.count : 0,
-          consumption: monthData.count > 0 ? monthData.consumption / monthData.count : 0
+          count: 0,
         }
       })
+
+      sortedReadings.forEach((reading) => {
+        if (!reading.timestamp) return
+
+        const date = new Date(reading.timestamp)
+        const month = date.getMonth()
+        const monthName = monthNames[month]
+
+        // Normalize the values using the calculated factors
+        const normalizedGeneration = (reading.powerGenerationWatts / 1000) * productionNormalizationFactor
+        const normalizedConsumption = (reading.powerConsumptionWatts / 1000) * consumptionNormalizationFactor
+        
+        yearData[monthName].generation += normalizedGeneration
+        yearData[monthName].consumption += normalizedConsumption
+        yearData[monthName].count += 1
+      })
+
+      return monthNames.map((month) => ({
+        name: month,
+        generation: yearData[month].count > 0 ? yearData[month].generation : 0,
+        consumption: yearData[month].count > 0 ? yearData[month].consumption : 0
+      }))
     }
   }
   
@@ -801,7 +756,7 @@ export default function InstallationDetailPage() {
                     
                     // Transform readings to chart data if available
                     if (dashboardData.recentReadings && dashboardData.recentReadings.length > 0) {
-                      const chartData = transformReadingsToChartData(dashboardData.recentReadings, timeRange)
+                      const chartData = processEnergyData(dashboardData.recentReadings, timeRange, dashboardData)
                       setEnergyData(chartData)
                     }
                   }
@@ -1018,7 +973,7 @@ export default function InstallationDetailPage() {
                         tickFormatter={(value) => `${value.toFixed(1)}`}
                         label={{ value: 'kW', angle: -90, position: 'insideLeft', offset: 0 }}
                       />
-                      <Tooltip formatter={(value: any) => [`${typeof value === 'number' ? value.toFixed(2) : value} kW`, "Generation"]} />
+                      <Tooltip formatter={(value: any) => [`${typeof value === 'number' ? value.toFixed(4) : value} kW`, "Generation"]} />
                       <Area 
                         type="monotone" 
                         dataKey="generation" 
@@ -1074,8 +1029,9 @@ export default function InstallationDetailPage() {
                       <YAxis 
                         tickFormatter={(value) => `${value.toFixed(1)}`}
                         label={{ value: 'kW', angle: -90, position: 'insideLeft', offset: 0 }}
+                        domain={['auto', 'auto']}
                       />
-                      <Tooltip formatter={(value: any) => [`${typeof value === 'number' ? value.toFixed(2) : value} kW`, "Consumption"]} />
+                      <Tooltip formatter={(value: any) => [`${typeof value === 'number' ? value.toFixed(4) : value} kW`, "Consumption"]} />
                       <Area 
                         type="monotone" 
                         dataKey="consumption" 
@@ -1092,6 +1048,73 @@ export default function InstallationDetailPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Combined Production and Consumption Chart */}
+      <Card className="mb-4">
+        <CardHeader>
+          <CardTitle>Combined Energy Data</CardTitle>
+          <CardDescription>
+            Production and consumption comparison
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {loading ? (
+            <div className="flex justify-center py-12">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+            </div>
+          ) : energyData.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <LineChart className="h-16 w-16 text-muted-foreground mb-4" />
+              <h3 className="text-lg font-medium">No Energy Data Available</h3>
+              <p className="text-sm text-muted-foreground max-w-md mt-2">
+                There is no energy data available for the selected time range.
+              </p>
+            </div>
+          ) : (
+            <Chart>
+              <ChartContainer>
+                <ResponsiveContainer width="100%" height={300}>
+                  <ComposedChart data={energyData} margin={{ top: 10, right: 10, left: 10, bottom: 20 }}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                    <XAxis dataKey="name" />
+                    <YAxis 
+                      yAxisId="left"
+                      orientation="left"
+                      tickFormatter={(value) => `${value.toFixed(2)}`}
+                      label={{ value: 'Production (kW)', angle: -90, position: 'insideLeft', offset: 10 }}
+                    />
+                    <YAxis 
+                      yAxisId="right"
+                      orientation="right"
+                      tickFormatter={(value) => `${value.toFixed(2)}`}
+                      label={{ value: 'Consumption (kW)', angle: 90, position: 'insideRight', offset: 10 }}
+                    />
+                    <Tooltip formatter={(value: any, name: string) => {
+                      return [`${typeof value === 'number' ? value.toFixed(4) : value} kW`, name === 'generation' ? 'Production' : 'Consumption']
+                    }} />
+                    <Legend />
+                    <Bar 
+                      yAxisId="left"
+                      dataKey="generation" 
+                      name="Production" 
+                      fill="#10b981" 
+                      radius={[4, 4, 0, 0]}
+                    />
+                    <Line 
+                      yAxisId="right"
+                      type="monotone" 
+                      dataKey="consumption" 
+                      name="Consumption" 
+                      stroke="#ef4444" 
+                      strokeWidth={2}
+                    />
+                  </ComposedChart>
+                </ResponsiveContainer>
+              </ChartContainer>
+            </Chart>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Status and Events */}
       <Card>

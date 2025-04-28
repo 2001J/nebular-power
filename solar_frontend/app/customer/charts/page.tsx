@@ -198,111 +198,139 @@ export default function DashboardPage() {
           return
         }
         
-        // Set dashboard data
+        console.log("Installation dashboard data:", dashboardResponse)
         setDashboardData(dashboardResponse)
-        console.log("Dashboard data loaded successfully")
-
-        // Define time parameters based on selected period
-        const now = new Date()
-        let dataLoaded = false
-        let readingsResponse = []
         
-        try {
-          if (selectedPeriod === "day") {
-            // Get hourly readings for today
-            const startDate = new Date(now)
-            startDate.setHours(0, 0, 0, 0)
-            const endDate = new Date(now)
-            endDate.setHours(23, 59, 59, 999)
-            
-            readingsResponse = await energyApi.getReadingsInDateRange(
-              selectedInstallation,
-              startDate.toISOString(),
-              endDate.toISOString()
-            )
-          } else if (selectedPeriod === "week") {
-            // Get daily summaries for the week
-            const startDate = new Date(now)
-            startDate.setDate(startDate.getDate() - 6) // Last 7 days including today
-            const endDate = new Date(now)
-            
-            readingsResponse = await energyApi.getSummariesByPeriodAndDateRange(
-              selectedInstallation,
-              "DAILY",
-              startDate.toISOString().split('T')[0],
-              endDate.toISOString().split('T')[0]
-            )
-          } else if (selectedPeriod === "month") {
-            // Get daily summaries for the month
-            const startDate = new Date(now.getFullYear(), now.getMonth(), 1)
-            const endDate = new Date(now)
-            
-            readingsResponse = await energyApi.getSummariesByPeriodAndDateRange(
-              selectedInstallation,
-              "DAILY", 
-              startDate.toISOString().split('T')[0],
-              endDate.toISOString().split('T')[0]
-            )
-          } else if (selectedPeriod === "year") {
-            // Get monthly summaries for the year
-            readingsResponse = await energyApi.getSummariesByPeriod(
-              selectedInstallation,
-              "MONTHLY"
-            )
-          }
+        // Get recent energy readings and recent alerts
+        let energyData = []
+        let alertsData = []
+        
+        // Try to get energy readings from the dashboard response first
+        if (dashboardResponse.recentReadings && dashboardResponse.recentReadings.length > 0) {
+          console.log(`Using ${dashboardResponse.recentReadings.length} readings from dashboard response`)
+          energyData = dashboardResponse.recentReadings
+        } else {
+          // If not available in dashboard, fetch them separately
+          console.log(`Fetching recent readings for installation ${selectedInstallation}`)
+          const readingsResponse = await energyApi.getRecentReadings(selectedInstallation, 100) // Get more readings for better charts
           
           if (Array.isArray(readingsResponse) && readingsResponse.length > 0) {
-            console.log(`Loaded ${readingsResponse.length} readings/summaries for ${selectedPeriod}`)
-            dataLoaded = true
-        } else {
-            console.warn(`No data available for ${selectedPeriod}`)
+            console.log(`Fetched ${readingsResponse.length} separate energy readings`)
+            energyData = readingsResponse
+          } else {
+            console.warn("No energy readings available or format incorrect")
+            // Try to fetch energy summaries by period if no raw readings
+            
+            // Get appropriate start and end dates
+            const today = new Date()
+            let startDate, endDate
+            
+            if (selectedPeriod === 'day') {
+              startDate = new Date(today.setHours(0, 0, 0, 0)).toISOString()
+              endDate = new Date().toISOString()
+            } else if (selectedPeriod === 'week') {
+              // Get previous 7 days
+              const weekStart = new Date(today)
+              weekStart.setDate(today.getDate() - 7)
+              startDate = weekStart.toISOString()
+              endDate = new Date().toISOString()
+            } else if (selectedPeriod === 'month') {
+              // Get current month
+              const monthStart = new Date(today.getFullYear(), today.getMonth(), 1)
+              startDate = monthStart.toISOString()
+              endDate = new Date().toISOString()
+            } else {
+              // Year view - get this year
+              const yearStart = new Date(today.getFullYear(), 0, 1)
+              startDate = yearStart.toISOString()
+              endDate = new Date().toISOString()
+            }
+            
+            console.log(`Attempting to fetch ${selectedPeriod} summaries from ${startDate} to ${endDate}`)
+            const summariesResponse = await energyApi.getSummariesByPeriodAndDateRange(
+              selectedInstallation, 
+              selectedPeriod, 
+              startDate, 
+              endDate
+            )
+            
+            if (Array.isArray(summariesResponse) && summariesResponse.length > 0) {
+              console.log(`Received ${summariesResponse.length} energy summaries`)
+              // Use summaries as readings with appropriate fields
+              energyData = summariesResponse.map(summary => ({
+                id: summary.id,
+                installationId: summary.installationId,
+                timestamp: summary.date || summary.endDate || summary.timestamp,
+                powerGenerationWatts: summary.averageGenerationWatts || 0,
+                powerConsumptionWatts: summary.averageConsumptionWatts || 0,
+                dailyYieldKWh: summary.totalGenerationKWh || 0,
+                totalGenerationKWh: summary.totalGenerationKWh || 0,
+                totalConsumptionKWh: summary.totalConsumptionKWh || 0,
+                isSimulated: true
+              }))
+            } else {
+              console.warn(`No energy summaries available for ${selectedPeriod} period`)
+              // Generate sample data if no actual data is available
+              if (dashboardData) {
+                console.log('Generating sample data based on dashboard metrics')
+                energyData = generateSampleData(selectedPeriod, dashboardResponse)
+              }
+            }
           }
-        } catch (error) {
-          console.error(`Error fetching energy data for ${selectedPeriod}:`, error)
         }
         
-        // If no data loaded, use sample data
-        if (!dataLoaded) {
-          console.log(`Using sample data for ${selectedPeriod}`)
-          readingsResponse = generateSampleData(selectedPeriod, dashboardResponse)
-        }
+        // Set the energy data for charts
+        setEnergyReadings(energyData)
+        console.log(`Set ${energyData.length} energy readings for charts`)
         
-        // Set energy readings with either real or sample data
-        setEnergyReadings(readingsResponse)
-        
-        // Fetch system status
+        // Check for security and system status
         try {
-          // Get tamper status from the installation details
-          const tamperInfo = dashboardResponse.installationDetails
+          console.log(`Fetching security status for installation ${selectedInstallation}`)
+          const securityResponse = await securityApi.getInstallationSecurityStatus(selectedInstallation)
           
-          // Get recent alerts from the security API
-          const alertsResponse = await securityApi.getInstallationAlerts(selectedInstallation)
-          const activeAlerts = Array.isArray(alertsResponse) ? alertsResponse.filter(a => !a.resolved) : []
-          
-          // Build system status information
-          const status: SystemStatus = {
-            tamperDetected: tamperInfo.tamperDetected,
-            lastTamperCheck: tamperInfo.lastTamperCheck,
-            systemHealth: determineSystemHealth(dashboardResponse.currentEfficiencyPercentage, tamperInfo.tamperDetected, activeAlerts.length),
-            efficiency: dashboardResponse.currentEfficiencyPercentage,
-            alerts: activeAlerts,
-            recommendations: generateRecommendations(dashboardResponse.currentEfficiencyPercentage, tamperInfo.tamperDetected, activeAlerts)
+          if (securityResponse) {
+            console.log("Security status response:", securityResponse)
+            
+            // Build system status from security data
+            const systemStatusData = {
+              tamperDetected: securityResponse.tamperDetected || dashboardResponse.installationDetails?.tamperDetected || false,
+              lastTamperCheck: securityResponse.lastCheck || dashboardResponse.installationDetails?.lastTamperCheck || new Date().toISOString(),
+              systemHealth: determineSystemHealth(
+                dashboardResponse.currentEfficiencyPercentage || 0, 
+                securityResponse.tamperDetected || false,
+                securityResponse.alerts?.length || 0
+              ),
+              efficiency: dashboardResponse.currentEfficiencyPercentage || 0,
+              lastMaintenance: securityResponse.lastMaintenance || null,
+              alerts: securityResponse.alerts || [],
+              recommendations: generateRecommendations(
+                dashboardResponse.currentEfficiencyPercentage || 0,
+                securityResponse.tamperDetected || false,
+                securityResponse.alerts || []
+              )
+            }
+            
+            setSystemStatus(systemStatusData)
           }
-          
-          setSystemStatus(status)
-          console.log("System status loaded successfully")
         } catch (error) {
-          console.error("Error loading system status:", error)
-          // Create a basic system status with available data
-          const status: SystemStatus = {
+          console.error("Error fetching security status:", error)
+          // Create minimal system status from dashboard data
+          setSystemStatus({
             tamperDetected: dashboardResponse.installationDetails?.tamperDetected || false,
             lastTamperCheck: dashboardResponse.installationDetails?.lastTamperCheck || new Date().toISOString(),
-            systemHealth: determineSystemHealth(dashboardResponse.currentEfficiencyPercentage, false, 0),
-            efficiency: dashboardResponse.currentEfficiencyPercentage,
+            systemHealth: determineSystemHealth(
+              dashboardResponse.currentEfficiencyPercentage || 0, 
+              dashboardResponse.installationDetails?.tamperDetected || false,
+              0
+            ),
+            efficiency: dashboardResponse.currentEfficiencyPercentage || 0,
             alerts: [],
-            recommendations: ["System monitoring data is limited. Regular maintenance is recommended."]
-          }
-          setSystemStatus(status)
+            recommendations: generateRecommendations(
+              dashboardResponse.currentEfficiencyPercentage || 0,
+              dashboardResponse.installationDetails?.tamperDetected || false,
+              []
+            )
+          })
         }
       } catch (error) {
         console.error("Error fetching dashboard data:", error)
@@ -310,7 +338,7 @@ export default function DashboardPage() {
         toast({
           variant: "destructive",
           title: "Error",
-          description: "Failed to load dashboard data. Please try again.",
+          description: "Failed to load your energy data. Please try again.",
         })
       } finally {
         setIsLoading(false)
@@ -532,11 +560,74 @@ export default function DashboardPage() {
 
   // Process data for chart display based on period
   const getProcessedChartData = () => {
-    if (energyReadings.length === 0) {
+    if (!dashboardData || energyReadings.length === 0) {
       return []
     }
     
     const chartData = []
+    
+    // Get reference values from dashboard for normalization
+    const todayGeneration = dashboardData.todayGenerationKWh || 0
+    const todayConsumption = dashboardData.todayConsumptionKWh || 0
+    const weekGeneration = dashboardData.weekToDateGenerationKWh || 0
+    const weekConsumption = dashboardData.weekToDateConsumptionKWh || 0
+    const monthGeneration = dashboardData.monthToDateGenerationKWh || 0
+    const monthConsumption = dashboardData.monthToDateConsumptionKWh || 0
+    const yearGeneration = dashboardData.yearToDateGenerationKWh || 0
+    const yearConsumption = dashboardData.yearToDateConsumptionKWh || 0
+    
+    // Get the appropriate generation and consumption totals based on period
+    let expectedGeneration = 0
+    let expectedConsumption = 0
+    
+    switch (selectedPeriod) {
+      case 'day':
+        expectedGeneration = todayGeneration
+        expectedConsumption = todayConsumption
+        break
+      case 'week':
+        expectedGeneration = weekGeneration
+        expectedConsumption = weekConsumption
+        break
+      case 'month':
+        expectedGeneration = monthGeneration
+        expectedConsumption = monthConsumption
+        break
+      case 'year':
+        expectedGeneration = yearGeneration
+        expectedConsumption = yearConsumption
+        break
+    }
+    
+    // Calculate total readings values for normalization
+    const totalReadingsGeneration = energyReadings.reduce(
+      (sum, reading) => sum + (reading.powerGenerationWatts / 1000), 0
+    )
+    
+    const totalReadingsConsumption = energyReadings.reduce(
+      (sum, reading) => sum + (reading.powerConsumptionWatts / 1000), 0
+    )
+    
+    // Calculate normalization factors - if readings have values and expected values exist
+    const generationNormalizationFactor = 
+      totalReadingsGeneration > 0 && expectedGeneration > 0
+        ? expectedGeneration / totalReadingsGeneration
+        : 1
+        
+    const consumptionNormalizationFactor = 
+      totalReadingsConsumption > 0 && expectedConsumption > 0
+        ? expectedConsumption / totalReadingsConsumption
+        : 1
+    
+    console.log('Chart normalization factors:', {
+      selectedPeriod,
+      expectedGeneration,
+      expectedConsumption,
+      totalReadingsGeneration,
+      totalReadingsConsumption,
+      generationFactor: generationNormalizationFactor,
+      consumptionFactor: consumptionNormalizationFactor
+    })
     
     if (selectedPeriod === "day") {
       // Group hourly data
@@ -561,8 +652,9 @@ export default function DashboardPage() {
         const hour = date.getHours()
         const hourLabel = `${hour}:00`
         
-        hourlyData[hourLabel].production += reading.powerGenerationWatts / 1000 || 0 // kW
-        hourlyData[hourLabel].consumption += reading.powerConsumptionWatts / 1000 || 0 // kW
+        // Apply normalization factors
+        hourlyData[hourLabel].production += (reading.powerGenerationWatts / 1000) * generationNormalizationFactor
+        hourlyData[hourLabel].consumption += (reading.powerConsumptionWatts / 1000) * consumptionNormalizationFactor
         hourlyData[hourLabel].count += 1
       })
       
@@ -617,14 +709,14 @@ export default function DashboardPage() {
           return // Skip if no valid date
         }
         
-        // For daily summaries
+        // Apply normalization - based on whether we have summary or raw readings
         if (reading.totalGenerationKWh !== undefined) {
-          dayData[dayName].production += reading.totalGenerationKWh || 0
-          dayData[dayName].consumption += reading.totalConsumptionKWh || 0
+          dayData[dayName].production += reading.totalGenerationKWh * generationNormalizationFactor
+          dayData[dayName].consumption += (reading.totalConsumptionKWh || 0) * consumptionNormalizationFactor
         } else {
           // For hourly readings
-          dayData[dayName].production += reading.powerGenerationWatts / 1000 || 0
-          dayData[dayName].consumption += reading.powerConsumptionWatts / 1000 || 0
+          dayData[dayName].production += (reading.powerGenerationWatts / 1000) * generationNormalizationFactor
+          dayData[dayName].consumption += (reading.powerConsumptionWatts / 1000) * consumptionNormalizationFactor
         }
         
         dayData[dayName].count += 1
@@ -672,14 +764,14 @@ export default function DashboardPage() {
           }
         }
         
-        // For daily summaries
+        // Apply normalization - based on whether we have summary or raw readings
         if (reading.totalGenerationKWh !== undefined) {
-          monthData[dayLabel].production += reading.totalGenerationKWh || 0
-          monthData[dayLabel].consumption += reading.totalConsumptionKWh || 0
+          monthData[dayLabel].production += reading.totalGenerationKWh * generationNormalizationFactor
+          monthData[dayLabel].consumption += (reading.totalConsumptionKWh || 0) * consumptionNormalizationFactor
         } else {
           // For hourly readings
-          monthData[dayLabel].production += reading.powerGenerationWatts / 1000 || 0
-          monthData[dayLabel].consumption += reading.powerConsumptionWatts / 1000 || 0
+          monthData[dayLabel].production += (reading.powerGenerationWatts / 1000) * generationNormalizationFactor
+          monthData[dayLabel].consumption += (reading.powerConsumptionWatts / 1000) * consumptionNormalizationFactor
         }
         
         monthData[dayLabel].count += 1
@@ -729,14 +821,14 @@ export default function DashboardPage() {
         
         const monthLabel = monthNames[month]
         
-        // For monthly summaries
+        // Apply normalization - based on whether we have summary or raw readings
         if (reading.totalGenerationKWh !== undefined) {
-          yearData[monthLabel].production += reading.totalGenerationKWh || 0
-          yearData[monthLabel].consumption += reading.totalConsumptionKWh || 0
+          yearData[monthLabel].production += reading.totalGenerationKWh * generationNormalizationFactor
+          yearData[monthLabel].consumption += (reading.totalConsumptionKWh || 0) * consumptionNormalizationFactor
         } else {
           // For hourly readings
-          yearData[monthLabel].production += reading.powerGenerationWatts / 1000 || 0
-          yearData[monthLabel].consumption += reading.powerConsumptionWatts / 1000 || 0
+          yearData[monthLabel].production += (reading.powerGenerationWatts / 1000) * generationNormalizationFactor
+          yearData[monthLabel].consumption += (reading.powerConsumptionWatts / 1000) * consumptionNormalizationFactor
         }
         
         yearData[monthLabel].count += 1

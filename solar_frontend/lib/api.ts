@@ -902,14 +902,29 @@ export const energyApi = {
   getInstallationDashboard: async (installationId: string) => {
     try {
       const response = await apiClient.get(`/monitoring/dashboard/installation/${installationId}`);
-      // Only return actual data from the server, no fallbacks
+      
+      // Ensure proper response handling
       if (!response || !response.data) {
         console.error(`No dashboard data received for installation ${installationId}`);
         return null;
       }
+      
+      // Log the data for debugging
+      console.log(`Installation dashboard data for ${installationId}:`, {
+        todayGen: response.data.todayGenerationKWh,
+        todayConsumption: response.data.todayConsumptionKWh,
+        recentReadings: response.data.recentReadings?.length || 0,
+        currentGeneration: response.data.currentPowerGenerationWatts,
+        currentConsumption: response.data.currentPowerConsumptionWatts
+      });
+      
       return response.data;
     } catch (error: any) {
       console.error(`Error fetching installation dashboard for ${installationId}:`, error.message);
+      if (error.response) {
+        console.error('Response status:', error.response.status);
+        console.error('Response data:', error.response.data);
+      }
       return null;
     }
   },
