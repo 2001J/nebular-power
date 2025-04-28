@@ -49,8 +49,10 @@ export default function PaymentStatusCard({ userId, installationId, isLarge = fa
         // If no upcoming payments in dashboard, fetch separately
         if (!upcomingPayments || upcomingPayments.length === 0) {
           try {
-            const fetchedPayments = await paymentApi.getCustomerUpcomingPayments(userId);
-            upcomingPayments = Array.isArray(fetchedPayments) ? fetchedPayments : [];
+            // Use getUpcomingPayments() instead of getCustomerUpcomingPayments(userId)
+            // This uses the authenticated user's context instead of requiring admin privileges
+            const fetchedPayments = await paymentApi.getUpcomingPayments();
+            upcomingPayments = fetchedPayments?.content || [];
             console.log("Fetched upcoming payments:", upcomingPayments);
           } catch (err) {
             console.error("Error fetching upcoming payments:", err);
