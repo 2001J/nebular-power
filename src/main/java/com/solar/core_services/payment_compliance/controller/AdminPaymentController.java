@@ -14,6 +14,7 @@ import com.solar.core_services.payment_compliance.service.PaymentPlanService;
 import com.solar.core_services.payment_compliance.service.PaymentReminderService;
 import com.solar.core_services.payment_compliance.service.PaymentService;
 import com.solar.core_services.payment_compliance.service.ReminderConfigService;
+import com.solar.exception.ResourceNotFoundException;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -123,24 +124,45 @@ public class AdminPaymentController {
 
                         @Parameter(description = "Updated payment plan details", required = true) @Valid @RequestBody PaymentPlanRequest request) {
 
-                // Verify the installation belongs to the customer
-                SolarInstallation installation = installationRepository.findById(request.getInstallationId())
-                                .orElse(null);
+                try {
+                        // Verify the installation exists
+                        SolarInstallation installation = installationRepository.findById(request.getInstallationId())
+                                        .orElseThrow(() -> new ResourceNotFoundException(
+                                                        "Solar installation not found with id: " + request.getInstallationId()));
 
-                if (installation == null) {
-                        return ResponseEntity.notFound().build();
-                }
+                        // Check if this installation belongs to the customer
+                        if (!installation.getUser().getId().equals(customerId)) {
+                                Map<String, String> errorResponse = new HashMap<>();
+                                errorResponse.put("error", "Installation #" + request.getInstallationId() +
+                                                " does not belong to customer #" + customerId);
+                                return ResponseEntity.badRequest().body(errorResponse);
+                        }
 
-                // Check if this installation belongs to the customer
-                if (!installation.getUser().getId().equals(customerId)) {
+                        // Verify the payment plan exists and belongs to this installation
+                        PaymentPlanDTO existingPlan = paymentPlanService.getPaymentPlanById(planId);
+                        if (!existingPlan.getInstallationId().equals(installation.getId())) {
+                                Map<String, String> errorResponse = new HashMap<>();
+                                errorResponse.put("error", "Payment plan #" + planId + 
+                                                " does not belong to installation #" + installation.getId());
+                                return ResponseEntity.badRequest().body(errorResponse);
+                        }
+
+                        // Update the payment plan
+                        PaymentPlanDTO updatedPlan = paymentPlanService.updatePaymentPlan(planId, request);
+                        return ResponseEntity.ok(updatedPlan);
+                } catch (ResourceNotFoundException e) {
                         Map<String, String> errorResponse = new HashMap<>();
-                        errorResponse.put("error", "Installation #" + request.getInstallationId() +
-                                        " does not belong to customer #" + customerId);
+                        errorResponse.put("error", e.getMessage());
+                        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(errorResponse);
+                } catch (IllegalArgumentException e) {
+                        Map<String, String> errorResponse = new HashMap<>();
+                        errorResponse.put("error", e.getMessage());
                         return ResponseEntity.badRequest().body(errorResponse);
+                } catch (Exception e) {
+                        Map<String, String> errorResponse = new HashMap<>();
+                        errorResponse.put("error", "Failed to update payment plan: " + e.getMessage());
+                        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
                 }
-
-                PaymentPlanDTO updatedPlan = paymentPlanService.updatePaymentPlan(planId, request);
-                return ResponseEntity.ok(updatedPlan);
         }
 
         @PostMapping("/customers/{customerId}/plan")

@@ -1891,9 +1891,19 @@ export const paymentComplianceApi = {
   },
 
   // Update customer payment plan
-  updatePaymentPlan: async (customerId: string, planId: string, planData: Partial<PaymentPlan>): Promise<PaymentPlan> => {
+  updatePaymentPlan: async (customerId: string | number | null | undefined, planId: string | number, planData: Partial<PaymentPlan>): Promise<PaymentPlan> => {
     try {
-      const response = await apiClient.put(`/api/admin/payments/customers/${customerId}/plan/${planId}`, planData);
+      // Handle customerId properly - ensure it's a valid number
+      const customerIdValue = typeof customerId === 'object' && customerId !== null 
+        ? (customerId as { id: string | number }).id 
+        : customerId;
+        
+      if (!customerIdValue) {
+        throw new Error("Customer ID is required for updating a payment plan");
+      }
+
+      console.log(`Updating payment plan ${planId} for customer ID: ${customerIdValue}`, planData);
+      const response = await apiClient.put(`/api/admin/payments/customers/${customerIdValue}/plan/${planId}`, planData);
       return response.data;
     } catch (error) {
       console.error(`Error updating payment plan ${planId} for customer ${customerId}:`, error);

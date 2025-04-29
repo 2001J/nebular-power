@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
+import React from "react"
 import { ArrowLeft, Calendar, DollarSign, Loader2 } from "lucide-react"
 import {
   Card,
@@ -101,7 +102,7 @@ interface PaymentPlan {
   id: number;
   installationId: number;
   customerName?: string;
-  customerId?: string;
+  customerId?: string | number;
   name?: string;
   description?: string;
   totalAmount?: number;
@@ -123,6 +124,8 @@ interface PaymentPlan {
 
 export default function EditLoanPage({ params }: { params: EditLoanParams }) {
   const router = useRouter()
+  const unwrappedParams = React.use(params)
+  const loanId = unwrappedParams.id
   const [loan, setLoan] = useState<PaymentPlan | null>(null)
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
@@ -156,9 +159,10 @@ export default function EditLoanPage({ params }: { params: EditLoanParams }) {
         setLoading(true)
         
         // Get the payment plan details
-        const loanData = await paymentComplianceApi.getPaymentPlanReport(params.id)
+        const loanData = await paymentComplianceApi.getPaymentPlanReport(loanId)
         
         if (loanData) {
+          console.log("Retrieved loan data:", loanData)
           setLoan(loanData)
           
           // Format dates properly
@@ -203,7 +207,7 @@ export default function EditLoanPage({ params }: { params: EditLoanParams }) {
     }
 
     fetchLoanDetails()
-  }, [params.id, form])
+  }, [loanId, form])
 
   // Handle form submission
   const onSubmit = async (data: LoanFormValues) => {
@@ -213,16 +217,28 @@ export default function EditLoanPage({ params }: { params: EditLoanParams }) {
       // Format the data for the API
       const formattedData = {
         ...data,
-        id: parseInt(params.id),
+        id: parseInt(unwrappedParams.id),
         startDate: format(data.startDate, "yyyy-MM-dd"),
         endDate: format(data.endDate, "yyyy-MM-dd"),
       }
       
+      if (!loan) {
+        throw new Error("Loan details not found");
+      }
+
+      // Get installation ID from the form data
+      const installationId = data.installationId;
+      
+      console.log("Submitting loan update:", {
+        installationId,
+        planId: parseInt(unwrappedParams.id),
+        loanData: formattedData
+      });
+      
       // Update the payment plan
-      // Pass the required parameters: customerId, planId, planData
       await paymentComplianceApi.updatePaymentPlan(
-        loan?.customerId, // customerId
-        parseInt(params.id), // planId
+        loan.customerId, // This should be the user ID associated with the installation
+        parseInt(unwrappedParams.id), // planId
         formattedData // planData
       )
       
@@ -281,7 +297,7 @@ export default function EditLoanPage({ params }: { params: EditLoanParams }) {
           </BreadcrumbItem>
           <BreadcrumbSeparator />
           <BreadcrumbItem>
-            <BreadcrumbLink href={`/admin/loans/${params.id}`}>Loan #{params.id}</BreadcrumbLink>
+            <BreadcrumbLink href={`/admin/loans/${unwrappedParams.id}`}>Loan #{unwrappedParams.id}</BreadcrumbLink>
           </BreadcrumbItem>
           <BreadcrumbSeparator />
           <BreadcrumbItem>
@@ -665,7 +681,7 @@ export default function EditLoanPage({ params }: { params: EditLoanParams }) {
                 type="button"
                 variant="outline"
                 className="w-full sm:w-auto"
-                onClick={() => router.push(`/admin/loans/${params.id}`)}
+                onClick={() => router.push(`/admin/loans/${unwrappedParams.id}`)}
                 disabled={submitting}
               >
                 Cancel

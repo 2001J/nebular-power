@@ -144,8 +144,8 @@ export default function NewLoanPage() {
     defaultValues: {
       customerId: "",
       installationId: "",
-      totalAmount: undefined,
-      installmentAmount: undefined,
+      totalAmount: 0,
+      installmentAmount: 0,
       frequency: "MONTHLY",
       startDate: new Date(),
       endDate: new Date(new Date().setFullYear(new Date().getFullYear() + 5)),
@@ -478,14 +478,21 @@ export default function NewLoanPage() {
                   name="totalAmount"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Total Amount ($)</FormLabel>
+                      <FormLabel>Total Loan Amount ($)</FormLabel>
                       <FormControl>
                         <div className="relative">
                           <DollarSign className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                          <Input type="number" step="0.01" placeholder="0.00" {...field} className="pl-9" />
+                          <Input 
+                            type="number" 
+                            step="0.01" 
+                            placeholder="0.00" 
+                            value={field.value || 0}
+                            onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                            className="pl-9" 
+                          />
                         </div>
                       </FormControl>
-                      <FormDescription>The total loan amount</FormDescription>
+                      <FormDescription>Total amount to be financed</FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -496,14 +503,23 @@ export default function NewLoanPage() {
                   name="installmentAmount"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Installment Amount ($)</FormLabel>
+                      <FormLabel>Monthly Payment ($)</FormLabel>
                       <FormControl>
                         <div className="relative">
                           <DollarSign className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                          <Input type="number" step="0.01" placeholder="0.00" {...field} className="pl-9" />
+                          <Input 
+                            type="number" 
+                            step="0.01" 
+                            placeholder="0.00" 
+                            value={field.value || 0}
+                            onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                            className="pl-9" 
+                          />
                         </div>
                       </FormControl>
-                      <FormDescription>The amount of each payment</FormDescription>
+                      <FormDescription>
+                        Amount of each recurring payment
+                      </FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -542,11 +558,17 @@ export default function NewLoanPage() {
                   name="interestRate"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Interest Rate (% per annum)</FormLabel>
+                      <FormLabel>Interest Rate (%)</FormLabel>
                       <FormControl>
-                        <Input type="number" step="0.01" placeholder="0.00" {...field} />
+                        <Input 
+                          type="number" 
+                          step="0.01" 
+                          placeholder="0.00" 
+                          value={field.value || 0}
+                          onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                        />
                       </FormControl>
-                      <FormDescription>Optional, leave at 0 for interest-free</FormDescription>
+                      <FormDescription>Annual interest rate (optional)</FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -660,7 +682,14 @@ export default function NewLoanPage() {
                       <FormControl>
                         <div className="relative">
                           <DollarSign className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                          <Input type="number" step="0.01" placeholder="0.00" {...field} className="pl-9" />
+                          <Input 
+                            type="number" 
+                            step="0.01" 
+                            placeholder="0.00" 
+                            value={field.value || 0}
+                            onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                            className="pl-9" 
+                          />
                         </div>
                       </FormControl>
                       <FormDescription>Optional initial payment</FormDescription>
@@ -708,7 +737,8 @@ export default function NewLoanPage() {
                               type="number"
                               step="0.01"
                               placeholder={loadingSettings ? "Loading..." : `Global default: $${globalPaymentSettings.lateFeeFixedAmount}`}
-                              {...field}
+                              value={field.value || 0}
+                              onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
                               className="pl-9"
                             />
                           </div>
@@ -733,7 +763,8 @@ export default function NewLoanPage() {
                         <FormControl>
                           <Input
                             type="number"
-                            {...field}
+                            value={field.value || 0}
+                            onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
                             placeholder={loadingSettings ? "Loading..." : `Global default: ${globalPaymentSettings.gracePeriodDays}`}
                           />
                         </FormControl>

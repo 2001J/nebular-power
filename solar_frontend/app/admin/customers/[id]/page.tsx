@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
+import React from "react"
 import {
   ArrowLeft, Edit, ClipboardCheck, History, Settings,
   Zap, CreditCard, AlertCircle, Loader2, User,
@@ -36,18 +37,21 @@ import {
 } from "@/components/ui/dialog"
 import { useToast } from "@/components/ui/use-toast"
 import { useAuth } from "@/components/auth-provider"
-import { customerApi } from "@/lib/api"
+import { customerApi, installationApi } from "@/lib/api"
 
 export default function CustomerDetailsPage({ params }: { params: { id: string } }) {
   const { user } = useAuth()
   const { toast } = useToast()
   const router = useRouter()
-  const customerId = params.id
+  const unwrappedParams = React.use(params)
+  const customerId = unwrappedParams.id
 
   const [loading, setLoading] = useState(true)
   const [customer, setCustomer] = useState<any>(null)
   const [showConfirmDialog, setShowConfirmDialog] = useState(false)
   const [confirmAction, setConfirmAction] = useState({ type: "", description: "" })
+  const [installations, setInstallations] = useState([])
+  const [loadingInstallations, setLoadingInstallations] = useState(false)
 
   // Fetch customer data
   useEffect(() => {
@@ -58,6 +62,22 @@ export default function CustomerDetailsPage({ params }: { params: { id: string }
         setLoading(true)
         const data = await customerApi.getCustomerById(customerId)
         setCustomer(data)
+        
+        // Fetch installations for this customer
+        try {
+          setLoadingInstallations(true)
+          const installationsData = await installationApi.getCustomerInstallations(customerId)
+          if (Array.isArray(installationsData)) {
+            setInstallations(installationsData)
+          } else {
+            setInstallations([])
+          }
+        } catch (error) {
+          console.error("Error fetching customer installations:", error)
+          setInstallations([])
+        } finally {
+          setLoadingInstallations(false)
+        }
       } catch (error) {
         console.error("Error fetching customer:", error)
         toast({
@@ -342,25 +362,60 @@ export default function CustomerDetailsPage({ params }: { params: { id: string }
                         <CardTitle>Solar Installations</CardTitle>
                         <CardDescription>Customer's solar energy installations</CardDescription>
                       </div>
-                      <Button
-                        size="sm"
-                        onClick={() => router.push(`/admin/customers/${customerId}/installations`)}
-                      >
-                        View All
-                      </Button>
                     </div>
                   </CardHeader>
                   <CardContent>
-                    <div className="flex flex-col items-center justify-center py-8 text-center">
-                      <Zap className="h-12 w-12 text-muted-foreground mb-4" />
-                      <h3 className="text-lg font-medium">No Installations Yet</h3>
-                      <p className="text-sm text-muted-foreground max-w-md mt-2">
-                        This customer does not have any solar installations set up yet.
-                      </p>
-                      <Button className="mt-4">
-                        Add Installation
-                      </Button>
-                    </div>
+                    {loadingInstallations ? (
+                      <div className="flex flex-col items-center justify-center py-8 text-center">
+                        <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
+                        <p className="text-sm text-muted-foreground">Loading installations...</p>
+                      </div>
+                    ) : installations.length > 0 ? (
+                      <div className="space-y-4">
+                        {installations.map((installation) => (
+                          <div 
+                            key={installation.id} 
+                            className="p-4 border rounded-md cursor-pointer hover:bg-muted/50"
+                            onClick={() => router.push(`/admin/installations/${installation.id}`)}
+                          >
+                            <div className="flex justify-between items-center">
+                              <div>
+                                <h3 className="font-medium">{installation.name || `Installation #${installation.id}`}</h3>
+                                <p className="text-sm text-muted-foreground">{installation.location || 'No location'}</p>
+                              </div>
+                              <Badge variant="outline">
+                                {installation.status || 'Unknown'}
+                              </Badge>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4 mt-4 text-sm">
+                              <div>
+                                <span className="text-muted-foreground">Installed capacity:</span>{' '}
+                                {installation.installedCapacityKW ? `${installation.installedCapacityKW} kW` : 'N/A'}
+                              </div>
+                              <div>
+                                <span className="text-muted-foreground">Installation date:</span>{' '}
+                                {installation.installationDate ? new Date(installation.installationDate).toLocaleDateString() : 'N/A'}
+                              </div>
+                              <div>
+                                <span className="text-muted-foreground">Type:</span>{' '}
+                                {installation.type || 'N/A'}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center justify-center py-8 text-center">
+                        <Zap className="h-12 w-12 text-muted-foreground mb-4" />
+                        <h3 className="text-lg font-medium">No Installations Yet</h3>
+                        <p className="text-sm text-muted-foreground max-w-md mt-2">
+                          This customer does not have any solar installations set up yet.
+                        </p>
+                        <Button className="mt-4">
+                          Add Installation
+                        </Button>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               </TabsContent>
@@ -373,22 +428,23 @@ export default function CustomerDetailsPage({ params }: { params: { id: string }
                         <CardTitle>Payment History</CardTitle>
                         <CardDescription>Customer's payment records</CardDescription>
                       </div>
-                      <Button
-                        size="sm"
-                        onClick={() => router.push(`/admin/customers/${customerId}/payments`)}
-                      >
-                        View All
-                      </Button>
                     </div>
                   </CardHeader>
                   <CardContent>
-                    <div className="flex flex-col items-center justify-center py-8 text-center">
-                      <CreditCard className="h-12 w-12 text-muted-foreground mb-4" />
-                      <h3 className="text-lg font-medium">No Payment Records</h3>
-                      <p className="text-sm text-muted-foreground max-w-md mt-2">
-                        This customer does not have any payment records yet.
-                      </p>
-                    </div>
+                    {loadingInstallations ? (
+                      <div className="flex flex-col items-center justify-center py-8 text-center">
+                        <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
+                        <p className="text-sm text-muted-foreground">Loading payments...</p>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center justify-center py-8 text-center">
+                        <CreditCard className="h-12 w-12 text-muted-foreground mb-4" />
+                        <h3 className="text-lg font-medium">No Payment Records</h3>
+                        <p className="text-sm text-muted-foreground max-w-md mt-2">
+                          This customer does not have any payment records yet.
+                        </p>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               </TabsContent>

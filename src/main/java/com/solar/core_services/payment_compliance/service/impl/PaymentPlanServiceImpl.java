@@ -140,6 +140,20 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
     @Override
     @Transactional
     public PaymentPlanDTO updatePaymentPlan(Long planId, PaymentPlanRequest request) {
+        if (planId == null) {
+            throw new IllegalArgumentException("Payment plan ID cannot be null");
+        }
+        
+        if (request == null) {
+            throw new IllegalArgumentException("Payment plan request cannot be null");
+        }
+        
+        if (request.getInstallationId() == null) {
+            throw new IllegalArgumentException("Installation ID cannot be null");
+        }
+        
+        log.info("Updating payment plan with ID: {}, installation ID: {}", planId, request.getInstallationId());
+        
         PaymentPlan paymentPlan = getPaymentPlanEntityById(planId);
 
         // Validate the installation ID matches

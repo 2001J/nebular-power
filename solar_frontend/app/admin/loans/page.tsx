@@ -132,26 +132,10 @@ export default function LoanManagementPage() {
           }
         } catch (error) {
           console.error("Error fetching payment plans:", error);
-          // Continue to mock data
         }
 
-        // Use sample data as fallback
-        setLoans([
-          {
-            id: 1,
-            customer: "No Active Loans",
-            customerId: "0",
-            loanAmount: 0,
-            remainingAmount: 0,
-            monthlyPayment: 0,
-            status: "No Data",
-            nextPayment: new Date().toISOString(),
-            term: "N/A",
-            startDate: new Date().toISOString(),
-            installationId: "0",
-            installationName: "No active payment plans found"
-          }
-        ]);
+        // No fallback data, just set an empty array
+        setLoans([]);
 
         // Show toast notification about no data
         toast({

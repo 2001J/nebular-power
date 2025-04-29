@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
+import React from "react"
 import {
   ArrowLeft,
   Calendar,
@@ -76,6 +77,8 @@ interface LoanParams {
 
 export default function LoanDetailsPage({ params }: { params: LoanParams }) {
   const router = useRouter()
+  const unwrappedParams = React.use(params)
+  const loanId = unwrappedParams.id
   const [loan, setLoan] = useState<PaymentPlan | null>(null)
   const [loading, setLoading] = useState(true)
   const [payments, setPayments] = useState<Payment[]>([])
@@ -106,7 +109,7 @@ export default function LoanDetailsPage({ params }: { params: LoanParams }) {
           
           // Find the plan that matches our ID among all plans
           if (allPlans.length > 0) {
-            const matchingPlan = allPlans.find(plan => plan.id === parseInt(params.id));
+            const matchingPlan = allPlans.find(plan => plan.id === parseInt(loanId));
             if (matchingPlan) {
               console.log("Found matching plan:", matchingPlan);
               
@@ -154,7 +157,7 @@ export default function LoanDetailsPage({ params }: { params: LoanParams }) {
         }
         
         // If we couldn't find the plan in active plans, try the regular payment plan report
-        const paymentData = await paymentComplianceApi.getPaymentPlanReport(params.id);
+        const paymentData = await paymentComplianceApi.getPaymentPlanReport(loanId);
         console.log("Payment plan data retrieved:", paymentData);
         
         if (paymentData) {
@@ -199,7 +202,7 @@ export default function LoanDetailsPage({ params }: { params: LoanParams }) {
                   const loanDetails = await paymentComplianceApi.getCustomerPaymentPlans(firstPayment.installationId);
                   if (loanDetails && Array.isArray(loanDetails) && loanDetails.length > 0) {
                     // Find the matching plan
-                    const matchingPlan = loanDetails.find(plan => plan.id === parseInt(params.id));
+                    const matchingPlan = loanDetails.find(plan => plan.id === parseInt(loanId));
                     if (matchingPlan) {
                       // Enhance the plan data with derived fields
                       const enhancedPlan = {
@@ -337,7 +340,7 @@ export default function LoanDetailsPage({ params }: { params: LoanParams }) {
           if (paymentHistoryData && Array.isArray(paymentHistoryData) && paymentHistoryData.length > 0) {
             // Filter to only show payments for this specific plan if needed
             const filteredPayments = paymentHistoryData.filter(payment => 
-              !payment.paymentPlanId || payment.paymentPlanId === parseInt(params.id)
+              !payment.paymentPlanId || payment.paymentPlanId === parseInt(loanId)
             );
             
             if (filteredPayments.length > 0) {
@@ -352,7 +355,7 @@ export default function LoanDetailsPage({ params }: { params: LoanParams }) {
           if (paymentsData && Array.isArray(paymentsData)) {
             // Filter payments for this specific plan if paymentPlanId is available
             const filteredPayments = paymentsData.filter(payment => 
-              !payment.paymentPlanId || payment.paymentPlanId === parseInt(params.id)
+              !payment.paymentPlanId || payment.paymentPlanId === parseInt(loanId)
             );
             
             if (filteredPayments.length > 0) {
@@ -364,7 +367,7 @@ export default function LoanDetailsPage({ params }: { params: LoanParams }) {
         }
         
         // Last resort: try payment plan report directly
-        const planPayments = await paymentComplianceApi.getPaymentPlanReport(params.id, new Date().getTime());
+        const planPayments = await paymentComplianceApi.getPaymentPlanReport(loanId, new Date().getTime());
         if (planPayments && planPayments.payments && planPayments.payments.length > 0) {
           setPayments(planPayments.payments);
         } else {
@@ -538,7 +541,7 @@ export default function LoanDetailsPage({ params }: { params: LoanParams }) {
     };
 
     fetchLoanDetails();
-  }, [params.id])
+  }, [loanId])
 
   // Format status badge display - update to handle "COMPLETED" status more visibly
   const getStatusBadge = (status: string) => {
@@ -645,7 +648,7 @@ export default function LoanDetailsPage({ params }: { params: LoanParams }) {
           </BreadcrumbItem>
           <BreadcrumbSeparator />
           <BreadcrumbItem>
-            <BreadcrumbPage>Loan #{params.id}</BreadcrumbPage>
+            <BreadcrumbPage>Loan #{unwrappedParams.id}</BreadcrumbPage>
           </BreadcrumbItem>
         </BreadcrumbList>
       </Breadcrumb>
@@ -662,11 +665,11 @@ export default function LoanDetailsPage({ params }: { params: LoanParams }) {
           </div>
 
           <div className="flex gap-2">
-            <Button variant="outline" onClick={() => router.push(`/admin/loans/${params.id}/payments`)}>
+            <Button variant="outline" onClick={() => router.push(`/admin/loans/${unwrappedParams.id}/payments`)}>
               <Receipt className="mr-2 h-4 w-4" />
               Payments
             </Button>
-            <Button variant="outline" onClick={() => router.push(`/admin/loans/${params.id}/edit`)}>
+            <Button variant="outline" onClick={() => router.push(`/admin/loans/${unwrappedParams.id}/edit`)}>
               <Pencil className="mr-2 h-4 w-4" />
               Edit
             </Button>
@@ -858,7 +861,7 @@ export default function LoanDetailsPage({ params }: { params: LoanParams }) {
               <CardTitle>Scheduled Payments</CardTitle>
               <CardDescription>Upcoming payment installments</CardDescription>
             </div>
-            <Button variant="outline" onClick={() => router.push(`/admin/loans/${params.id}/payments`)}>
+            <Button variant="outline" onClick={() => router.push(`/admin/loans/${unwrappedParams.id}/payments`)}>
               View All
             </Button>
           </CardHeader>
@@ -873,7 +876,7 @@ export default function LoanDetailsPage({ params }: { params: LoanParams }) {
                 <Button 
                   variant="outline" 
                   className="mt-4"
-                  onClick={() => router.push(`/admin/loans/${params.id}/payments/new`)}
+                  onClick={() => router.push(`/admin/loans/${unwrappedParams.id}/payments/new`)}
                 >
                   Record Payment
                 </Button>
@@ -902,7 +905,7 @@ export default function LoanDetailsPage({ params }: { params: LoanParams }) {
                         <Button 
                           variant="ghost" 
                           size="sm"
-                          onClick={() => router.push(`/admin/loans/${params.id}/payments/${payment.id}`)}
+                          onClick={() => router.push(`/admin/loans/${unwrappedParams.id}/payments/${payment.id}`)}
                         >
                           Details
                         </Button>

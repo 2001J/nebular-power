@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
@@ -10,7 +10,7 @@ import { useToast } from "@/components/ui/use-toast"
 import { authApi } from "@/lib/api"
 import { Eye, EyeOff, RefreshCw, ShieldCheck } from "lucide-react"
 
-export default function ResetPasswordPage() {
+function ResetPasswordContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { toast } = useToast()
@@ -241,5 +241,29 @@ export default function ResetPasswordPage() {
         </form>
       </Card>
     </div>
+  )
+}
+
+export default function ResetPasswordPage() {
+  return (
+    <Suspense fallback={
+      <div className="container flex items-center justify-center min-h-screen py-10">
+        <Card className="w-full max-w-md">
+          <CardHeader>
+            <CardTitle className="text-2xl">Reset Your Password</CardTitle>
+            <CardDescription>
+              Loading...
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="h-32 flex items-center justify-center">
+              <RefreshCw className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    }>
+      <ResetPasswordContent />
+    </Suspense>
   )
 } 

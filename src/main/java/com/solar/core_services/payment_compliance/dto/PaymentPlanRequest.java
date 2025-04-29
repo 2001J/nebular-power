@@ -55,5 +55,6 @@ public class PaymentPlanRequest {
     private boolean useDefaultLateFee;
 
     // Flag to indicate whether late fees should be applied at all
+    @Builder.Default
     private boolean applyLateFee = true;
 }

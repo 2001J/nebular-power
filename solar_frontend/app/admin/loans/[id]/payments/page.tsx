@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
+import React from "react"
 import {
   ArrowLeft,
   Calendar,
@@ -35,6 +36,8 @@ interface PaymentParams {
 
 export default function LoanPaymentsPage({ params }: { params: PaymentParams }) {
   const router = useRouter()
+  const unwrappedParams = React.use(params)
+  const loanId = unwrappedParams.id
   const [loan, setLoan] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [payments, setPayments] = useState<any[]>([])
@@ -66,7 +69,7 @@ export default function LoanPaymentsPage({ params }: { params: PaymentParams }) 
       if (paymentHistoryData && Array.isArray(paymentHistoryData) && paymentHistoryData.length > 0) {
         // Filter to only show payments for this specific payment plan if needed
         const filteredPayments = paymentHistoryData.filter(payment => 
-          !payment.paymentPlanId || payment.paymentPlanId === parseInt(params.id)
+          !payment.paymentPlanId || payment.paymentPlanId === parseInt(loanId)
         );
         
         if (filteredPayments.length > 0) {
@@ -80,7 +83,7 @@ export default function LoanPaymentsPage({ params }: { params: PaymentParams }) 
       if (altPaymentData && Array.isArray(altPaymentData) && altPaymentData.length > 0) {
         // Filter to only show payments for this specific payment plan if needed
         const filteredPayments = altPaymentData.filter(payment => 
-          !payment.paymentPlanId || payment.paymentPlanId === parseInt(params.id)
+          !payment.paymentPlanId || payment.paymentPlanId === parseInt(loanId)
         );
         
         if (filteredPayments.length > 0) {
@@ -90,7 +93,7 @@ export default function LoanPaymentsPage({ params }: { params: PaymentParams }) 
       }
       
       // Last resort: check if loan data itself has payments
-      const paymentPlanData = await paymentComplianceApi.getPaymentPlanReport(params.id, timestamp);
+      const paymentPlanData = await paymentComplianceApi.getPaymentPlanReport(loanId, timestamp);
       if (paymentPlanData && paymentPlanData.payments && Array.isArray(paymentPlanData.payments) && paymentPlanData.payments.length > 0) {
         console.log("Found payments in payment plan data:", paymentPlanData.payments);
         return paymentPlanData.payments;
@@ -149,28 +152,27 @@ export default function LoanPaymentsPage({ params }: { params: PaymentParams }) 
 
   // Fetch loan details
   useEffect(() => {
-    const fetchLoanDetails = async () => {
+    const fetchLoanPayments = async () => {
       try {
-        setLoading(true);
+        setLoading(true)
         
-        // Get the payment plan details with timestamp to avoid caching
-        const timestamp = new Date().getTime();
-        const loanData = await paymentComplianceApi.getPaymentPlanReport(params.id, timestamp);
+        // Fetch the payment plan report which includes payment data
+        const planReport = await paymentComplianceApi.getPaymentPlanReport(loanId)
         
-        if (loanData) {
-          setLoan(loanData);
+        if (planReport) {
+          setLoan(planReport);
           
           // Only try to fetch payments if we have an installation ID
-          if (loanData.installationId) {
-            const paymentData = await fetchPayments(loanData.installationId, timestamp);
+          if (planReport.installationId) {
+            const paymentData = await fetchPayments(planReport.installationId, new Date().getTime());
             setPayments(paymentData);
           } else {
             // Try to get payments directly from the loan data
-            if (loanData.payments && Array.isArray(loanData.payments) && loanData.payments.length > 0) {
-              setPayments(loanData.payments);
+            if (planReport.payments && Array.isArray(planReport.payments) && planReport.payments.length > 0) {
+              setPayments(planReport.payments);
             } else {
               // Last try: get payments by ID only
-              const backupPaymentData = await fetchPayments(params.id, timestamp);
+              const backupPaymentData = await fetchPayments(loanId, new Date().getTime());
               setPayments(backupPaymentData);
             }
           }
@@ -191,10 +193,10 @@ export default function LoanPaymentsPage({ params }: { params: PaymentParams }) 
       } finally {
         setLoading(false);
       }
-    };
-
-    fetchLoanDetails();
-  }, [params.id]);
+    }
+    
+    fetchLoanPayments()
+  }, [loanId])
 
   // Format status badge display
   const getStatusBadge = (status: string) => {
@@ -253,7 +255,7 @@ export default function LoanPaymentsPage({ params }: { params: PaymentParams }) 
           </BreadcrumbItem>
           <BreadcrumbSeparator />
           <BreadcrumbItem>
-            <BreadcrumbLink href={`/admin/loans/${params.id}`}>Loan #{params.id}</BreadcrumbLink>
+            <BreadcrumbLink href={`/admin/loans/${unwrappedParams.id}`}>Loan #{unwrappedParams.id}</BreadcrumbLink>
           </BreadcrumbItem>
           <BreadcrumbSeparator />
           <BreadcrumbItem>
@@ -266,7 +268,7 @@ export default function LoanPaymentsPage({ params }: { params: PaymentParams }) 
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Payment History</h1>
           <p className="text-muted-foreground">
-            All payments for loan #{params.id} - {loan.customerName || `Installation #${loan.installationId}`}
+            {loan ? `Payments for ${loan.customerName || loan.name || `Loan #${unwrappedParams.id}`}` : "Manage payment history"}
           </p>
         </div>
 
@@ -281,11 +283,11 @@ export default function LoanPaymentsPage({ params }: { params: PaymentParams }) 
             {refreshing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />}
             Refresh
           </Button>
-          <Button onClick={() => router.push(`/admin/loans/${params.id}/payments/new`)}>
+          <Button onClick={() => router.push(`/admin/loans/${unwrappedParams.id}/payments/new`)}>
             <Plus className="mr-2 h-4 w-4" />
             Record Payment
           </Button>
-          <Button variant="outline" onClick={() => router.push(`/admin/loans/${params.id}`)}>
+          <Button onClick={() => router.push(`/admin/loans/${unwrappedParams.id}`)}>
             <ArrowLeft className="mr-2 h-4 w-4" />
             Back to Loan
           </Button>
@@ -344,7 +346,7 @@ export default function LoanPaymentsPage({ params }: { params: PaymentParams }) 
                     </Button>
                     <Button 
                       variant="outline" 
-                      onClick={() => router.push(`/admin/loans/${params.id}/payments/new`)}
+                      onClick={() => router.push(`/admin/loans/${unwrappedParams.id}/payments/new`)}
                     >
                       Record Payment
                     </Button>
@@ -380,7 +382,7 @@ export default function LoanPaymentsPage({ params }: { params: PaymentParams }) 
                       <Button 
                         variant="ghost" 
                         size="sm"
-                        onClick={() => router.push(`/admin/loans/${params.id}/payments/${payment.id}`)}
+                        onClick={() => router.push(`/admin/loans/${unwrappedParams.id}/payments/${payment.id}`)}
                       >
                         Details
                       </Button>

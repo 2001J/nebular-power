@@ -167,8 +167,7 @@ export default function CustomersPage() {
       "Email",
       "Phone",
       "Status",
-      "Installation Date",
-      "Payment Status",
+      "Date Joined",
     ]
     const csvData = filteredCustomers.map((customer) => [
       customer.id,
@@ -176,8 +175,7 @@ export default function CustomersPage() {
       customer.email || "",
       customer.phoneNumber || "",
       customer.status || "",
-      customer.installationDate || "",
-      customer.paymentStatus || "",
+      customer.createdAt ? new Date(customer.createdAt).toLocaleDateString() : customer.joinDate ? new Date(customer.joinDate).toLocaleDateString() : "",
     ])
 
     const csvContent = [headers.join(","), ...csvData.map((row) => row.join(","))].join("\n")
@@ -653,7 +651,7 @@ export default function CustomersPage() {
                         <ArrowUpDown className="ml-2 h-4 w-4" />
                       </Button>
                     </TableHead>
-                    <TableHead>Payment Status</TableHead>
+                    <TableHead>Date Joined</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -761,21 +759,11 @@ export default function CustomersPage() {
                           </Badge>
                         </TableCell>
                         <TableCell>
-                          <Badge
-                            variant={
-                              (customer.paymentStatus || "").toLowerCase() === "current"
-                                ? "default"
-                                : (customer.paymentStatus || "").toLowerCase() === "pending"
-                                  ? "outline"
-                                  : (customer.paymentStatus || "").toLowerCase() === "overdue"
-                                    ? "destructive"
-                                    : "secondary"
-                            }
-                          >
-                            {customer.paymentStatus 
-                              ? customer.paymentStatus.charAt(0).toUpperCase() + customer.paymentStatus.slice(1).toLowerCase()
+                          {customer.createdAt 
+                            ? new Date(customer.createdAt).toLocaleDateString() 
+                            : customer.joinDate 
+                              ? new Date(customer.joinDate).toLocaleDateString() 
                               : "N/A"}
-                          </Badge>
                         </TableCell>
                         <TableCell className="text-right">
                           <DropdownMenu>
