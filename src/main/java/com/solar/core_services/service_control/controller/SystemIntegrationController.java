@@ -148,12 +148,11 @@ public class SystemIntegrationController {
     )
     @ApiResponses(value = {
         @ApiResponse(responseCode = "200", description = "Health report generated successfully", 
-                    content = @Content(schema = @Schema(implementation = String.class))),
+                    content = @Content(schema = @Schema(implementation = Map.class))),
         @ApiResponse(responseCode = "403", description = "Access denied", content = @Content)
     })
-    public ResponseEntity<String> generateHealthReport() {
-        String report = systemIntegrationService.generateSystemHealthReport();
-        return ResponseEntity.ok(report);
+    public ResponseEntity<Map<String, Object>> generateHealthReport() {
+        return ResponseEntity.ok(systemIntegrationService.generateSystemHealthReport());
     }
     
     @PostMapping("/register-device")

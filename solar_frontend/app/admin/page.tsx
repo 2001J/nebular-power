@@ -9,7 +9,6 @@ import {
   ShieldAlert,
   Sun,
   Users,
-  Calendar,
   Download,
   Filter,
   CheckCircle,
@@ -17,6 +16,7 @@ import {
   ArrowDown,
   BarChart3,
   Settings,
+  RefreshCw,
 } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -62,7 +62,7 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb"
 import { useRouter } from "next/navigation"
-import { customerApi, installationApi, paymentApi, securityApi, energyApi } from "@/lib/api"
+import { customerApi, installationApi, paymentApi, securityApi, energyApi, serviceApi } from "@/lib/api"
 
 export default function AdminDashboardPage() {
   const { user } = useAuth()
@@ -320,6 +320,17 @@ export default function AdminDashboardPage() {
           });
         }
 
+        // Fetch system health data
+        try {
+          console.log("Fetching system health data");
+          const healthData = await serviceApi.getSystemHealth();
+          console.log("System health data received:", healthData);
+          setSystemHealth(healthData);
+        } catch (error) {
+          console.error("Error fetching system health:", error);
+          setSystemHealth(null);
+        }
+
       } catch (generalError) {
         console.error("General error loading dashboard data:", generalError);
         toast({
@@ -360,18 +371,9 @@ export default function AdminDashboardPage() {
   const displaySecurityAlerts = securityAlerts;
 
   // Format system health data from the system overview
-  const systemHealthData = systemOverview?.systemHealth ? systemOverview.systemHealth : [];
-
-  // Filter installations to get upcoming ones
-  const upcomingInstallations = installations.filter(installation => {
-    // Check if it has a status of PENDING or Pending
-    const isPending = installation.status === "PENDING" || installation.status === "Pending";
-
-    // Check if installation date is in the future
-    const hasValidDate = installation.installationDate && new Date(installation.installationDate) > new Date();
-
-    return isPending && hasValidDate;
-  });
+  const systemHealthData = systemOverview?.systemHealth 
+    ? systemOverview.systemHealth 
+    : [];
 
   // Calculate overdue payments data
   let overduePayments = [];
@@ -707,65 +709,6 @@ export default function AdminDashboardPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Weather Impact on Production</CardTitle>
-            <CardDescription>How weather conditions affect system performance</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <div className="flex justify-center py-8">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-              </div>
-            ) : !weatherImpactData ? (
-              <div className="flex flex-col items-center justify-center py-12 text-center">
-                <Sun className="h-16 w-16 text-muted-foreground mb-4" />
-                <h3 className="text-lg font-medium">No Weather Impact Data Available</h3>
-                <p className="text-sm text-muted-foreground max-w-md mt-2">
-                  Weather impact data is not available at this time.
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="rounded-lg border p-4 text-center">
-                    <div className="text-sm text-muted-foreground">Sunny Days</div>
-                    <div className="mt-1 text-2xl font-bold text-amber-500">
-                      {weatherImpactData.sunnyDayImpact ? `${weatherImpactData.sunnyDayImpact > 0 ? '+' : ''}${weatherImpactData.sunnyDayImpact}%` : "+25%"}
-                    </div>
-                    <div className="mt-1 text-sm text-muted-foreground">
-                      {weatherImpactData.sunnyDayImpact > 0 ? "Above" : "Below"} average production
-                    </div>
-                  </div>
-                  <div className="rounded-lg border p-4 text-center">
-                    <div className="text-sm text-muted-foreground">Cloudy Days</div>
-                    <div className="mt-1 text-2xl font-bold text-muted-foreground">
-                      {weatherImpactData.cloudyDayImpact ? `${weatherImpactData.cloudyDayImpact > 0 ? '+' : ''}${weatherImpactData.cloudyDayImpact}%` : "-18%"}
-                    </div>
-                    <div className="mt-1 text-sm text-muted-foreground">
-                      {weatherImpactData.cloudyDayImpact > 0 ? "Above" : "Below"} average production
-                    </div>
-                  </div>
-                </div>
-                <div className="flex justify-center text-center space-y-1 py-3">
-                  <div>
-                    <div className="text-sm text-muted-foreground">Optimal Temperature Range</div>
-                    <div className="text-xl font-bold text-green-500">
-                      {weatherImpactData.optimalTemperatureRange || "70-75°F"}
-                    </div>
-                    <div className="text-xs text-muted-foreground">For maximum efficiency</div>
-                  </div>
-                </div>
-                <div className="text-xs text-center text-muted-foreground mt-2">
-                  Data based on system performance correlation with weather conditions over the last 30 days
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader>
             <CardTitle>Security Alerts</CardTitle>
             <CardDescription>Recent security alerts across all systems</CardDescription>
           </CardHeader>
@@ -807,60 +750,6 @@ export default function AdminDashboardPage() {
                 </Button>
               </div>
             </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>System Health</CardTitle>
-            <CardDescription>Current status of system components</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <div className="flex justify-center py-8">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-              </div>
-            ) : systemHealthData.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-12 text-center">
-                <Settings className="h-16 w-16 text-muted-foreground mb-4" />
-                <h3 className="text-lg font-medium">No System Health Data Available</h3>
-                <p className="text-sm text-muted-foreground max-w-md mt-2">
-                  System health metrics are not available at this time.
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-6">
-                {systemHealthData.map((item) => (
-                  <div key={item.name} className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium">{item.name}</span>
-                      <span className="text-sm font-medium">{item.value}%</span>
-                    </div>
-                    <Progress
-                      value={item.value}
-                      className="h-2"
-                      style={
-                        {
-                          backgroundColor: "var(--muted)",
-                          "--progress-color": item.color,
-                        } as React.CSSProperties
-                      }
-                    />
-                    <div className="flex items-center justify-between text-xs text-muted-foreground">
-                      <span>Target: {item.target}%</span>
-                      <span className={item.value >= item.target ? "text-green-500" : "text-amber-500"}>
-                        {item.value >= item.target ? (
-                          <CheckCircle className="inline h-3 w-3 mr-1" />
-                        ) : (
-                          <XCircle className="inline h-3 w-3 mr-1" />
-                        )}
-                        {item.value >= item.target ? "Meeting target" : "Below target"}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
           </CardContent>
         </Card>
       </div>
@@ -951,46 +840,144 @@ export default function AdminDashboardPage() {
         </CardContent>
       </Card>
 
-      <Card className="mt-6">
-        <CardHeader>
-          <CardTitle>Upcoming Installations</CardTitle>
-          <CardDescription>Scheduled installations for the next 7 days</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
+      <div className="grid grid-cols-1 lg:grid-cols-1 gap-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>System Health</CardTitle>
+            <CardDescription>Current status of system components</CardDescription>
+          </CardHeader>
+          <CardContent>
             {loading ? (
               <div className="flex justify-center py-8">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
               </div>
-            ) : upcomingInstallations.length > 0 ? (
-              upcomingInstallations.slice(0, 3).map((installation) => (
-                <div key={installation.id} className="flex items-center gap-4 p-3 border rounded-md">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
-                    <Calendar className="h-5 w-5 text-primary" />
+            ) : !systemHealth ? (
+              <div className="flex flex-col items-center justify-center py-12 text-center">
+                <Settings className="h-16 w-16 text-muted-foreground mb-4" />
+                <h3 className="text-lg font-medium">No System Health Data Available</h3>
+                <p className="text-sm text-muted-foreground max-w-md mt-2">
+                  System health metrics are not available at this time.
+                </p>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="mt-4"
+                  onClick={async () => {
+                    try {
+                      setLoading(true);
+                      const healthData = await serviceApi.getSystemHealth();
+                      console.log("Refreshed system health data:", healthData);
+                      setSystemHealth(healthData);
+                    } catch (error) {
+                      console.error("Error refreshing system health:", error);
+                      toast({
+                        title: "Error",
+                        description: "Failed to refresh system health data",
+                        variant: "destructive",
+                      });
+                    } finally {
+                      setLoading(false);
+                    }
+                  }}
+                >
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Refresh Data
+                </Button>
+              </div>
+            ) : systemHealth.systemHealth && systemHealth.systemHealth.length > 0 ? (
+              <div className="space-y-6">
+                {systemHealth.systemHealth.map((item, index) => (
+                  <div key={item.name || index} className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium">{item.name}</span>
+                      <span className="text-sm font-medium">{item.value}%</span>
+                    </div>
+                    <Progress
+                      value={item.value}
+                      className="h-2"
+                      style={
+                        {
+                          backgroundColor: "var(--muted)",
+                          "--progress-color": item.color,
+                        } as React.CSSProperties
+                      }
+                    />
+                    <div className="flex items-center justify-between text-xs text-muted-foreground">
+                      <span>Target: {item.target}%</span>
+                      <span className={item.value >= item.target ? "text-green-500" : "text-amber-500"}>
+                        {item.value >= item.target ? (
+                          <CheckCircle className="inline h-3 w-3 mr-1" />
+                        ) : (
+                          <XCircle className="inline h-3 w-3 mr-1" />
+                        )}
+                        {item.value >= item.target ? "Meeting target" : "Below target"}
+                      </span>
+                    </div>
                   </div>
-                  <div className="flex-1">
-                    <p className="font-medium">{installation.name || `Installation #${installation.id}`}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {installation.installationDate ? new Date(installation.installationDate).toLocaleDateString() : 'N/A'} -
-                      {installation.location || 'Location not specified'}
-                    </p>
-                  </div>
-                  <Button variant="outline" size="sm" onClick={() => router.push(`/admin/installations/${installation.id}`)}>
-                    View Details
-                  </Button>
-                </div>
-              ))
+                ))}
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="mt-4"
+                  onClick={async () => {
+                    try {
+                      setLoading(true);
+                      const healthData = await serviceApi.getSystemHealth();
+                      console.log("Refreshed system health data:", healthData);
+                      setSystemHealth(healthData);
+                    } catch (error) {
+                      console.error("Error refreshing system health:", error);
+                      toast({
+                        title: "Error",
+                        description: "Failed to refresh system health data",
+                        variant: "destructive",
+                      });
+                    } finally {
+                      setLoading(false);
+                    }
+                  }}
+                >
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Refresh Data
+                </Button>
+              </div>
             ) : (
-              <div className="text-center py-8 text-muted-foreground">
-                {installations.length > 0 ?
-                  "No pending installations scheduled for future dates" :
-                  "No installations found in the system"
-                }
+              <div className="flex flex-col items-center justify-center py-12 text-center">
+                <Settings className="h-16 w-16 text-muted-foreground mb-4" />
+                <h3 className="text-lg font-medium">System Health Data Format Error</h3>
+                <p className="text-sm text-muted-foreground max-w-md mt-2">
+                  The system health data was received but in an unexpected format.
+                </p>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="mt-4"
+                  onClick={async () => {
+                    try {
+                      setLoading(true);
+                      const healthData = await serviceApi.getSystemHealth();
+                      console.log("Refreshed system health data:", healthData);
+                      setSystemHealth(healthData);
+                    } catch (error) {
+                      console.error("Error refreshing system health:", error);
+                      toast({
+                        title: "Error",
+                        description: "Failed to refresh system health data",
+                        variant: "destructive",
+                      });
+                    } finally {
+                      setLoading(false);
+                    }
+                  }}
+                >
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Refresh Data
+                </Button>
               </div>
             )}
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   )
 }

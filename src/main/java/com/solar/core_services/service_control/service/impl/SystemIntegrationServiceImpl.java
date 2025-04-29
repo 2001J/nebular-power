@@ -89,7 +89,7 @@ public class SystemIntegrationServiceImpl implements SystemIntegrationService {
 
     @Override
     @Transactional(readOnly = true)
-    public String generateSystemHealthReport() {
+    public Map<String, Object> generateSystemHealthReport() {
         log.info("Generating system health report");
         return systemMonitoringService.generateSystemHealthReport();
     }

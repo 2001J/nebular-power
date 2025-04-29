@@ -3,6 +3,8 @@ package com.solar.core_services.service_control.service;
 import com.solar.core_services.service_control.dto.DeviceHeartbeatRequest;
 import com.solar.core_services.service_control.dto.SystemOverviewResponse;
 
+import java.util.Map;
+
 public interface SystemMonitoringService {
     
     /**
@@ -37,6 +39,7 @@ public interface SystemMonitoringService {
     
     /**
      * Generate system health report
+     * @return The health report as a structured map
      */
-    String generateSystemHealthReport();
+    Map<String, Object> generateSystemHealthReport();
 } 

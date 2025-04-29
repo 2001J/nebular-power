@@ -182,14 +182,20 @@ public class SystemIntegrationControllerTest {
     @WithMockUser(username = "admin")
     void shouldGenerateHealthReport() throws Exception {
         // Arrange
-        String reportContent = "Sample health report content with system status details";
+        Map<String, Object> reportMap = new HashMap<>();
+        reportMap.put("timestamp", LocalDateTime.now().toString());
+        reportMap.put("status", "HEALTHY");
+        reportMap.put("message", "System is operating normally");
+        
         when(systemIntegrationService.generateSystemHealthReport())
-                .thenReturn(reportContent);
+                .thenReturn(reportMap);
 
         // Act & Assert
         mockMvc.perform(get("/api/service/system/health-report"))
                 .andExpect(status().isOk())
-                .andExpect(content().string(reportContent));
+                .andExpect(jsonPath("$.timestamp").exists())
+                .andExpect(jsonPath("$.status").value("HEALTHY"))
+                .andExpect(jsonPath("$.message").value("System is operating normally"));
 
         verify(systemIntegrationService).generateSystemHealthReport();
     }

@@ -14,7 +14,9 @@ import {
   RefreshCw,
   Server,
   Settings,
-  Zap
+  Zap,
+  CheckCircle,
+  XCircle
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -55,6 +57,7 @@ import {
 import { Calendar } from "@/components/ui/calendar"
 import { cn } from "@/lib/utils"
 import { serviceControlApi, serviceApi } from "@/lib/api"
+import { Progress } from "@/components/ui/progress"
 
 // Define interfaces for the data structures
 interface LogEntry {
@@ -92,17 +95,38 @@ interface SystemComponent {
 }
 
 interface SystemHealthData {
-  overallHealth: string
-  lastUpdated: string
-  components?: SystemComponent[]
-  alerts?: number
-  warnings?: number
+  timestamp?: string;
+  installations?: {
+    total: number;
+    byStatus: Record<string, number>;
+  };
+  devices?: {
+    total: number;
+    counts: {
+      active: number;
+      inactive: number;
+      lowBattery: number;
+      poorConnectivity: number;
+      outdatedFirmware: number;
+    };
+  };
+  systemHealth?: Array<{
+    name: string;
+    value: number;
+    target: number;
+    color: string;
+  }>;
+  overallHealth?: string;
+  lastUpdated?: string;
+  components?: SystemComponent[];
+  alerts?: number;
+  warnings?: number;
   systemLoad?: {
-    cpu: number
-    memory: number
-    disk: number
-    network: number
-  }
+    cpu: number;
+    memory: number;
+    disk: number;
+    network: number;
+  };
 }
 
 // Extended Badge component to support additional variants
@@ -356,6 +380,8 @@ export default function SystemLogsPage() {
       
       // Get system health
       const healthData = await serviceApi.getSystemHealth() as SystemHealthData
+      console.log("Received system health data:", healthData);
+      console.log("systemHealth array:", healthData?.systemHealth);
       setSystemHealth(healthData)
     } catch (error) {
       console.error("Error fetching system health:", error)
@@ -973,29 +999,36 @@ export default function SystemLogsPage() {
                       </CardHeader>
                       <CardContent>
                         <div className="text-2xl font-bold">
-                          {getHeartbeatStatusBadge(systemHealth.overallHealth)}
+                          {systemHealth.installations ? 
+                            `${systemHealth.installations.total} Installations` : 
+                            getHeartbeatStatusBadge(systemHealth.overallHealth || "HEALTHY")}
                         </div>
                         <p className="text-xs text-muted-foreground mt-1">
-                          Last Updated: {formatDate(systemHealth.lastUpdated)}
+                          Last Updated: {formatDate(systemHealth.timestamp || systemHealth.lastUpdated || "")}
                         </p>
                       </CardContent>
                     </Card>
                     <Card>
                       <CardHeader className="flex flex-row items-center justify-between py-2">
-                        <CardTitle className="text-sm font-medium">CPU Load</CardTitle>
+                        <CardTitle className="text-sm font-medium">Device Stats</CardTitle>
                         <Zap className="h-4 w-4 text-muted-foreground" />
                       </CardHeader>
                       <CardContent>
-                        <div className="text-2xl font-bold">{systemHealth.systemLoad?.cpu || 0}%</div>
+                        <div className="text-2xl font-bold">
+                          {systemHealth.devices?.total || systemHealth.systemLoad?.cpu || 0}
+                          {systemHealth.devices ? " Devices" : "%"}
+                        </div>
                         <div className="w-full h-2 bg-muted rounded overflow-hidden mt-2">
                           <div 
                             className={cn(
                               "h-full", 
-                              (systemHealth.systemLoad?.cpu || 0) > 80 ? "bg-red-500" : 
-                              (systemHealth.systemLoad?.cpu || 0) > 50 ? "bg-amber-500" : 
-                              "bg-green-500"
+                              (systemHealth.devices?.counts.active || systemHealth.systemLoad?.cpu || 0) > 80 ? "bg-green-500" : 
+                              (systemHealth.devices?.counts.lowBattery || systemHealth.systemLoad?.cpu || 0) > 50 ? "bg-amber-500" : 
+                              "bg-red-500"
                             )}
-                            style={{ width: `${systemHealth.systemLoad?.cpu || 0}%` }}
+                            style={{ width: `${systemHealth.devices?.counts.active ? 
+                                (systemHealth.devices.counts.active / systemHealth.devices.total * 100) :
+                                systemHealth.systemLoad?.cpu || 0}%` }}
                           />
                         </div>
                       </CardContent>
@@ -1022,18 +1055,18 @@ export default function SystemLogsPage() {
                     </Card>
                     <Card>
                       <CardHeader className="flex flex-row items-center justify-between py-2">
-                        <CardTitle className="text-sm font-medium">Active Alerts</CardTitle>
+                        <CardTitle className="text-sm font-medium">Device Health</CardTitle>
                         <AlertTriangle className="h-4 w-4 text-muted-foreground" />
                       </CardHeader>
                       <CardContent>
                         <div className="flex space-x-4">
                           <div>
-                            <div className="text-2xl font-bold">{systemHealth.alerts || 0}</div>
-                            <p className="text-xs text-muted-foreground">Alerts</p>
+                            <div className="text-2xl font-bold">{systemHealth.devices?.counts.lowBattery || systemHealth.alerts || 0}</div>
+                            <p className="text-xs text-muted-foreground">Low Battery</p>
                           </div>
                           <div>
-                            <div className="text-2xl font-bold">{systemHealth.warnings || 0}</div>
-                            <p className="text-xs text-muted-foreground">Warnings</p>
+                            <div className="text-2xl font-bold">{systemHealth.devices?.counts.poorConnectivity || systemHealth.warnings || 0}</div>
+                            <p className="text-xs text-muted-foreground">Poor Signal</p>
                           </div>
                         </div>
                       </CardContent>
@@ -1041,36 +1074,71 @@ export default function SystemLogsPage() {
                   </div>
 
                   <div>
-                    <h3 className="text-lg font-medium mb-4">Component Status</h3>
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Component</TableHead>
-                          <TableHead>Status</TableHead>
-                          <TableHead>Metrics</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {systemHealth.components?.map((component, index) => (
-                          <TableRow key={index}>
-                            <TableCell className="font-medium">{component.name}</TableCell>
-                            <TableCell>
-                              {getHeartbeatStatusBadge(component.status)}
-                            </TableCell>
-                            <TableCell>
-                              <div className="text-sm">
-                                {component.metrics && Object.entries(component.metrics).map(([key, value]) => (
-                                  <div key={key} className="flex justify-between mb-1">
-                                    <span className="text-muted-foreground">{key.replace(/([A-Z])/g, ' $1').trim()}</span>
-                                    <span>{typeof value === 'number' && value % 1 !== 0 ? value.toFixed(2) : String(value)}</span>
-                                  </div>
-                                ))}
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
+                    <h3 className="text-lg font-medium mb-4">System Health Metrics</h3>
+                    <div className="space-y-6">
+                      {systemHealth.systemHealth && systemHealth.systemHealth.length > 0 ? (
+                        systemHealth.systemHealth.map((component, index) => (
+                          <div key={index} className="space-y-2">
+                            <div className="flex items-center justify-between">
+                              <span className="text-sm font-medium">{component.name}</span>
+                              <span className="text-sm font-medium">{component.value || 0}%</span>
+                            </div>
+                            <Progress
+                              value={component.value}
+                              className="h-2"
+                              style={{
+                                backgroundColor: "var(--muted)",
+                                "--progress-color": component.color,
+                              } as React.CSSProperties}
+                            />
+                            <div className="flex items-center justify-between text-xs text-muted-foreground">
+                              <span>Target: {component.target || 90}%</span>
+                              <span className={(component.value || 0) >= (component.target || 90) ? "text-green-500" : "text-amber-500"}>
+                                {(component.value || 0) >= (component.target || 90) ? (
+                                  <CheckCircle className="inline h-3 w-3 mr-1" />
+                                ) : (
+                                  <XCircle className="inline h-3 w-3 mr-1" />
+                                )}
+                                {(component.value || 0) >= (component.target || 90) ? "Meeting target" : "Below target"}
+                              </span>
+                            </div>
+                          </div>
+                        ))
+                      ) : systemHealth.components ? (
+                        systemHealth.components.map((component, index) => (
+                          <div key={index} className="space-y-2">
+                            <div className="flex items-center justify-between">
+                              <span className="text-sm font-medium">{component.name}</span>
+                              <span className="text-sm font-medium">{component.metrics?.value || 0}%</span>
+                            </div>
+                            <Progress
+                              value={Number(component.metrics?.value) || 70}
+                              className="h-2"
+                              style={{
+                                backgroundColor: "var(--muted)",
+                                "--progress-color": component.status === "HEALTHY" ? "#10b981" : 
+                                                   component.status === "DEGRADED" ? "#f59e0b" : "#ef4444",
+                              } as React.CSSProperties}
+                            />
+                            <div className="flex items-center justify-between text-xs text-muted-foreground">
+                              <span>Status: {component.status}</span>
+                              <span className={component.status === "HEALTHY" ? "text-green-500" : "text-amber-500"}>
+                                {component.status === "HEALTHY" ? (
+                                  <CheckCircle className="inline h-3 w-3 mr-1" />
+                                ) : (
+                                  <XCircle className="inline h-3 w-3 mr-1" />
+                                )}
+                                {component.status === "HEALTHY" ? "Healthy" : "Needs attention"}
+                              </span>
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="py-6 text-center">
+                          <p className="text-muted-foreground">No health metrics available</p>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               ) : (
@@ -1081,6 +1149,10 @@ export default function SystemLogsPage() {
               )}
             </CardContent>
             <CardFooter className="border-t px-6 py-4">
+              <Button variant="outline" onClick={() => fetchSystemHealth()} className="mr-2">
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Refresh Data
+              </Button>
               <Button variant="default" className="ml-auto">
                 <RefreshCw className="h-4 w-4 mr-2" />
                 Run Full Diagnostics

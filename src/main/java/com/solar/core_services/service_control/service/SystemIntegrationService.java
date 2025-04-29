@@ -5,6 +5,8 @@ import com.solar.core_services.service_control.dto.DeviceCommandDTO;
 import com.solar.core_services.service_control.dto.DeviceHeartbeatRequest;
 import com.solar.core_services.service_control.dto.SystemOverviewResponse;
 
+import java.util.Map;
+
 /**
  * Service interface for system integration operations
  * Handles device communication, system monitoring, and health checks
@@ -38,9 +40,9 @@ public interface SystemIntegrationService {
     
     /**
      * Generate a detailed health report of the system
-     * @return The health report as a formatted string
+     * @return The health report as a structured JSON map
      */
-    String generateSystemHealthReport();
+    Map<String, Object> generateSystemHealthReport();
     
     /**
      * Register a new device in the system

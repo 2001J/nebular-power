@@ -2146,7 +2146,7 @@ export const serviceApi = {
   // System health monitoring
   getSystemHealth: async () => {
     try {
-      const response = await apiClient.get('/monitoring/system/health');
+      const response = await apiClient.get('/api/service/system/health-report');
       return response.data;
     } catch (error) {
       console.error("Error fetching system health:", error);

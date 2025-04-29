@@ -225,12 +225,19 @@ public class SystemMonitoringServiceTest {
         systemMonitoringService.processHeartbeat(heartbeatRequest);
 
         // When
-        String result = systemMonitoringService.generateSystemHealthReport();
+        Map<String, Object> result = systemMonitoringService.generateSystemHealthReport();
 
         // Then
         assertNotNull(result);
-        assertTrue(result.contains("System Health Report"));
-        assertTrue(result.contains("Total Installations: 10"));
+        assertTrue(result.containsKey("timestamp"));
+        assertTrue(result.containsKey("installations"));
+        assertTrue(result.containsKey("devices"));
+        assertTrue(result.containsKey("systemHealth"));
+        
+        @SuppressWarnings("unchecked")
+        Map<String, Object> installationStats = (Map<String, Object>) result.get("installations");
+        assertEquals(10L, installationStats.get("total"));
+        
         verify(installationRepository).count();
         verify(installationRepository).findAll();
     }
