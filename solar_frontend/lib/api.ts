@@ -3131,6 +3131,8 @@ export const tamperDetectionApi = {
   startMonitoring: async (installationId: string) => {
     try {
       const response = await apiClient.post(`/api/security/detection/installations/${installationId}/start`);
+      // Save to localStorage as backup
+      localStorage.setItem(`monitoring_${installationId}`, 'true');
       return response.data;
     } catch (error: any) {
       console.error(`Error starting monitoring for installation ${installationId}:`, error);
@@ -3141,18 +3143,23 @@ export const tamperDetectionApi = {
   isMonitoring: async (installationId: string) => {
     try {
       const response = await apiClient.get(`/api/security/detection/installations/${installationId}/status`);
-      // Return the monitoring status boolean from the response
-      return response.data && response.data.isMonitoring === true;
+      const isMonitoring = response.data && response.data.isMonitoring === true;
+      // Save to localStorage as backup
+      localStorage.setItem(`monitoring_${installationId}`, isMonitoring ? 'true' : 'false');
+      return isMonitoring;
     } catch (error: any) {
       console.error(`Error checking if installation ${installationId} is being monitored:`, error);
-      // Return false by default to avoid UI errors
-      return false;
+      // Try to get from localStorage as fallback
+      const fallback = localStorage.getItem(`monitoring_${installationId}`);
+      return fallback === 'true';
     }
   },
 
   stopMonitoring: async (installationId: string) => {
     try {
       const response = await apiClient.post(`/api/security/detection/installations/${installationId}/stop`);
+      // Save to localStorage as backup
+      localStorage.setItem(`monitoring_${installationId}`, 'false');
       return response.data;
     } catch (error: any) {
       console.error(`Error stopping monitoring for installation ${installationId}:`, error);
@@ -3163,10 +3170,17 @@ export const tamperDetectionApi = {
   getMonitoringStatus: async (installationId: string) => {
     try {
       const response = await apiClient.get(`/api/security/detection/installations/${installationId}/status`);
-      return response.data;
+      const status = response.data;
+      // Save to localStorage as backup
+      if (status && typeof status.isMonitoring === 'boolean') {
+        localStorage.setItem(`monitoring_${installationId}`, status.isMonitoring ? 'true' : 'false');
+      }
+      return status;
     } catch (error: any) {
       console.error(`Error checking monitoring status for installation ${installationId}:`, error);
-      throw error;
+      // Try to get from localStorage as fallback
+      const fallback = localStorage.getItem(`monitoring_${installationId}`);
+      return { isMonitoring: fallback === 'true' };
     }
   },
 

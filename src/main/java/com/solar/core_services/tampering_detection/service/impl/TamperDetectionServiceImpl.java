@@ -2,24 +2,26 @@ package com.solar.core_services.tampering_detection.service.impl;
 
 import com.solar.core_services.energy_monitoring.model.SolarInstallation;
 import com.solar.core_services.energy_monitoring.repository.SolarInstallationRepository;
+import com.solar.exception.ResourceNotFoundException;
 import com.solar.core_services.tampering_detection.dto.AlertConfigDTO;
 import com.solar.core_services.tampering_detection.dto.AlertConfigUpdateDTO;
 import com.solar.core_services.tampering_detection.dto.TamperEventCreateDTO;
 import com.solar.core_services.tampering_detection.dto.TamperEventDTO;
 import com.solar.core_services.tampering_detection.model.AlertConfig;
+import com.solar.core_services.tampering_detection.model.MonitoringStatus;
 import com.solar.core_services.tampering_detection.model.SecurityLog;
 import com.solar.core_services.tampering_detection.model.TamperEvent;
+import com.solar.core_services.tampering_detection.repository.MonitoringStatusRepository;
 import com.solar.core_services.tampering_detection.service.AlertConfigService;
 import com.solar.core_services.tampering_detection.service.SecurityLogService;
 import com.solar.core_services.tampering_detection.service.TamperDetectionService;
 import com.solar.core_services.tampering_detection.service.TamperEventService;
 import com.solar.core_services.tampering_detection.service.TamperResponseService;
-import com.solar.exception.ResourceNotFoundException;
-import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -35,14 +37,13 @@ public class TamperDetectionServiceImpl implements TamperDetectionService {
     private final AlertConfigService alertConfigService;
     private final SecurityLogService securityLogService;
     private final TamperResponseService tamperResponseService;
-    
-    // Map to track which installations are being monitored
-    private final Map<Long, Boolean> monitoringStatus = new ConcurrentHashMap<>();
+    private final MonitoringStatusRepository monitoringStatusRepository;
     
     // Map to store the last known values for each installation to detect changes
     private final Map<Long, Map<String, Object>> lastKnownValues = new ConcurrentHashMap<>();
 
     @Override
+    @Transactional
     public void startMonitoring(Long installationId) {
         log.info("Starting monitoring for installation ID: {}", installationId);
         
@@ -53,8 +54,13 @@ public class TamperDetectionServiceImpl implements TamperDetectionService {
         // Initialize the last known values map for this installation if it doesn't exist
         lastKnownValues.putIfAbsent(installationId, new HashMap<>());
         
-        // Set monitoring status to true
-        monitoringStatus.put(installationId, true);
+        // Set monitoring status to true in the database
+        MonitoringStatus status = monitoringStatusRepository.findByInstallationId(installationId)
+                .orElse(new MonitoringStatus());
+        
+        status.setInstallation(installation);
+        status.setMonitoring(true);
+        monitoringStatusRepository.save(status);
         
         // Log the monitoring start
         securityLogService.createSecurityLog(
@@ -71,15 +77,21 @@ public class TamperDetectionServiceImpl implements TamperDetectionService {
     }
 
     @Override
+    @Transactional
     public void stopMonitoring(Long installationId) {
         log.info("Stopping monitoring for installation ID: {}", installationId);
         
         // Verify the installation exists
-        solarInstallationRepository.findById(installationId)
+        SolarInstallation installation = solarInstallationRepository.findById(installationId)
                 .orElseThrow(() -> new ResourceNotFoundException("Solar installation not found with ID: " + installationId));
         
-        // Set monitoring status to false
-        monitoringStatus.put(installationId, false);
+        // Set monitoring status to false in the database
+        MonitoringStatus status = monitoringStatusRepository.findByInstallationId(installationId)
+                .orElse(new MonitoringStatus());
+        
+        status.setInstallation(installation);
+        status.setMonitoring(false);
+        monitoringStatusRepository.save(status);
         
         // Log the monitoring stop
         securityLogService.createSecurityLog(
@@ -94,7 +106,9 @@ public class TamperDetectionServiceImpl implements TamperDetectionService {
 
     @Override
     public boolean isMonitoring(Long installationId) {
-        return monitoringStatus.getOrDefault(installationId, false);
+        return monitoringStatusRepository.findByInstallationId(installationId)
+                .map(MonitoringStatus::isMonitoring)
+                .orElse(false);
     }
 
     @Override

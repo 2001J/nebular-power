@@ -16,6 +16,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.HashMap;
+import java.util.Map;
+
 @RestController
 @RequestMapping("/api/security/detection")
 @RequiredArgsConstructor
@@ -72,11 +75,13 @@ public class TamperDetectionController {
         @ApiResponse(responseCode = "404", description = "Installation not found", content = @Content),
         @ApiResponse(responseCode = "403", description = "Insufficient permissions", content = @Content)
     })
-    public ResponseEntity<Boolean> isMonitoring(
+    public ResponseEntity<Map<String, Object>> isMonitoring(
             @Parameter(description = "ID of the installation to check monitoring status", required = true)
             @PathVariable Long installationId) {
         boolean isMonitoring = tamperDetectionService.isMonitoring(installationId);
-        return ResponseEntity.ok(isMonitoring);
+        Map<String, Object> response = new HashMap<>();
+        response.put("isMonitoring", isMonitoring);
+        return ResponseEntity.ok(response);
     }
 
     @PostMapping("/installations/{installationId}/diagnostics")

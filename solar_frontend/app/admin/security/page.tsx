@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { AlertCircle, FileBarChart, FileCheck, ShieldAlert } from "lucide-react"
+import { AlertCircle, FileBarChart, FileCheck, ShieldAlert, RefreshCw, Loader2 } from "lucide-react"
 import { useRouter } from "next/navigation"
 
 import { Badge } from "@/components/ui/badge"
@@ -50,11 +50,16 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb"
+import { Installation } from "@/types/installation"
+
+interface MonitoringStatusMap {
+  [key: string]: boolean;
+}
 
 export default function SecurityPage() {
-  const [installations, setInstallations] = useState([])
+  const [installations, setInstallations] = useState<Installation[]>([])
   const [loading, setLoading] = useState(true)
-  const [selectedInstallation, setSelectedInstallation] = useState(null)
+  const [selectedInstallation, setSelectedInstallation] = useState<Installation | null>(null)
   const [sensitivityDialogOpen, setSensitivityDialogOpen] = useState(false)
   const [sensitivitySettings, setSensitivitySettings] = useState({
     PHYSICAL_MOVEMENT: 0.5,
@@ -62,47 +67,58 @@ export default function SecurityPage() {
     CONNECTION_INTERRUPTION: 0.5,
     LOCATION_CHANGE: 0.5
   })
-  const [monitoringStatus, setMonitoringStatus] = useState({})
+  const [monitoringStatus, setMonitoringStatus] = useState<MonitoringStatusMap>({})
+  const [refreshing, setRefreshing] = useState(false)
   const router = useRouter()
 
   // Fetch installations and monitoring status
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setLoading(true)
+  const fetchData = async () => {
+    try {
+      setLoading(true)
 
-        // Get all installations
-        const installationsData = await installationApi.getAllInstallations()
-        setInstallations(installationsData.content || [])
+      // Get all installations
+      const installationsData = await installationApi.getAllInstallations()
+      setInstallations(installationsData.content || [])
 
-        // For each installation, check monitoring status
-        const statuses = {}
-        for (const installation of installationsData.content || []) {
-          try {
-            const statusResponse = await tamperDetectionApi.getMonitoringStatus(installation.id)
-            statuses[installation.id] = statusResponse && statusResponse.isMonitoring === true
-          } catch (error) {
-            console.error(`Error fetching monitoring status for installation ${installation.id}:`, error)
-            statuses[installation.id] = false
-          }
+      // For each installation, check monitoring status
+      const statuses: MonitoringStatusMap = {}
+      for (const installation of installationsData.content || []) {
+        try {
+          const statusResponse = await tamperDetectionApi.getMonitoringStatus(installation.id)
+          statuses[installation.id] = statusResponse && statusResponse.isMonitoring === true
+        } catch (error) {
+          console.error(`Error fetching monitoring status for installation ${installation.id}:`, error)
+          
+          // Try to get from localStorage as fallback
+          const fallback = localStorage.getItem(`monitoring_${installation.id}`) === 'true'
+          statuses[installation.id] = fallback
         }
-        setMonitoringStatus(statuses)
-      } catch (error) {
-        console.error("Error fetching security data:", error)
-        toast({
-          title: "Error",
-          description: "Failed to load security monitoring data",
-          variant: "destructive",
-        })
-      } finally {
-        setLoading(false)
       }
+      setMonitoringStatus(statuses)
+    } catch (error) {
+      console.error("Error fetching security data:", error)
+      toast({
+        title: "Error",
+        description: "Failed to load security monitoring data",
+        variant: "destructive",
+      })
+    } finally {
+      setLoading(false)
+      setRefreshing(false)
     }
+  }
 
+  // Load data on initial page load
+  useEffect(() => {
     fetchData()
   }, [])
 
-  const toggleMonitoring = async (installationId) => {
+  const refreshData = () => {
+    setRefreshing(true)
+    fetchData()
+  }
+
+  const toggleMonitoring = async (installationId: string) => {
     try {
       const currentStatus = monitoringStatus[installationId]
 
@@ -128,6 +144,9 @@ export default function SecurityPage() {
         [installationId]: !currentStatus
       }))
 
+      // Also update localStorage
+      localStorage.setItem(`monitoring_${installationId}`, (!currentStatus).toString())
+
     } catch (error) {
       console.error(`Error toggling monitoring for installation ${installationId}:`, error)
       toast({
@@ -138,7 +157,7 @@ export default function SecurityPage() {
     }
   }
 
-  const runDiagnostics = async (installationId) => {
+  const runDiagnostics = async (installationId: string) => {
     try {
       await tamperDetectionApi.runDiagnostics(installationId)
       toast({
@@ -164,7 +183,7 @@ export default function SecurityPage() {
         await tamperDetectionApi.adjustSensitivity(
           selectedInstallation.id,
           eventType,
-          sensitivitySettings[eventType]
+          sensitivitySettings[eventType as keyof typeof sensitivitySettings]
         )
       }
 
@@ -200,6 +219,19 @@ export default function SecurityPage() {
             <BreadcrumbPage>Monitoring</BreadcrumbPage>
         </BreadcrumbList>
       </Breadcrumb>
+      </div>
+
+      <div className="flex items-center justify-between mb-4">
+        <h1 className="text-2xl font-semibold">Security Monitoring</h1>
+        <Button 
+          variant="outline" 
+          size="sm" 
+          onClick={refreshData} 
+          disabled={refreshing || loading}
+        >
+          <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+          Refresh
+        </Button>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
@@ -336,13 +368,20 @@ export default function SecurityPage() {
           <CardFooter className="flex justify-between">
             <Button
               variant="outline"
-              disabled={loading}
-              onClick={() => {
-                // Refresh the page data
-                window.location.reload()
-              }}
+              disabled={loading || refreshing}
+              onClick={refreshData}
             >
-              Refresh
+              {refreshing ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Refreshing...
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="mr-2 h-4 w-4" />
+                  Refresh
+                </>
+              )}
             </Button>
             <Button
               onClick={() => router.push('/admin/security/alerts')}

@@ -102,7 +102,7 @@ public class TamperDetectionControllerTest {
         // Act & Assert
         mockMvc.perform(get("/api/security/detection/installations/{installationId}/status", installationId))
                 .andExpect(status().isOk())
-                .andExpect(content().string("true"));
+                .andExpect(content().json("{\"isMonitoring\":true}"));
 
         verify(tamperDetectionService).isMonitoring(installationId);
     }
