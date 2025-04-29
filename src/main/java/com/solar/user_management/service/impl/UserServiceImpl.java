@@ -44,10 +44,14 @@ public class UserServiceImpl implements UserService {
     @Override
     public AuthResponse authenticateUser(LoginRequest loginRequest) {
         try {
+            System.out.println("Authentication attempt for: " + loginRequest.getEmail());
+            
             // Find user by email
             User user = userRepository.findByEmail(loginRequest.getEmail())
                     .orElseThrow(() -> new UsernameNotFoundException("User not found with email: " + loginRequest.getEmail()));
 
+            System.out.println("User found, current lastLogin: " + user.getLastLogin());
+            
             // Check account status before authentication
             checkAccountStatus(user);
 
@@ -59,22 +63,32 @@ public class UserServiceImpl implements UserService {
                     )
             );
 
+            System.out.println("Authentication successful for: " + loginRequest.getEmail());
+            
             // If authentication is successful, reset failed attempts and update last login
             resetFailedLoginAttempts(user.getEmail());
+            System.out.println("Calling updateLastLogin for: " + loginRequest.getEmail());
             updateLastLogin(user.getEmail());
 
             // Refresh user data after updates
+            System.out.println("Refreshing user data for: " + loginRequest.getEmail());
             user = userRepository.findByEmail(loginRequest.getEmail())
                     .orElseThrow(() -> new UsernameNotFoundException("User not found with email: " + loginRequest.getEmail()));
+            System.out.println("Updated user data, lastLogin now: " + user.getLastLogin());
 
             // Generate JWT token
             String jwt = tokenProvider.generateToken(authentication);
 
+            System.out.println("Token generated, returning auth response with lastLogin: " + user.getLastLogin());
             // Create and return auth response
             return AuthResponse.fromUserAndToken(jwt, user);
         } catch (BadCredentialsException e) {
+            System.out.println("Bad credentials for: " + loginRequest.getEmail());
             // Increment failed login attempts on bad credentials
             incrementFailedLoginAttempts(loginRequest.getEmail());
+            throw e;
+        } catch (Exception e) {
+            System.out.println("Authentication error for: " + loginRequest.getEmail() + " - " + e.getMessage());
             throw e;
         }
     }
@@ -398,11 +412,33 @@ public class UserServiceImpl implements UserService {
     @Override
     @Transactional
     public void updateLastLogin(String email) {
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new UsernameNotFoundException("User not found with email: " + email));
+        try {
+            User user = userRepository.findByEmail(email)
+                    .orElseThrow(() -> new UsernameNotFoundException("User not found with email: " + email));
 
-        user.setLastLogin(LocalDateTime.now());
-        userRepository.save(user);
+            // Log original value
+            System.out.println("Updating last login for user: " + email + ", current value: " + user.getLastLogin());
+            
+            // Set the new value with the current time
+            LocalDateTime now = LocalDateTime.now();
+            System.out.println("Setting lastLogin to: " + now);
+            user.setLastLogin(now);
+            
+            // Explicitly flush the transaction to ensure it's persisted
+            User savedUser = userRepository.saveAndFlush(user);
+            System.out.println("Updated and flushed last login for user: " + email + ", new value: " + savedUser.getLastLogin());
+            
+            // Double-check the update by fetching again
+            User verifiedUser = userRepository.findById(user.getId()).orElse(null);
+            if (verifiedUser != null) {
+                System.out.println("Verified lastLogin value after update: " + verifiedUser.getLastLogin());
+            } else {
+                System.out.println("Failed to verify lastLogin update - user not found");
+            }
+        } catch (Exception e) {
+            System.err.println("Error updating last login for " + email + ": " + e.getMessage());
+            e.printStackTrace();
+        }
     }
 
     @Override

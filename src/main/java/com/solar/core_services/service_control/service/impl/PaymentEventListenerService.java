@@ -1,6 +1,8 @@
 package com.solar.core_services.service_control.service.impl;
 
+import com.solar.core_services.energy_monitoring.model.SolarInstallation;
 import com.solar.core_services.payment_compliance.model.Payment;
+import com.solar.core_services.payment_compliance.repository.PaymentRepository;
 import com.solar.core_services.payment_compliance.service.impl.PaymentEventPublisherImpl;
 import com.solar.core_services.service_control.service.PaymentIntegrationService;
 import lombok.RequiredArgsConstructor;
@@ -19,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class PaymentEventListenerService {
     
     private final PaymentIntegrationService paymentIntegrationService;
+    private final PaymentRepository paymentRepository;
     
     /**
      * Listen for payment received events and restore service if needed
@@ -29,11 +32,24 @@ public class PaymentEventListenerService {
         log.info("Received payment event for installation {}, payment {}", 
                 event.getInstallationId(), event.getPaymentId());
         
-        // Restore service for the installation
-        paymentIntegrationService.restoreServiceAfterPayment(
-                event.getInstallationId(),
-                event.getPaymentId()
-        );
+        // Get payment to check installation status
+        Payment payment = paymentRepository.findById(event.getPaymentId())
+                .orElseThrow(() -> new RuntimeException("Payment not found with ID: " + event.getPaymentId()));
+        
+        // Only restore service if the installation was previously suspended
+        if (payment.getInstallation().getStatus() == SolarInstallation.InstallationStatus.SUSPENDED) {
+            log.info("Installation {} was suspended. Restoring service after payment {}.", 
+                    event.getInstallationId(), event.getPaymentId());
+            
+            // Restore service for the installation
+            paymentIntegrationService.restoreServiceAfterPayment(
+                    event.getInstallationId(),
+                    event.getPaymentId()
+            );
+        } else {
+            log.info("Installation {} is already active. No need to restore service.", 
+                    event.getInstallationId());
+        }
     }
     
     /**

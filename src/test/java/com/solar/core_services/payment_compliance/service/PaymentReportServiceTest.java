@@ -36,6 +36,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.lenient;
 
 // Add import for InstallationStatus enum
 import com.solar.core_services.energy_monitoring.model.SolarInstallation.InstallationStatus;
@@ -182,7 +183,18 @@ public class PaymentReportServiceTest {
         LocalDateTime startDate = LocalDateTime.now().minusDays(1);
         LocalDateTime endDate = LocalDateTime.now().plusDays(1);
         
-        when(paymentRepository.findByDueDateBetweenAndStatus(startDate, endDate, Payment.PaymentStatus.PENDING))
+        List<Payment.PaymentStatus> relevantStatuses = Arrays.asList(
+            Payment.PaymentStatus.PENDING,
+            Payment.PaymentStatus.SCHEDULED,
+            Payment.PaymentStatus.UPCOMING,
+            Payment.PaymentStatus.DUE_TODAY,
+            Payment.PaymentStatus.PAID,
+            Payment.PaymentStatus.PARTIALLY_PAID,
+            Payment.PaymentStatus.OVERDUE,
+            Payment.PaymentStatus.GRACE_PERIOD
+        );
+        
+        when(paymentRepository.findByDueDateBetweenAndStatusIn(eq(startDate), eq(endDate), eq(relevantStatuses)))
                 .thenReturn(Collections.singletonList(testPayment2));
         
         // When
@@ -192,16 +204,24 @@ public class PaymentReportServiceTest {
         assertNotNull(report);
         assertEquals(1, report.size());
         assertEquals(testPayment2.getId(), report.get(0).getId());
-        verify(paymentRepository, times(1)).findByDueDateBetweenAndStatus(startDate, endDate, Payment.PaymentStatus.PENDING);
+        verify(paymentRepository, times(1)).findByDueDateBetweenAndStatusIn(eq(startDate), eq(endDate), eq(relevantStatuses));
     }
 
     @Test
     @DisplayName("Should generate overdue payments report")
     void shouldGenerateOverduePaymentsReport() {
         // Given
-        List<Payment.PaymentStatus> statuses = Arrays.asList(Payment.PaymentStatus.PENDING, Payment.PaymentStatus.PARTIALLY_PAID);
-        when(paymentRepository.findOverduePayments(any(LocalDateTime.class), eq(statuses)))
-                .thenReturn(Collections.singletonList(testPayment3));
+        List<Payment.PaymentStatus> expectedStatuses = Arrays.asList(
+            Payment.PaymentStatus.PENDING, 
+            Payment.PaymentStatus.PARTIALLY_PAID,
+            Payment.PaymentStatus.OVERDUE,
+            Payment.PaymentStatus.GRACE_PERIOD,
+            Payment.PaymentStatus.SUSPENSION_PENDING,
+            Payment.PaymentStatus.DUE_TODAY
+        );
+        
+        when(paymentRepository.findOverduePayments(any(LocalDateTime.class), eq(expectedStatuses)))
+            .thenReturn(Collections.singletonList(testPayment3));
         
         // When
         List<Payment> report = paymentReportService.generateOverduePaymentsReport();
@@ -210,24 +230,33 @@ public class PaymentReportServiceTest {
         assertNotNull(report);
         assertEquals(1, report.size());
         assertEquals(testPayment3.getId(), report.get(0).getId());
-        verify(paymentRepository, times(1)).findOverduePayments(any(LocalDateTime.class), eq(statuses));
+        verify(paymentRepository, times(1)).findOverduePayments(any(LocalDateTime.class), eq(expectedStatuses));
     }
 
     @Test
     @DisplayName("Should generate upcoming payments report")
     void shouldGenerateUpcomingPaymentsReport() {
         // Given
+        int daysAhead = 30;
+        
+        List<Payment.PaymentStatus> upcomingStatuses = Arrays.asList(
+            Payment.PaymentStatus.PENDING,
+            Payment.PaymentStatus.SCHEDULED,
+            Payment.PaymentStatus.UPCOMING,
+            Payment.PaymentStatus.DUE_TODAY
+        );
+        
         doReturn(Collections.singletonList(testPayment3))
-            .when(paymentRepository).findUpcomingPayments(any(LocalDateTime.class), any(Payment.PaymentStatus.class));
+            .when(paymentRepository).findUpcomingPaymentsByStatuses(any(LocalDateTime.class), eq(upcomingStatuses));
         
         // When
-        List<Payment> report = paymentReportService.generateUpcomingPaymentsReport(30);
+        List<Payment> report = paymentReportService.generateUpcomingPaymentsReport(daysAhead);
         
         // Then
         assertNotNull(report);
         assertEquals(1, report.size());
         assertEquals(testPayment3.getId(), report.get(0).getId());
-        verify(paymentRepository, times(1)).findUpcomingPayments(any(LocalDateTime.class), any(Payment.PaymentStatus.class));
+        verify(paymentRepository, times(1)).findUpcomingPaymentsByStatuses(any(LocalDateTime.class), eq(upcomingStatuses));
     }
 
     @Test
@@ -252,23 +281,45 @@ public class PaymentReportServiceTest {
     @DisplayName("Should generate payment summary report")
     void shouldGeneratePaymentSummaryReport() {
         // Given
-        // Stub all possible payment status values to avoid strict stubbing issues
+        // Mock countByStatus instead of findByStatus for each status
         for (Payment.PaymentStatus status : Payment.PaymentStatus.values()) {
             if (status == Payment.PaymentStatus.PAID) {
-                when(paymentRepository.findByStatus(status)).thenReturn(Collections.singletonList(testPayment1));
+                when(paymentRepository.countByStatus(status)).thenReturn(1L);
             } else if (status == Payment.PaymentStatus.PENDING) {
-                when(paymentRepository.findByStatus(status)).thenReturn(Collections.singletonList(testPayment2));
+                when(paymentRepository.countByStatus(status)).thenReturn(1L);
             } else if (status == Payment.PaymentStatus.PARTIALLY_PAID) {
-                when(paymentRepository.findByStatus(status)).thenReturn(Collections.singletonList(testPayment3));
+                when(paymentRepository.countByStatus(status)).thenReturn(1L);
             } else {
-                when(paymentRepository.findByStatus(status)).thenReturn(Collections.emptyList());
+                when(paymentRepository.countByStatus(status)).thenReturn(0L);
             }
         }
         
-        List<Payment.PaymentStatus> overdueStatuses = Arrays.asList(Payment.PaymentStatus.PENDING, Payment.PaymentStatus.PARTIALLY_PAID);
-        when(paymentRepository.findOverduePayments(any(LocalDateTime.class), eq(overdueStatuses))).thenReturn(Arrays.asList(testPayment2, testPayment3));
+        // Mock overdue payments with expanded status list
+        List<Payment.PaymentStatus> expectedOverdueStatuses = Arrays.asList(
+            Payment.PaymentStatus.PENDING, 
+            Payment.PaymentStatus.PARTIALLY_PAID,
+            Payment.PaymentStatus.OVERDUE,
+            Payment.PaymentStatus.GRACE_PERIOD, 
+            Payment.PaymentStatus.SUSPENSION_PENDING
+        );
         
-        when(paymentRepository.findUpcomingPayments(any(LocalDateTime.class), eq(Payment.PaymentStatus.PENDING))).thenReturn(Collections.singletonList(testPayment2));
+        doReturn(Arrays.asList(testPayment2, testPayment3))
+            .when(paymentRepository).findOverduePayments(any(LocalDateTime.class), anyList());
+        
+        // Mock upcoming payments with expanded status list
+        List<Payment.PaymentStatus> expectedUpcomingStatuses = Arrays.asList(
+            Payment.PaymentStatus.PENDING,
+            Payment.PaymentStatus.SCHEDULED,
+            Payment.PaymentStatus.UPCOMING,
+            Payment.PaymentStatus.DUE_TODAY
+        );
+        
+        doReturn(Collections.singletonList(testPayment2))
+            .when(paymentRepository).findUpcomingPaymentsByStatuses(any(LocalDateTime.class), anyList());
+        
+        // Mock due today payments
+        doReturn(Collections.singletonList(testPayment2))
+            .when(paymentRepository).findByDueDateBetweenAndStatusIn(any(LocalDateTime.class), any(LocalDateTime.class), anyList());
         
         // When
         Map<String, Object> summary = paymentReportService.generatePaymentSummaryReport();
@@ -286,6 +337,7 @@ public class PaymentReportServiceTest {
         assertTrue(summary.containsKey("CANCELLED"), "Summary should contain 'CANCELLED' key");
         assertTrue(summary.containsKey("OVERDUE_COUNT"), "Summary should contain 'OVERDUE_COUNT' key");
         assertTrue(summary.containsKey("UPCOMING_7_DAYS"), "Summary should contain 'UPCOMING_7_DAYS' key");
+        assertTrue(summary.containsKey("DUE_TODAY_COUNT"), "Summary should contain 'DUE_TODAY_COUNT' key");
         
         assertEquals(1L, summary.get("PAID"));
         assertEquals(1L, summary.get("PENDING"));
@@ -293,11 +345,13 @@ public class PaymentReportServiceTest {
         assertEquals(0L, summary.get("CANCELLED"));
         assertEquals(2L, summary.get("OVERDUE_COUNT"));
         assertEquals(1L, summary.get("UPCOMING_7_DAYS"));
+        assertEquals(1L, summary.get("DUE_TODAY_COUNT"));
         
         // Verify repository method calls
-        verify(paymentRepository, times(Payment.PaymentStatus.values().length)).findByStatus(any(Payment.PaymentStatus.class));
-        verify(paymentRepository).findOverduePayments(any(LocalDateTime.class), eq(overdueStatuses));
-        verify(paymentRepository).findUpcomingPayments(any(LocalDateTime.class), eq(Payment.PaymentStatus.PENDING));
+        verify(paymentRepository, times(Payment.PaymentStatus.values().length)).countByStatus(any(Payment.PaymentStatus.class));
+        verify(paymentRepository).findOverduePayments(any(LocalDateTime.class), anyList());
+        verify(paymentRepository).findUpcomingPaymentsByStatuses(any(LocalDateTime.class), anyList());
+        verify(paymentRepository).findByDueDateBetweenAndStatusIn(any(LocalDateTime.class), any(LocalDateTime.class), anyList());
     }
 
     @Test

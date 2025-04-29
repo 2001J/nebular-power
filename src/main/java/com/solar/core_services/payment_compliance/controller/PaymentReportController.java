@@ -17,11 +17,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -285,8 +281,17 @@ public class PaymentReportController {
             endDate = LocalDateTime.now();
         }
         
+        System.out.println("Generating compliance report for period: " + startDate + " to " + endDate);
+        
         // Get all payments due in the period
         List<Payment> duePayments = paymentReportService.generatePaymentsDueReport(startDate, endDate);
+        System.out.println("Found " + duePayments.size() + " payments due in the period");
+        
+        // Add summary of all payments by status
+        Map<Payment.PaymentStatus, Long> countByStatus = duePayments.stream()
+                .collect(Collectors.groupingBy(Payment::getStatus, Collectors.counting()));
+        
+        System.out.println("Payment status breakdown: " + countByStatus);
         
         // Count paid on time
         long paidOnTime = duePayments.stream()
@@ -314,6 +319,10 @@ public class PaymentReportController {
         double onTimeRate = duePayments.isEmpty() ? 0 : 
                 (double) paidOnTime / duePayments.size() * 100;
         
+        System.out.println("Compliance metrics: paidOnTime=" + paidOnTime + ", paidLate=" + paidLate + 
+                ", unpaid=" + unpaid + ", complianceRate=" + complianceRate + 
+                ", onTimeRate=" + onTimeRate);
+        
         report.put("reportType", "Payment Compliance Report");
         report.put("startDate", startDate);
         report.put("endDate", endDate);
@@ -323,6 +332,20 @@ public class PaymentReportController {
         report.put("unpaid", unpaid);
         report.put("complianceRate", BigDecimal.valueOf(complianceRate).setScale(2, RoundingMode.HALF_UP));
         report.put("onTimePaymentRate", BigDecimal.valueOf(onTimeRate).setScale(2, RoundingMode.HALF_UP));
+        
+        // Add payment details for debugging
+        report.put("paymentDetails", duePayments.stream()
+                .map(payment -> {
+                    Map<String, Object> details = new HashMap<>();
+                    details.put("id", payment.getId());
+                    details.put("amount", payment.getAmount());
+                    details.put("dueDate", payment.getDueDate());
+                    details.put("status", payment.getStatus());
+                    details.put("paidAt", payment.getPaidAt());
+                    details.put("customerName", payment.getInstallation().getUser().getFullName());
+                    return details;
+                })
+                .collect(Collectors.toList()));
         
         return report;
     }
@@ -338,12 +361,21 @@ public class PaymentReportController {
             endDate = LocalDateTime.now();
         }
         
+        System.out.println("Generating revenue report for period: " + startDate + " to " + endDate);
+        
         // Get all payments due in the period
         List<Payment> duePayments = paymentReportService.generatePaymentsDueReport(startDate, endDate);
+        System.out.println("Found " + duePayments.size() + " payments due in the period");
+        
+        // Add breakdown of payments by status
+        Map<Payment.PaymentStatus, Long> countByStatus = duePayments.stream()
+                .collect(Collectors.groupingBy(Payment::getStatus, Collectors.counting()));
+        
+        System.out.println("Payment status breakdown: " + countByStatus);
         
         // Calculate total revenue from paid payments
         BigDecimal totalRevenue = duePayments.stream()
-                .filter(p -> p.getStatus() == Payment.PaymentStatus.PAID)
+                .filter(p -> p.getStatus() == Payment.PaymentStatus.PAID || p.getStatus() == Payment.PaymentStatus.PARTIALLY_PAID)
                 .map(Payment::getAmount)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
         
@@ -358,6 +390,9 @@ public class PaymentReportController {
                         .multiply(BigDecimal.valueOf(100))
                         .doubleValue();
         
+        System.out.println("Revenue metrics: totalRevenue=" + totalRevenue + 
+                ", expectedRevenue=" + expectedRevenue + ", collectionRate=" + collectionRate);
+        
         report.put("reportType", "Revenue Report");
         report.put("startDate", startDate);
         report.put("endDate", endDate);
@@ -365,8 +400,25 @@ public class PaymentReportController {
         report.put("expectedRevenue", expectedRevenue);
         report.put("collectionRate", BigDecimal.valueOf(collectionRate).setScale(2, RoundingMode.HALF_UP));
         report.put("numberOfPayments", duePayments.stream()
-                .filter(p -> p.getStatus() == Payment.PaymentStatus.PAID)
+                .filter(p -> p.getStatus() == Payment.PaymentStatus.PAID || p.getStatus() == Payment.PaymentStatus.PARTIALLY_PAID)
                 .count());
+        
+        // Add breakdown of payment status counts
+        report.put("paymentStatusBreakdown", countByStatus);
+        
+        // Add payment details for debugging
+        report.put("paymentDetails", duePayments.stream()
+                .map(payment -> {
+                    Map<String, Object> details = new HashMap<>();
+                    details.put("id", payment.getId());
+                    details.put("amount", payment.getAmount());
+                    details.put("dueDate", payment.getDueDate());
+                    details.put("status", payment.getStatus());
+                    details.put("paidAt", payment.getPaidAt());
+                    details.put("customerName", payment.getInstallation().getUser().getFullName());
+                    return details;
+                })
+                .collect(Collectors.toList()));
         
         return report;
     }

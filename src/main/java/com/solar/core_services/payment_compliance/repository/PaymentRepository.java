@@ -30,7 +30,7 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
             @Param("status") Payment.PaymentStatus status);
     
     // Find payments that are overdue by a specific number of days
-    @Query("SELECT p FROM Payment p WHERE p.dueDate < :cutoffDate AND p.status IN :statuses")
+    @Query("SELECT p FROM Payment p WHERE (p.dueDate < :cutoffDate AND p.status IN :statuses) OR p.status = com.solar.core_services.payment_compliance.model.Payment$PaymentStatus.OVERDUE")
     List<Payment> findOverduePayments(@Param("cutoffDate") LocalDateTime cutoffDate, @Param("statuses") List<Payment.PaymentStatus> statuses);
     
     // Find payments by payment plan
@@ -46,12 +46,26 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
     @Query("SELECT p FROM Payment p WHERE p.dueDate BETWEEN CURRENT_TIMESTAMP AND :futureDate AND p.status = :status")
     List<Payment> findUpcomingPayments(@Param("futureDate") LocalDateTime futureDate, @Param("status") Payment.PaymentStatus status);
     
+    // Find upcoming payments by installation
+    @Query("SELECT p FROM Payment p WHERE p.installation = :installation AND p.dueDate BETWEEN CURRENT_TIMESTAMP AND :futureDate AND p.status = :status")
+    List<Payment> findUpcomingPaymentsByInstallation(
+            @Param("installation") SolarInstallation installation, 
+            @Param("futureDate") LocalDateTime futureDate, 
+            @Param("status") Payment.PaymentStatus status);
+    
+    // Find upcoming payments (scheduled within the next N days) with multiple statuses
+    @Query("SELECT p FROM Payment p WHERE p.dueDate BETWEEN CURRENT_TIMESTAMP AND :futureDate AND p.status IN :statuses")
+    List<Payment> findUpcomingPaymentsByStatuses(@Param("futureDate") LocalDateTime futureDate, @Param("statuses") List<Payment.PaymentStatus> statuses);
+    
     // Count overdue payments by installation
     @Query("SELECT COUNT(p) FROM Payment p WHERE p.installation = :installation AND p.status IN :statuses")
     Long countOverduePaymentsByInstallation(@Param("installation") SolarInstallation installation, @Param("statuses") List<Payment.PaymentStatus> statuses);
     
     // Find payments by status
     List<Payment> findByStatus(Payment.PaymentStatus status);
+    
+    // Count payments by status
+    Long countByStatus(Payment.PaymentStatus status);
     
     // Find payments by payment plan and due date
     List<Payment> findByPaymentPlanAndDueDate(PaymentPlan paymentPlan, LocalDateTime dueDate);
@@ -70,4 +84,10 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
     
     // Find payments by installation and paid date range
     List<Payment> findByInstallationAndPaidAtBetween(SolarInstallation installation, LocalDateTime startDate, LocalDateTime endDate);
+    
+    // Find payments due within a specific date range with multiple statuses
+    List<Payment> findByDueDateBetweenAndStatusIn(LocalDateTime startDate, LocalDateTime endDate, List<Payment.PaymentStatus> statuses);
+    
+    // Find payments that are due before a date with multiple statuses
+    List<Payment> findByDueDateBeforeAndStatusIn(LocalDateTime date, List<Payment.PaymentStatus> statuses);
 } 

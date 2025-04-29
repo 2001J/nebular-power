@@ -2,6 +2,7 @@ package com.solar.core_services.payment_compliance.service.impl;
 
 import com.solar.core_services.energy_monitoring.model.SolarInstallation;
 import com.solar.core_services.energy_monitoring.repository.SolarInstallationRepository;
+import com.solar.core_services.payment_compliance.dto.PaymentDTO;
 import com.solar.core_services.payment_compliance.dto.PaymentPlanDTO;
 import com.solar.core_services.payment_compliance.dto.PaymentPlanRequest;
 import com.solar.core_services.payment_compliance.model.Payment;
@@ -23,6 +24,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -404,21 +406,46 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
         // Count remaining installments that are still scheduled
         int remainingInstallments = paymentRepository.findByPaymentPlanAndStatus(
                 plan, Payment.PaymentStatus.SCHEDULED).size();
+                
+        // Find next payment date
+        LocalDateTime nextPaymentDate = null;
+        if (plan.getPayments() != null && !plan.getPayments().isEmpty()) {
+            nextPaymentDate = plan.getPayments().stream()
+                    .filter(p -> p.getStatus() == Payment.PaymentStatus.SCHEDULED || 
+                                p.getStatus() == Payment.PaymentStatus.UPCOMING || 
+                                p.getStatus() == Payment.PaymentStatus.DUE_TODAY)
+                    .min(Comparator.comparing(Payment::getDueDate))
+                    .map(Payment::getDueDate)
+                    .orElse(null);
+        }
 
         return PaymentPlanDTO.builder()
                 .id(plan.getId())
                 .installationId(plan.getInstallation().getId())
-                .installmentAmount(plan.getInstallmentAmount())
-                .frequency(plan.getFrequency())
-                .startDate(plan.getStartDate())
-                .endDate(plan.getEndDate())
+                .customerName(plan.getInstallation().getUser().getFullName())
+                .customerEmail(plan.getInstallation().getUser().getEmail())
+                .name(plan.getName())
+                .description(plan.getDescription())
                 .totalAmount(plan.getTotalAmount())
                 .remainingAmount(plan.getRemainingAmount())
                 .numberOfPayments(plan.getNumberOfPayments())
                 .totalInstallments(totalInstallments)
                 .remainingInstallments(remainingInstallments)
+                .installmentAmount(plan.getInstallmentAmount())
+                .monthlyPayment(plan.getInstallmentAmount())
+                .frequency(plan.getFrequency())
+                .startDate(plan.getStartDate())
+                .endDate(plan.getEndDate())
+                .status(plan.getStatus())
+                .interestRate(plan.getInterestRate())
                 .lateFeeAmount(plan.getLateFeeAmount())
                 .gracePeriodDays(plan.getGracePeriodDays())
+                .payments(plan.getPayments().stream()
+                        .map(PaymentDTO::fromEntity)
+                        .collect(Collectors.toList()))
+                .nextPaymentDate(nextPaymentDate)
+                .createdAt(plan.getCreatedAt())
+                .updatedAt(plan.getUpdatedAt())
                 .build();
     }
 

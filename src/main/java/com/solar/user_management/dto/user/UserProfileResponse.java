@@ -51,7 +51,15 @@ public class UserProfileResponse {
         response.setRole(user.getRole());
         response.setStatus(user.getAccountStatus());
         response.setEmailVerified(user.isEmailVerified());
-        response.setLastLogin(user.getLastLogin());
+        
+        // Handle lastLogin which might be null
+        if (user.getLastLogin() != null) {
+            response.setLastLogin(user.getLastLogin());
+            System.out.println("Set lastLogin in response to: " + user.getLastLogin());
+        } else {
+            System.out.println("User lastLogin is null, not setting in response");
+        }
+        
         response.setCreatedAt(user.getCreatedAt());
         return response;
     }

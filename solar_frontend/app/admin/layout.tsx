@@ -146,11 +146,6 @@ export default function AdminLayout({
       icon: Bell,
       href: "/admin/security/alerts",
     },
-    {
-      title: "Compliance Reports",
-      icon: FileCheck,
-      href: "/admin/compliance",
-    },
   ]
 
   return (

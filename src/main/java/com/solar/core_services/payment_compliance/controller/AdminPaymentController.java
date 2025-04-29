@@ -309,4 +309,31 @@ public class AdminPaymentController {
                         return ResponseEntity.badRequest().build();
                 }
         }
+
+        @PostMapping("/update-statuses")
+        @Operation(
+            summary = "Force payment status update",
+            description = "Manually triggers the payment status update process to recalculate overdue, upcoming, and due payments."
+        )
+        @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Status update completed successfully"),
+            @ApiResponse(responseCode = "401", description = "Unauthorized", content = @Content),
+            @ApiResponse(responseCode = "403", description = "Forbidden - requires ADMIN role", content = @Content)
+        })
+        public ResponseEntity<Map<String, String>> forcePaymentStatusUpdate() {
+            try {
+                // Run the status update job
+                paymentService.updatePaymentStatuses();
+                
+                Map<String, String> response = new HashMap<>();
+                response.put("status", "success");
+                response.put("message", "Payment status update completed successfully");
+                return ResponseEntity.ok(response);
+            } catch (Exception e) {
+                Map<String, String> errorResponse = new HashMap<>();
+                errorResponse.put("status", "error");
+                errorResponse.put("message", "Error updating payment statuses: " + e.getMessage());
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
+            }
+        }
 }

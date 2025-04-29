@@ -2,8 +2,8 @@
 
 import type React from "react"
 
-import { useState } from "react"
-import { AlertTriangle, Bell, BellOff, Check, Clock, Filter, Search, Settings, Shield, Zap } from "lucide-react"
+import { useEffect, useState } from "react"
+import { AlertTriangle, Bell, BellOff, Check, Clock, Filter, RefreshCw, Search, Settings, Shield, ShieldAlert, Zap } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
@@ -11,121 +11,148 @@ import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
 import { Badge } from "@/components/ui/badge"
+import { useToast } from "@/components/ui/use-toast"
+import { useAuth } from "@/components/auth-provider"
+import { installationApi, securityApi } from "@/lib/api"
+
+interface Alert {
+  id: string;
+  installationId: string;
+  type: string;
+  message: string;
+  description?: string;
+  severity: string;
+  timestamp: string;
+  location?: string;
+  status: string;
+  resolvedAt?: string;
+}
+
+interface Installation {
+  id: string;
+  name: string;
+  status: string;
+}
 
 export default function AlertsPage() {
+  const { user } = useAuth()
+  const { toast } = useToast()
   const [activeTab, setActiveTab] = useState("active")
   const [searchTerm, setSearchTerm] = useState("")
   const [filterType, setFilterType] = useState("all")
+  const [installations, setInstallations] = useState<Installation[]>([])
+  const [alerts, setAlerts] = useState<Alert[]>([])
+  const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
 
-  // Mock data for alerts
-  const activeAlerts = [
-    {
-      id: 1,
-      title: "Low Battery Level",
-      description: "Battery level is below 20%. Consider charging or reducing consumption.",
-      type: "warning",
-      timestamp: "2025-04-01T08:15:00",
-      icon: BatteryLow,
-    },
-    {
-      id: 2,
-      title: "System Maintenance Required",
-      description: "Scheduled maintenance is due in 3 days. Please contact support to schedule.",
-      type: "info",
-      timestamp: "2025-04-01T07:30:00",
-      icon: Settings,
-    },
-    {
-      id: 3,
-      title: "Potential Security Breach",
-      description: "Unusual access pattern detected. Please verify system security.",
-      type: "critical",
-      timestamp: "2025-04-01T06:45:00",
-      icon: Shield,
-    },
-    {
-      id: 4,
-      title: "High Energy Consumption",
-      description: "Energy consumption is 35% higher than usual for this time of day.",
-      type: "warning",
-      timestamp: "2025-04-01T05:20:00",
-      icon: Zap,
-    },
-    {
-      id: 5,
-      title: "Weather Alert",
-      description: "Severe weather expected in your area. System may experience reduced efficiency.",
-      type: "warning",
-      timestamp: "2025-03-31T22:10:00",
-      icon: Cloud,
-    },
-  ]
+  const fetchData = async () => {
+    if (!user) return
 
-  const resolvedAlerts = [
-    {
-      id: 6,
-      title: "Inverter Error",
-      description: "Inverter reported error code E-14. Issue has been resolved.",
-      type: "critical",
-      timestamp: "2025-03-30T14:25:00",
-      resolvedAt: "2025-03-30T16:40:00",
-      icon: AlertTriangle,
-    },
-    {
-      id: 7,
-      title: "Connection Lost",
-      description: "System connection was temporarily lost. Connection has been restored.",
-      type: "warning",
-      timestamp: "2025-03-29T09:15:00",
-      resolvedAt: "2025-03-29T10:30:00",
-      icon: WifiOff,
-    },
-    {
-      id: 8,
-      title: "Panel Efficiency Low",
-      description: "Solar panel efficiency was below threshold. Issue resolved after cleaning.",
-      type: "warning",
-      timestamp: "2025-03-28T11:40:00",
-      resolvedAt: "2025-03-28T15:20:00",
-      icon: Sun,
-    },
-    {
-      id: 9,
-      title: "Software Update Required",
-      description: "System software update was required. Update has been completed.",
-      type: "info",
-      timestamp: "2025-03-27T08:30:00",
-      resolvedAt: "2025-03-27T09:45:00",
-      icon: Download,
-    },
-    {
-      id: 10,
-      title: "Grid Connection Issue",
-      description: "Grid connection was unstable. Issue has been resolved.",
-      type: "critical",
-      timestamp: "2025-03-26T16:20:00",
-      resolvedAt: "2025-03-26T18:15:00",
-      icon: Zap,
-    },
-  ]
+    try {
+      setRefreshing(true)
+      
+      // Step 1: Fetch customer installations
+      const installationsData = await installationApi.getCustomerInstallations(user.id)
+      if (Array.isArray(installationsData) && installationsData.length > 0) {
+        setInstallations(installationsData)
+        
+        // Step 2: Fetch alerts for each installation
+        let allAlerts: Alert[] = []
+        for (const installation of installationsData) {
+          const installationAlerts = await securityApi.getInstallationAlerts(installation.id)
+          if (Array.isArray(installationAlerts) && installationAlerts.length > 0) {
+            // Map the API response to our Alert interface
+            const formattedAlerts = installationAlerts.map((alert: any) => ({
+              id: alert.id || alert.alertId,
+              installationId: installation.id,
+              type: mapAlertTypeToUIType(alert.type || alert.tamperType),
+              message: alert.message || alert.title || alert.description,
+              description: alert.description,
+              severity: alert.severity?.toLowerCase() || "medium",
+              timestamp: alert.timestamp || alert.createdAt,
+              location: alert.location?.address || installation.name,
+              status: alert.status || (alert.resolved ? "RESOLVED" : "OPEN"),
+              resolvedAt: alert.resolvedAt || alert.resolutionTimestamp
+            }))
+            allAlerts = [...allAlerts, ...formattedAlerts]
+          }
+        }
+        
+        setAlerts(allAlerts)
+      } else {
+        setInstallations([])
+        toast({
+          variant: "destructive",
+          title: "No installations found",
+          description: "You don't have any registered solar installations to monitor."
+        })
+      }
+    } catch (error) {
+      console.error("Error fetching alerts data:", error)
+      toast({
+        variant: "destructive",
+        title: "Failed to load alerts",
+        description: "There was a problem loading your system alerts. Please try again later."
+      })
+    } finally {
+      setLoading(false)
+      setRefreshing(false)
+    }
+  }
+
+  // Map API alert types to UI alert types
+  const mapAlertTypeToUIType = (type: string): string => {
+    const typeMap: Record<string, string> = {
+      "PHYSICAL_INTRUSION": "critical",
+      "ORIENTATION_CHANGE": "warning",
+      "CONNECTION_MANIPULATION": "critical",
+      "TAMPER_DETECTION": "critical",
+      "VOLTAGE_FLUCTUATION": "warning",
+      "PHYSICAL_MOVEMENT": "critical",
+      "UNAUTHORIZED_ACCESS": "critical",
+      "CONNECTION_INTERRUPTION": "warning",
+      "LOCATION_CHANGE": "warning",
+      "HIGH": "critical",
+      "MEDIUM": "warning",
+      "LOW": "info"
+    }
+    
+    return typeMap[type?.toUpperCase()] || "info"
+  }
+
+  // Load data on component mount
+  useEffect(() => {
+    fetchData()
+  }, [user])
 
   // Filter alerts based on search term and type
+  const activeAlerts = alerts.filter(alert => 
+    alert.status.toUpperCase() !== "RESOLVED" && 
+    !alert.resolvedAt
+  )
+  
+  const resolvedAlerts = alerts.filter(alert => 
+    alert.status.toUpperCase() === "RESOLVED" || 
+    alert.resolvedAt
+  )
+
   const filteredActiveAlerts = activeAlerts.filter(
     (alert) =>
-      (alert.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        alert.description.toLowerCase().includes(searchTerm.toLowerCase())) &&
-      (filterType === "all" || alert.type === filterType),
+      (alert.message?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        alert.description?.toLowerCase().includes(searchTerm.toLowerCase())) &&
+      (filterType === "all" || alert.type === filterType)
   )
 
   const filteredResolvedAlerts = resolvedAlerts.filter(
     (alert) =>
-      (alert.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        alert.description.toLowerCase().includes(searchTerm.toLowerCase())) &&
-      (filterType === "all" || alert.type === filterType),
+      (alert.message?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        alert.description?.toLowerCase().includes(searchTerm.toLowerCase())) &&
+      (filterType === "all" || alert.type === filterType)
   )
 
   // Format date for display
   const formatDate = (dateString: string) => {
+    if (!dateString) return "Unknown"
     const date = new Date(dateString)
     return date.toLocaleString()
   }
@@ -149,6 +176,20 @@ export default function AlertsPage() {
         )
       default:
         return <Badge variant="outline">Unknown</Badge>
+    }
+  }
+
+  // Get icon based on alert type
+  const getAlertIcon = (type: string) => {
+    switch (type) {
+      case "critical":
+        return ShieldAlert
+      case "warning":
+        return AlertTriangle
+      case "info":
+        return Bell
+      default:
+        return Bell
     }
   }
 
@@ -180,8 +221,8 @@ export default function AlertsPage() {
             </SelectContent>
           </Select>
 
-          <Button variant="outline" size="icon">
-            <Filter className="h-4 w-4" />
+          <Button variant="outline" size="icon" onClick={fetchData} disabled={refreshing}>
+            <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
           </Button>
         </div>
       </div>
@@ -265,46 +306,59 @@ export default function AlertsPage() {
             </TabsList>
 
             <TabsContent value="active">
-              {filteredActiveAlerts.length > 0 ? (
+              {loading ? (
+                <div className="flex items-center justify-center py-10">
+                  <div className="flex flex-col items-center text-center">
+                    <RefreshCw className="h-8 w-8 animate-spin text-muted-foreground" />
+                    <p className="mt-2 text-sm text-muted-foreground">Loading alerts...</p>
+                  </div>
+                </div>
+              ) : filteredActiveAlerts.length > 0 ? (
                 <div className="space-y-4">
-                  {filteredActiveAlerts.map((alert) => (
-                    <Card key={alert.id} className="border">
-                      <CardContent className="p-4">
-                        <div className="flex items-start gap-4">
-                          <div
-                            className={`flex h-10 w-10 items-center justify-center rounded-full ${
-                              alert.type === "critical"
-                                ? "bg-red-100 text-red-500"
-                                : alert.type === "warning"
-                                  ? "bg-amber-100 text-amber-500"
-                                  : "bg-blue-100 text-blue-500"
-                            }`}
-                          >
-                            <alert.icon className="h-5 w-5" />
-                          </div>
-                          <div className="flex-1">
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-2">
-                                <h3 className="font-medium">{alert.title}</h3>
-                                {getAlertBadge(alert.type)}
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <span className="text-xs text-gray-500 flex items-center">
-                                  <Clock className="h-3 w-3 mr-1" />
-                                  {formatDate(alert.timestamp)}
-                                </span>
-                                <Button variant="ghost" size="sm">
-                                  <Check className="h-4 w-4 mr-1" />
-                                  Resolve
-                                </Button>
-                              </div>
+                  {filteredActiveAlerts.map((alert) => {
+                    const AlertIcon = getAlertIcon(alert.type)
+                    return (
+                      <Card key={alert.id} className="border">
+                        <CardContent className="p-4">
+                          <div className="flex items-start gap-4">
+                            <div
+                              className={`flex h-10 w-10 items-center justify-center rounded-full ${
+                                alert.type === "critical"
+                                  ? "bg-red-100 text-red-500"
+                                  : alert.type === "warning"
+                                    ? "bg-amber-100 text-amber-500"
+                                    : "bg-blue-100 text-blue-500"
+                              }`}
+                            >
+                              <AlertIcon className="h-5 w-5" />
                             </div>
-                            <p className="text-sm text-gray-500 mt-1">{alert.description}</p>
+                            <div className="flex-1">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                  <h3 className="font-medium">{alert.message}</h3>
+                                  {getAlertBadge(alert.type)}
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs text-gray-500 flex items-center">
+                                    <Clock className="h-3 w-3 mr-1" />
+                                    {formatDate(alert.timestamp)}
+                                  </span>
+                                  <Button variant="ghost" size="sm">
+                                    <Check className="h-4 w-4 mr-1" />
+                                    Resolve
+                                  </Button>
+                                </div>
+                              </div>
+                              <p className="text-sm text-gray-500 mt-1">{alert.description || alert.message}</p>
+                              {alert.location && (
+                                <p className="text-xs text-gray-400 mt-1">Location: {alert.location}</p>
+                              )}
+                            </div>
                           </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
+                        </CardContent>
+                      </Card>
+                    )
+                  })}
                 </div>
               ) : (
                 <div className="text-center py-8">
@@ -318,39 +372,54 @@ export default function AlertsPage() {
             </TabsContent>
 
             <TabsContent value="resolved">
-              {filteredResolvedAlerts.length > 0 ? (
+              {loading ? (
+                <div className="flex items-center justify-center py-10">
+                  <div className="flex flex-col items-center text-center">
+                    <RefreshCw className="h-8 w-8 animate-spin text-muted-foreground" />
+                    <p className="mt-2 text-sm text-muted-foreground">Loading alerts...</p>
+                  </div>
+                </div>
+              ) : filteredResolvedAlerts.length > 0 ? (
                 <div className="space-y-4">
-                  {filteredResolvedAlerts.map((alert) => (
-                    <Card key={alert.id} className="border">
-                      <CardContent className="p-4">
-                        <div className="flex items-start gap-4">
-                          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-100 text-gray-500">
-                            <alert.icon className="h-5 w-5" />
-                          </div>
-                          <div className="flex-1">
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-2">
-                                <h3 className="font-medium">{alert.title}</h3>
-                                <Badge variant="outline" className="text-gray-500">
-                                  Resolved
-                                </Badge>
+                  {filteredResolvedAlerts.map((alert) => {
+                    const AlertIcon = getAlertIcon(alert.type)
+                    return (
+                      <Card key={alert.id} className="border">
+                        <CardContent className="p-4">
+                          <div className="flex items-start gap-4">
+                            <div
+                              className={`flex h-10 w-10 items-center justify-center rounded-full bg-gray-100 text-gray-500`}
+                            >
+                              <AlertIcon className="h-5 w-5" />
+                            </div>
+                            <div className="flex-1">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                  <h3 className="font-medium">{alert.message}</h3>
+                                  <Badge variant="outline">Resolved</Badge>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs text-gray-500 flex items-center">
+                                    <Clock className="h-3 w-3 mr-1" />
+                                    {formatDate(alert.timestamp)}
+                                  </span>
+                                </div>
                               </div>
-                              <div>
-                                <span className="text-xs text-gray-500 flex items-center">
-                                  <Clock className="h-3 w-3 mr-1" />
-                                  Resolved: {formatDate(alert.resolvedAt)}
-                                </span>
+                              <p className="text-sm text-gray-500 mt-1">{alert.description || alert.message}</p>
+                              <div className="flex justify-between mt-1">
+                                {alert.location && (
+                                  <p className="text-xs text-gray-400">Location: {alert.location}</p>
+                                )}
+                                {alert.resolvedAt && (
+                                  <p className="text-xs text-gray-400">Resolved: {formatDate(alert.resolvedAt)}</p>
+                                )}
                               </div>
                             </div>
-                            <p className="text-sm text-gray-500 mt-1">{alert.description}</p>
-                            <div className="flex items-center gap-2 mt-2 text-xs text-gray-500">
-                              <span>Occurred: {formatDate(alert.timestamp)}</span>
-                            </div>
                           </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
+                        </CardContent>
+                      </Card>
+                    )
+                  })}
                 </div>
               ) : (
                 <div className="text-center py-8">
@@ -440,51 +509,6 @@ export default function AlertsPage() {
                     </CardContent>
                   </Card>
                 </div>
-
-                <Card className="border">
-                  <CardHeader>
-                    <CardTitle className="text-lg">Alert Schedule</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <h4 className="font-medium">Quiet Hours</h4>
-                          <p className="text-sm text-gray-500">Disable non-critical alerts during specified hours</p>
-                        </div>
-                        <Switch />
-                      </div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <label className="text-sm font-medium">Start Time</label>
-                          <Select disabled>
-                            <SelectTrigger>
-                              <SelectValue placeholder="10:00 PM" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="10pm">10:00 PM</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div>
-                          <label className="text-sm font-medium">End Time</label>
-                          <Select disabled>
-                            <SelectTrigger>
-                              <SelectValue placeholder="7:00 AM" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="7am">7:00 AM</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <div className="flex justify-end">
-                  <Button>Save Settings</Button>
-                </div>
               </div>
             </TabsContent>
           </Tabs>
@@ -494,7 +518,7 @@ export default function AlertsPage() {
   )
 }
 
-// Additional components
+// Keep the icon components from the original file
 function BatteryLow(props: React.SVGProps<SVGSVGElement>) {
   return (
     <svg
@@ -512,7 +536,6 @@ function BatteryLow(props: React.SVGProps<SVGSVGElement>) {
       <rect width="16" height="10" x="2" y="7" rx="2" ry="2" />
       <line x1="22" x2="22" y1="11" y2="13" />
       <line x1="6" x2="6" y1="11" y2="13" />
-      <line x1="10" x2="10" y1="11" y2="13" />
     </svg>
   )
 }

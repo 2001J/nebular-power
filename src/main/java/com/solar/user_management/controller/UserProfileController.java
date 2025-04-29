@@ -1,5 +1,7 @@
 package com.solar.user_management.controller;
 
+import com.solar.core_services.energy_monitoring.model.SolarInstallation;
+import com.solar.core_services.energy_monitoring.repository.SolarInstallationRepository;
 import com.solar.user_management.dto.user.PasswordResetConfirmRequest;
 import com.solar.user_management.dto.user.PasswordResetRequest;
 import com.solar.user_management.dto.user.UpdateProfileRequest;
@@ -18,10 +20,13 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 
 @RestController
@@ -29,10 +34,12 @@ import org.springframework.web.bind.annotation.*;
 @RequiredArgsConstructor
 @Tag(name = "User Profile", description = "User profile management endpoints")
 @SecurityRequirement(name = "bearerAuth")
+@Slf4j
 public class UserProfileController {
 
     private final UserService userService;
     private final UserActivityLogService activityLogService;
+    private final SolarInstallationRepository installationRepository;
 
     @GetMapping
     @Operation(
@@ -46,7 +53,27 @@ public class UserProfileController {
     )
     public ResponseEntity<UserProfileResponse> getCurrentUserProfile() {
         User user = userService.getCurrentUser();
-        return ResponseEntity.ok(UserProfileResponse.fromUser(user));
+        log.info("Fetching profile for user ID: {}, Email: {}", user.getId(), user.getEmail());
+        log.info("User object details - lastLogin: {}, createdAt: {}", user.getLastLogin(), user.getCreatedAt());
+        
+        UserProfileResponse profile = UserProfileResponse.fromUser(user);
+        log.info("Profile response after conversion - lastLogin: {}, createdAt: {}", profile.getLastLogin(), profile.getCreatedAt());
+        
+        // Add installation data for customers
+        if (user.getRole() == User.UserRole.CUSTOMER) {
+            List<SolarInstallation> installations = installationRepository.findByUserId(user.getId());
+            if (!installations.isEmpty()) {
+                SolarInstallation installation = installations.get(0);
+                profile.setInstallationDate(installation.getInstallationDate());
+                profile.setInstallationType(installation.getType() != null ? installation.getType().name() : null);
+                log.info("Added installation data - date: {}, type: {}", installation.getInstallationDate(), 
+                        installation.getType() != null ? installation.getType().name() : null);
+            } else {
+                log.info("No installation found for user ID: {}", user.getId());
+            }
+        }
+        
+        return ResponseEntity.ok(profile);
     }
 
     @PutMapping
@@ -68,7 +95,19 @@ public class UserProfileController {
                 httpRequest
         );
 
-        return ResponseEntity.ok(UserProfileResponse.fromUser(user));
+        UserProfileResponse profile = UserProfileResponse.fromUser(user);
+        
+        // Add installation data for customers
+        if (user.getRole() == User.UserRole.CUSTOMER) {
+            List<SolarInstallation> installations = installationRepository.findByUserId(user.getId());
+            if (!installations.isEmpty()) {
+                SolarInstallation installation = installations.get(0);
+                profile.setInstallationDate(installation.getInstallationDate());
+                profile.setInstallationType(installation.getType() != null ? installation.getType().name() : null);
+            }
+        }
+        
+        return ResponseEntity.ok(profile);
     }
 
     @PostMapping("/password/reset-request")

@@ -38,21 +38,66 @@ public class PaymentReportServiceImpl implements PaymentReportService {
 
     @Override
     public List<Payment> generatePaymentsDueReport(LocalDateTime startDate, LocalDateTime endDate) {
-        return paymentRepository.findByDueDateBetweenAndStatus(startDate, endDate, Payment.PaymentStatus.PENDING);
+        // Include all relevant statuses to capture all payments due in the date range
+        List<Payment.PaymentStatus> relevantStatuses = Arrays.asList(
+            Payment.PaymentStatus.PENDING,
+            Payment.PaymentStatus.SCHEDULED,
+            Payment.PaymentStatus.UPCOMING,
+            Payment.PaymentStatus.DUE_TODAY,
+            Payment.PaymentStatus.PAID,
+            Payment.PaymentStatus.PARTIALLY_PAID,
+            Payment.PaymentStatus.OVERDUE,
+            Payment.PaymentStatus.GRACE_PERIOD
+        );
+        
+        // Add debug logging
+        System.out.println("Generating payments due report for period: " + startDate + " to " + endDate);
+        
+        // Use the method that allows multiple statuses
+        List<Payment> payments = paymentRepository.findByDueDateBetweenAndStatusIn(startDate, endDate, relevantStatuses);
+        System.out.println("Found " + payments.size() + " payments due in the period with statuses: " + relevantStatuses);
+        
+        return payments;
     }
 
     @Override
     public List<Payment> generateOverduePaymentsReport() {
         LocalDateTime now = LocalDateTime.now();
-        List<Payment.PaymentStatus> statuses = Arrays.asList(Payment.PaymentStatus.PENDING, Payment.PaymentStatus.PARTIALLY_PAID);
-        return paymentRepository.findOverduePayments(now, statuses);
+        // Include more statuses to capture all potentially overdue payments
+        List<Payment.PaymentStatus> statuses = Arrays.asList(
+            Payment.PaymentStatus.PENDING, 
+            Payment.PaymentStatus.PARTIALLY_PAID,
+            Payment.PaymentStatus.OVERDUE,
+            Payment.PaymentStatus.GRACE_PERIOD,
+            Payment.PaymentStatus.SUSPENSION_PENDING,
+            Payment.PaymentStatus.DUE_TODAY
+        );
+        
+        // Add debug log
+        List<Payment> overduePayments = paymentRepository.findOverduePayments(now, statuses);
+        System.out.println("Found " + overduePayments.size() + " overdue payments with statuses: " + statuses);
+        return overduePayments;
     }
 
     @Override
     public List<Payment> generateUpcomingPaymentsReport(int daysAhead) {
         LocalDateTime now = LocalDateTime.now();
         LocalDateTime futureDate = now.plusDays(daysAhead);
-        return paymentRepository.findUpcomingPayments(futureDate, Payment.PaymentStatus.PENDING);
+        
+        // Include all relevant upcoming payment statuses
+        List<Payment.PaymentStatus> upcomingStatuses = Arrays.asList(
+            Payment.PaymentStatus.PENDING,
+            Payment.PaymentStatus.SCHEDULED,
+            Payment.PaymentStatus.UPCOMING,
+            Payment.PaymentStatus.DUE_TODAY
+        );
+        
+        System.out.println("Generating upcoming payments report for next " + daysAhead + " days (until " + futureDate + ")");
+        
+        List<Payment> upcomingPayments = paymentRepository.findUpcomingPaymentsByStatuses(futureDate, upcomingStatuses);
+        System.out.println("Found " + upcomingPayments.size() + " upcoming payments with statuses: " + upcomingStatuses);
+        
+        return upcomingPayments;
     }
 
     @Override
@@ -68,20 +113,55 @@ public class PaymentReportServiceImpl implements PaymentReportService {
         
         // Count payments by status
         for (Payment.PaymentStatus status : Payment.PaymentStatus.values()) {
-            long count = paymentRepository.findByStatus(status).size();
+            long count = paymentRepository.countByStatus(status);
             summary.put(status.name(), count);
+            // Add debug log
+            System.out.println("Status " + status.name() + " count: " + count);
         }
         
-        // Count overdue payments
+        // Count overdue payments with expanded status list
         LocalDateTime now = LocalDateTime.now();
-        List<Payment.PaymentStatus> overdueStatuses = Arrays.asList(Payment.PaymentStatus.PENDING, Payment.PaymentStatus.PARTIALLY_PAID);
-        long overdueCount = paymentRepository.findOverduePayments(now, overdueStatuses).size();
+        List<Payment.PaymentStatus> overdueStatuses = Arrays.asList(
+            Payment.PaymentStatus.PENDING, 
+            Payment.PaymentStatus.PARTIALLY_PAID,
+            Payment.PaymentStatus.OVERDUE,
+            Payment.PaymentStatus.GRACE_PERIOD, 
+            Payment.PaymentStatus.SUSPENSION_PENDING
+        );
+        
+        List<Payment> overduePayments = paymentRepository.findOverduePayments(now, overdueStatuses);
+        long overdueCount = overduePayments.size();
         summary.put("OVERDUE_COUNT", overdueCount);
+        System.out.println("Total overdue count: " + overdueCount);
         
         // Count upcoming payments (next 7 days)
         LocalDateTime nextWeek = now.plusDays(7);
-        long upcomingCount = paymentRepository.findUpcomingPayments(nextWeek, Payment.PaymentStatus.PENDING).size();
+        List<Payment.PaymentStatus> upcomingStatuses = Arrays.asList(
+            Payment.PaymentStatus.PENDING,
+            Payment.PaymentStatus.SCHEDULED,
+            Payment.PaymentStatus.UPCOMING,
+            Payment.PaymentStatus.DUE_TODAY
+        );
+        List<Payment> upcomingPayments = paymentRepository.findUpcomingPaymentsByStatuses(nextWeek, upcomingStatuses);
+        long upcomingCount = upcomingPayments.size();
         summary.put("UPCOMING_7_DAYS", upcomingCount);
+        System.out.println("Total upcoming (7 days) count: " + upcomingCount);
+        
+        // Add more useful metrics
+        // Count due today payments
+        LocalDateTime startOfToday = now.toLocalDate().atStartOfDay();
+        LocalDateTime endOfToday = startOfToday.plusDays(1).minusNanos(1);
+        List<Payment.PaymentStatus> dueTodayStatuses = Arrays.asList(
+            Payment.PaymentStatus.PENDING,
+            Payment.PaymentStatus.SCHEDULED,
+            Payment.PaymentStatus.UPCOMING,
+            Payment.PaymentStatus.DUE_TODAY
+        );
+        List<Payment> dueTodayPayments = paymentRepository.findByDueDateBetweenAndStatusIn(
+            startOfToday, endOfToday, dueTodayStatuses);
+        long dueTodayCount = dueTodayPayments.size();
+        summary.put("DUE_TODAY_COUNT", dueTodayCount);
+        System.out.println("Due today count: " + dueTodayCount);
         
         return summary;
     }

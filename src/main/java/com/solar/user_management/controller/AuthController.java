@@ -9,6 +9,8 @@ import com.solar.user_management.service.UserActivityLogService;
 import com.solar.user_management.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
@@ -32,13 +34,30 @@ public class AuthController {
 
     @PostMapping("/login")
     @Operation(
-            summary = "Authenticate user",
-            description = "Authenticates a user and returns a JWT token. The response includes a 'passwordChangeRequired' flag that indicates if the user needs to change their password before accessing the system."
+            summary = "Login user",
+            description = "Authenticates a user and returns an authentication token"
     )
-    @ApiResponse(responseCode = "200", description = "Authentication successful")
-    @ApiResponse(responseCode = "401", description = "Authentication failed")
-    public ResponseEntity<AuthResponse> authenticateUser(@Valid @RequestBody LoginRequest loginRequest) {
-        return ResponseEntity.ok(userService.authenticateUser(loginRequest));
+    @ApiResponse(
+            responseCode = "200",
+            description = "Successfully authenticated",
+            content = @Content(schema = @Schema(implementation = AuthResponse.class))
+    )
+    public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest loginRequest) {
+        System.out.println("Login request for email: " + loginRequest.getEmail());
+        
+        // Authenticate user
+        AuthResponse response = userService.authenticateUser(loginRequest);
+        
+        // Additional explicit call to update last login
+        try {
+            System.out.println("Explicitly calling updateLastLogin after authentication");
+            userService.updateLastLogin(loginRequest.getEmail());
+            System.out.println("Last login updated successfully in auth controller");
+        } catch (Exception e) {
+            System.err.println("Error updating last login from auth controller: " + e.getMessage());
+        }
+        
+        return ResponseEntity.ok(response);
     }
 
     @GetMapping("/check-email")

@@ -237,10 +237,11 @@ public class PaymentRepositoryTest {
     void shouldFindUpcomingPayments() {
         // Given
         LocalDateTime futureDate = LocalDateTime.now().plusDays(60);
+        List<Payment.PaymentStatus> statuses = Arrays.asList(Payment.PaymentStatus.UPCOMING);
         
         // When
-        List<Payment> upcomingPayments = paymentRepository.findUpcomingPayments(
-                futureDate, Payment.PaymentStatus.UPCOMING);
+        List<Payment> upcomingPayments = paymentRepository.findUpcomingPaymentsByStatuses(
+                futureDate, statuses);
         
         // Then
         assertThat(upcomingPayments).hasSize(1);

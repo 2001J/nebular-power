@@ -477,12 +477,30 @@ export const authApi = {
     }
   },
 
-  changePassword: async (currentPassword: string, newPassword: string) => {
+  changePassword: async (currentPassword: string, newPassword: string, email?: string) => {
     try {
+      // Get current user's email if not provided
+      if (!email) {
+        const user = JSON.parse(localStorage.getItem('user') || sessionStorage.getItem('user') || '{}');
+        email = user?.email;
+        
+        if (!email) {
+          throw new Error("User email is required for password change");
+        }
+      }
+      
+      console.log("Making change password request with email:", email.substring(0, 3) + "..." + email.substring(email.indexOf('@')));
+      
+      // The server expects email and newPassword in the body, currentPassword as query param
       const response = await apiClient.post('/api/auth/change-password', {
-        currentPassword,
+        email, // Include email in the request body
         newPassword,
+        confirmPassword: newPassword // Include confirmation password
+      }, {
+        params: { currentPassword } // Current password as query parameter
       });
+      
+      console.log("Password change successful");
       return response.data;
     } catch (error: any) {
       console.error("Error changing password:", error.message);
@@ -512,7 +530,10 @@ export const authApi = {
 
   resetPasswordRequest: async (email: string) => {
     try {
-      const response = await apiClient.post('/api/profile/password/reset-request', { email });
+      console.log("Requesting password reset for email:", email.substring(0, 3) + "..." + email.substring(email.indexOf('@')));
+      const response = await apiClient.post('/api/profile/password/reset-request', { 
+        email // Send email in the request body as required
+      });
       return response.data;
     } catch (error: any) {
       console.error("Error requesting password reset:", error.message);
@@ -523,12 +544,14 @@ export const authApi = {
     }
   },
 
-  resetPasswordConfirm: async (token: string, newPassword: string, confirmPassword: string) => {
+  resetPasswordConfirm: async (token: string, newPassword: string, confirmPassword: string, email: string) => {
     try {
+      console.log("Confirming password reset with token:", token.substring(0, 8) + "...");
       const response = await apiClient.post('/api/profile/password/reset-confirm', {
         token,
         newPassword,
         confirmPassword,
+        email
       });
       return response.data;
     } catch (error: any) {
@@ -596,6 +619,13 @@ export const userApi = {
         throw new Error("Server returned an invalid user profile format");
       }
 
+      // Log additional debug info about the response
+      console.log("User profile data fields:", Object.keys(data));
+      console.log("Last login value:", data.lastLogin); 
+      console.log("Created at value:", data.createdAt);
+      console.log("Installation date value:", data.installationDate);
+      console.log("Installation type value:", data.installationType);
+
       console.log("User profile fetched successfully");
       return data;
     } catch (error: any) {
@@ -628,6 +658,25 @@ export const userApi = {
 
   getActivityLogs: async (page = 0, size = 10) => {
     try {
+      console.log(`Fetching activity logs page ${page}, size ${size}`);
+      
+      // Get auth token for explicit header inclusion
+      const token = typeof window !== 'undefined'
+        ? localStorage.getItem("token") || sessionStorage.getItem("token")
+        : null;
+      
+      if (!token) {
+        console.error("No authentication token found for activity logs request");
+        return {
+          content: [],
+          totalElements: 0,
+          totalPages: 0,
+          size,
+          number: page,
+          error: "Authentication required"
+        };
+      }
+      
       // Add cache control headers and timeout to avoid hanging requests
       const response = await apiClient.get('/api/profile/activity', {
         params: {
@@ -637,18 +686,19 @@ export const userApi = {
           _t: Date.now()
         },
         headers: {
+          // Explicitly set Authorization header
+          'Authorization': `Bearer ${token}`,
           // Prevent caching
           'Cache-Control': 'no-cache, no-store, must-revalidate',
           'Pragma': 'no-cache'
         },
         // Set a shorter timeout for this potentially problematic endpoint
-        timeout: 8000,
-        // Explicit auth - ensure the token is current
-        withCredentials: true
+        timeout: 8000
       });
 
       // Add better validation of the response data
       const data = response.data;
+      console.log(`Activity logs response received with status ${response.status}`);
 
       // Ensure we have an array of logs, even if nested in content property
       if (data && Array.isArray(data)) {
@@ -677,6 +727,9 @@ export const userApi = {
     } catch (error: any) {
       // Only log minimal error info to console
       console.error("Activity logs API error:", error.message || "Unknown error");
+      if (error.response) {
+        console.error("Activity logs API response status:", error.response.status);
+      }
 
       // Return empty data with standardized format
       return {
@@ -1603,23 +1656,17 @@ export const paymentApi = {
   // Get payment history report
   getPaymentHistoryReport: async (installationId: string, startDate?: string, endDate?: string, timestamp?: number) => {
     try {
-      const params: any = {};
+      const params: Record<string, any> = {};
       
       if (startDate) params.startDate = startDate;
       if (endDate) params.endDate = endDate;
       if (timestamp) params._t = timestamp;
       
-      const response = await apiClient.get(`/api/admin/payments/reports/history/${installationId}`, {
-        params,
-        headers: {
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          'Pragma': 'no-cache'
-        }
-      });
+      const response = await apiClient.get(`/api/admin/payments/reports/history/${installationId}`, { params });
       return response.data;
-    } catch (error) {
-      console.error(`Error fetching payment history for installation ${installationId} report:`, error);
-      throw error;
+    } catch (error: any) {
+      console.error(`Error getting payment history report for installation ${installationId}:`, error.message);
+      return null;
     }
   },
 
@@ -2662,12 +2709,12 @@ export const serviceControlApi = {
         console.error("Authentication failed for logs by time range - token may be invalid or expired");
         
         // If available, use toast to provide user feedback about authentication error
-        if (typeof window !== 'undefined' && window.dispatchEvent) {
-          // Create a custom event to trigger a toast notification
-          const authErrorEvent = new CustomEvent('auth-error', { 
-            detail: { message: "Your session has expired. Please log in again to view logs." } 
+        if (typeof toast === "function") {
+          toast({
+            title: "Authentication Error",
+            description: "Your session has expired. Please log in again to continue.",
+            variant: "destructive"
           });
-          window.dispatchEvent(authErrorEvent);
         }
       }
       
@@ -2872,7 +2919,7 @@ export const securityApi = {
 
   getAdminAuditLogs: async (page = 0, size = 20, activityType?: string) => {
     try {
-      const params: any = { page, size };
+      const params: Record<string, any> = { page, size };
       if (activityType) params.activityType = activityType;
 
       const response = await apiClient.get('/api/security/admin/audit', { params });
@@ -3086,7 +3133,7 @@ export const securityApi = {
 
   getAdminAuditLogs: async (page = 0, size = 20, activityType?: string) => {
     try {
-      const params: any = { page, size };
+      const params: Record<string, any> = { page, size };
       if (activityType) params.activityType = activityType;
 
       const response = await apiClient.get('/api/security/admin/audit', { params });

@@ -319,7 +319,8 @@ public class UserServiceTest {
     void updateLastLogin_Success() {
         // Arrange
         when(userRepository.findByEmail(anyString())).thenReturn(Optional.of(testUser));
-        when(userRepository.save(any(User.class))).thenReturn(testUser);
+        when(userRepository.saveAndFlush(any(User.class))).thenReturn(testUser);
+        when(userRepository.findById(anyLong())).thenReturn(Optional.of(testUser));
 
         // Act
         userService.updateLastLogin("test@example.com");
@@ -327,7 +328,7 @@ public class UserServiceTest {
         // Assert
         assertNotNull(testUser.getLastLogin());
         verify(userRepository).findByEmail("test@example.com");
-        verify(userRepository).save(testUser);
+        verify(userRepository).saveAndFlush(testUser);
     }
 
     @Test

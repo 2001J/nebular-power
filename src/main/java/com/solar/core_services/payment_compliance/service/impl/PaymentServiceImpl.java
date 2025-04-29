@@ -83,10 +83,11 @@ public class PaymentServiceImpl implements PaymentService {
 
         // Get upcoming payments
         LocalDateTime futureDate = LocalDateTime.now().plusMonths(3);
-        List<Payment> upcomingPayments = paymentRepository.findUpcomingPayments(
+        List<Payment> upcomingPayments = paymentRepository.findUpcomingPaymentsByInstallation(
+                installation,
                 futureDate,
                 Payment.PaymentStatus.SCHEDULED);
-
+        
         // Check for overdue payments
         List<Payment.PaymentStatus> overdueStatuses = Arrays.asList(
                 Payment.PaymentStatus.OVERDUE,
@@ -219,13 +220,12 @@ public class PaymentServiceImpl implements PaymentService {
 
         // Only get payments for next 7 days rather than 3 months
         LocalDateTime cutoffDate = LocalDateTime.now().plusDays(7);
-        List<Payment> upcomingPayments = paymentRepository.findUpcomingPayments(
+        List<Payment> upcomingPayments = paymentRepository.findUpcomingPaymentsByInstallation(
+                installation,
                 cutoffDate,
                 Payment.PaymentStatus.SCHEDULED);
 
-        // Filter to ensure we're only returning this customer's payments
         return upcomingPayments.stream()
-                .filter(payment -> payment.getInstallation().getId().equals(installation.getId()))
                 .sorted((p1, p2) -> p1.getDueDate().compareTo(p2.getDueDate()))
                 .map(this::mapToDTO)
                 .collect(Collectors.toList());
@@ -315,6 +315,9 @@ public class PaymentServiceImpl implements PaymentService {
         log.info("Starting daily payment status update job");
 
         try {
+            // Force a recheck of all pending/scheduled payments first
+            recheckPendingPayments();
+
             // Phase 1: Identify upcoming payments
             identifyUpcomingPayments(LocalDateTime.now().plusDays(7));
 
@@ -332,6 +335,40 @@ public class PaymentServiceImpl implements PaymentService {
             log.error("Error in daily payment status update job", e);
             // In a real implementation, we would have more robust error handling and
             // alerting
+        }
+    }
+
+    @Transactional
+    private void recheckPendingPayments() {
+        log.info("Rechecking all pending and scheduled payments");
+        
+        // Get all pending/scheduled payments
+        List<Payment.PaymentStatus> statusesToCheck = Arrays.asList(
+            Payment.PaymentStatus.PENDING,
+            Payment.PaymentStatus.SCHEDULED,
+            Payment.PaymentStatus.UPCOMING
+        );
+        
+        List<Payment> pendingPayments = paymentRepository.findByStatusIn(statusesToCheck);
+        log.info("Found {} pending/scheduled payments to check", pendingPayments.size());
+        
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime startOfToday = now.toLocalDate().atStartOfDay();
+        LocalDateTime endOfToday = startOfToday.plusDays(1).minusNanos(1);
+        
+        for (Payment payment : pendingPayments) {
+            // If payment is due today
+            if (payment.getDueDate().isAfter(startOfToday) && payment.getDueDate().isBefore(endOfToday)) {
+                updatePaymentStatus(payment, Payment.PaymentStatus.DUE_TODAY, "Payment due today");
+            }
+            // If payment is overdue
+            else if (payment.getDueDate().isBefore(startOfToday)) {
+                updatePaymentStatus(payment, Payment.PaymentStatus.OVERDUE, "Payment date has passed without payment");
+            }
+            // If payment is upcoming (within 7 days)
+            else if (payment.getDueDate().isBefore(now.plusDays(7))) {
+                updatePaymentStatus(payment, Payment.PaymentStatus.UPCOMING, "Payment due within 7 days");
+            }
         }
     }
 
@@ -383,14 +420,31 @@ public class PaymentServiceImpl implements PaymentService {
     public void markOverduePayments() {
         log.info("Marking overdue payments");
 
-        // Find payments that are due today or earlier and not paid
-        List<Payment> overduePayments = paymentRepository.findByDueDateBeforeAndStatus(
-                LocalDateTime.now().plusDays(1).withHour(0).withMinute(0).withSecond(0),
-                Payment.PaymentStatus.DUE_TODAY);
+        // Find payments that were due today or earlier and still not paid
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime cutoffDate = now.toLocalDate().atStartOfDay();
+        
+        // Include multiple statuses that could be marked overdue
+        List<Payment.PaymentStatus> statusesToCheck = Arrays.asList(
+            Payment.PaymentStatus.DUE_TODAY,
+            Payment.PaymentStatus.PENDING,
+            Payment.PaymentStatus.SCHEDULED,
+            Payment.PaymentStatus.UPCOMING
+        );
+        
+        List<Payment> overduePayments = paymentRepository.findByDueDateBeforeAndStatusIn(
+                cutoffDate, statusesToCheck);
 
         log.info("Found {} overdue payments", overduePayments.size());
 
         for (Payment payment : overduePayments) {
+            // Skip if it's already been processed elsewhere
+            if (payment.getStatus() == Payment.PaymentStatus.OVERDUE || 
+                payment.getStatus() == Payment.PaymentStatus.GRACE_PERIOD || 
+                payment.getStatus() == Payment.PaymentStatus.SUSPENSION_PENDING) {
+                continue;
+            }
+            
             // Update status to OVERDUE
             updatePaymentStatus(payment, Payment.PaymentStatus.OVERDUE,
                     "Payment date has passed without payment");
@@ -588,9 +642,6 @@ public class PaymentServiceImpl implements PaymentService {
                 }
             }
         }
-
-        // Notify payment event
-        paymentEventPublisher.publishPaymentReceived(payment);
 
         return mapToDTO(payment);
     }
