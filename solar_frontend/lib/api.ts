@@ -2238,7 +2238,7 @@ export const serviceApi = {
   // Service control operations
   startService: async (installationId: string) => {
     try {
-      const response = await apiClient.post(`/api/service/installations/${installationId}/start`);
+      const response = await apiClient.post(`/api/service/status/installations/${installationId}/start`);
       return response.data;
     } catch (error) {
       console.error(`Error starting service for installation ${installationId}:`, error);
@@ -2248,7 +2248,7 @@ export const serviceApi = {
   
   stopService: async (installationId: string) => {
     try {
-      const response = await apiClient.post(`/api/service/installations/${installationId}/stop`);
+      const response = await apiClient.post(`/api/service/status/installations/${installationId}/stop`);
       return response.data;
     } catch (error) {
       console.error(`Error stopping service for installation ${installationId}:`, error);
@@ -2258,7 +2258,7 @@ export const serviceApi = {
   
   restartService: async (installationId: string) => {
     try {
-      const response = await apiClient.post(`/api/service/installations/${installationId}/restart`);
+      const response = await apiClient.post(`/api/service/status/installations/${installationId}/restart`);
       return response.data;
     } catch (error) {
       console.error(`Error restarting service for installation ${installationId}:`, error);

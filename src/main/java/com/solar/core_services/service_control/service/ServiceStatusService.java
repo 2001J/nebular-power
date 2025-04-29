@@ -6,6 +6,7 @@ import com.solar.core_services.service_control.model.ServiceStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 public interface ServiceStatusService {
@@ -49,7 +50,7 @@ public interface ServiceStatusService {
      * Schedule a service status change
      */
     ServiceStatusDTO scheduleStatusChange(Long installationId, ServiceStatus.ServiceState targetStatus, 
-                                         String reason, String username, java.time.LocalDateTime scheduledTime);
+                                         String reason, LocalDateTime scheduledTime, String username);
     
     /**
      * Cancel a scheduled service status change
@@ -75,4 +76,9 @@ public interface ServiceStatusService {
      * Get statuses for multiple installations in a single batch request
      */
     List<ServiceStatusDTO> getBatchStatuses(List<Long> installationIds);
+    
+    // Add these new methods for service control operations
+    ServiceStatusDTO startService(Long installationId, String username);
+    ServiceStatusDTO stopService(Long installationId, String username);
+    ServiceStatusDTO restartService(Long installationId, String username);
 } 

@@ -28,14 +28,22 @@ public class ServiceStatusServiceImpl implements ServiceStatusService {
     private final SolarInstallationRepository installationRepository;
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional
     public ServiceStatusDTO getCurrentStatus(Long installationId) {
         log.info("Getting current service status for installation {}", installationId);
         
-        ServiceStatus status = serviceStatusRepository.findActiveByInstallationId(installationId)
-                .orElseThrow(() -> new RuntimeException("No active service status found for installation: " + installationId));
-        
-        return ServiceStatusDTO.fromEntity(status);
+        try {
+            // Try to find existing active status
+            ServiceStatus status = serviceStatusRepository.findActiveByInstallationId(installationId)
+                    .orElseThrow(() -> new RuntimeException("No active service status found for installation: " + installationId));
+            
+            return ServiceStatusDTO.fromEntity(status);
+        } catch (Exception e) {
+            log.error("Error getting current status for installation {}: {}", installationId, e.getMessage());
+            
+            // Rethrow the exception instead of creating a fallback
+            throw new RuntimeException("Error retrieving current status: " + e.getMessage(), e);
+        }
     }
 
     @Override
@@ -135,7 +143,7 @@ public class ServiceStatusServiceImpl implements ServiceStatusService {
     @Override
     @Transactional
     public ServiceStatusDTO scheduleStatusChange(Long installationId, ServiceStatus.ServiceState targetStatus, 
-                                               String reason, String username, LocalDateTime scheduledTime) {
+                                               String reason, LocalDateTime scheduledTime, String username) {
         log.info("Scheduling status change to {} for installation {} at {}", targetStatus, installationId, scheduledTime);
         
         if (scheduledTime.isBefore(LocalDateTime.now())) {
@@ -276,5 +284,59 @@ public class ServiceStatusServiceImpl implements ServiceStatusService {
         }
 
         return results;
+    }
+
+    @Override
+    @Transactional
+    public ServiceStatusDTO startService(Long installationId, String username) {
+        log.info("Starting service for installation {}", installationId);
+        
+        ServiceStatusUpdateRequest request = new ServiceStatusUpdateRequest();
+        request.setStatus(ServiceStatus.ServiceState.ACTIVE);
+        request.setStatusReason("Service started by " + username);
+        request.setUpdatedBy(username);
+        
+        // Create a device command to actually start the service
+        // This would typically send a command to the device
+        // For this implementation, we'll just update the status
+        
+        return updateServiceStatus(installationId, request, username);
+    }
+
+    @Override
+    @Transactional
+    public ServiceStatusDTO stopService(Long installationId, String username) {
+        log.info("Stopping service for installation {}", installationId);
+        
+        ServiceStatusUpdateRequest request = new ServiceStatusUpdateRequest();
+        request.setStatus(ServiceStatus.ServiceState.SUSPENDED_MAINTENANCE);
+        request.setStatusReason("Service stopped by " + username);
+        request.setUpdatedBy(username);
+        
+        // Create a device command to actually stop the service
+        // This would typically send a command to the device
+        // For this implementation, we'll just update the status
+        
+        return updateServiceStatus(installationId, request, username);
+    }
+
+    @Override
+    @Transactional
+    public ServiceStatusDTO restartService(Long installationId, String username) {
+        log.info("Restarting service for installation {}", installationId);
+        
+        // First stop the service
+        stopService(installationId, username);
+        
+        // Then start it again after a short delay
+        try {
+            // Simulate a delay for restart
+            Thread.sleep(500);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+        
+        // Start the service again
+        return startService(installationId, username);
     }
 } 

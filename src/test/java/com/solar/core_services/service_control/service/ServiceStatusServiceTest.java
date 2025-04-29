@@ -48,6 +48,7 @@ public class ServiceStatusServiceTest {
     private SolarInstallation installation;
     private ServiceStatus activeStatus;
     private ServiceStatus historicalStatus;
+    private LocalDateTime testTime;
     
     @BeforeEach
     void setUp() {
@@ -74,6 +75,8 @@ public class ServiceStatusServiceTest {
         historicalStatus.setUpdatedAt(LocalDateTime.now().minusDays(1));
         historicalStatus.setUpdatedBy("system");
         historicalStatus.setActive(false);
+
+        testTime = LocalDateTime.now();
     }
 
     @Test
@@ -239,9 +242,8 @@ public class ServiceStatusServiceTest {
             1L, 
             ServiceStatus.ServiceState.SUSPENDED_MAINTENANCE, 
             "Scheduled maintenance", 
-            "admin", 
-            scheduledTime
-        );
+            scheduledTime,
+            "admin");
         
         // Assert
         assertNotNull(result);
@@ -394,9 +396,8 @@ public class ServiceStatusServiceTest {
                 1L, 
                 ServiceStatus.ServiceState.SUSPENDED_MAINTENANCE, 
                 "Scheduled maintenance", 
-                "admin", 
-                pastTime
-            )
+                pastTime,
+                "admin")
         );
         
         verify(serviceStatusRepository, never()).findActiveByInstallationId(anyLong());

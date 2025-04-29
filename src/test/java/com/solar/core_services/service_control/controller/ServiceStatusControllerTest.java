@@ -301,7 +301,12 @@ public class ServiceStatusControllerTest {
         scheduledStatus.setActive(true);
         scheduledStatus.setInstallationId(1L);
 
-        when(serviceStatusService.scheduleStatusChange(eq(1L), eq(ServiceStatus.ServiceState.SUSPENDED_MAINTENANCE), anyString(), eq("admin"), any(LocalDateTime.class)))
+        when(serviceStatusService.scheduleStatusChange(
+                eq(1L), 
+                eq(ServiceStatus.ServiceState.SUSPENDED_MAINTENANCE), 
+                anyString(), 
+                any(LocalDateTime.class), 
+                eq("admin")))
                 .thenReturn(scheduledStatus);
 
         // Act & Assert
@@ -315,7 +320,12 @@ public class ServiceStatusControllerTest {
                 .andExpect(jsonPath("$.scheduledChange").value("SUSPENDED_MAINTENANCE"))
                 .andExpect(jsonPath("$.status").value("ACTIVE"));
 
-        verify(serviceStatusService).scheduleStatusChange(eq(1L), eq(ServiceStatus.ServiceState.SUSPENDED_MAINTENANCE), anyString(), eq("admin"), any(LocalDateTime.class));
+        verify(serviceStatusService).scheduleStatusChange(
+                eq(1L), 
+                eq(ServiceStatus.ServiceState.SUSPENDED_MAINTENANCE), 
+                anyString(), 
+                any(LocalDateTime.class), 
+                eq("admin"));
         verify(operationalLogService).logOperation(
                 anyLong(), eq(OperationalLog.OperationType.STATUS_CHANGE_SCHEDULED), anyString(), contains("Scheduled status change"), anyString(), anyString(), anyString(), isNull(), eq(true), isNull());
     }
@@ -386,5 +396,169 @@ public class ServiceStatusControllerTest {
                 .andExpect(jsonPath("$.totalElements").value(1));
 
         verify(serviceStatusService).getInstallationsByStatus(eq(ServiceStatus.ServiceState.ACTIVE), any(Pageable.class));
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = {"ADMIN"})
+    void startService() throws Exception {
+        // Create a mock response for the startService operation
+        ServiceStatusDTO startedStatusDTO = new ServiceStatusDTO();
+        startedStatusDTO.setId(1L);
+        startedStatusDTO.setInstallationId(101L);
+        startedStatusDTO.setStatus(ServiceStatus.ServiceState.ACTIVE);
+        startedStatusDTO.setStatusReason("Service started by admin");
+        startedStatusDTO.setUpdatedBy("admin");
+        startedStatusDTO.setUpdatedAt(LocalDateTime.now());
+        startedStatusDTO.setActive(true);
+        
+        when(serviceStatusService.startService(eq(101L), eq("admin"))).thenReturn(startedStatusDTO);
+        
+        mockMvc.perform(post("/api/service/status/installations/101/start"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.installationId").value(101))
+                .andExpect(jsonPath("$.status").value("ACTIVE"))
+                .andExpect(jsonPath("$.statusReason").value("Service started by admin"));
+        
+        verify(serviceStatusService).startService(101L, "admin");
+    }
+    
+    @Test
+    @WithMockUser(username = "admin", roles = {"ADMIN"})
+    void stopService() throws Exception {
+        // Create a mock response for the stopService operation
+        ServiceStatusDTO stoppedStatusDTO = new ServiceStatusDTO();
+        stoppedStatusDTO.setId(1L);
+        stoppedStatusDTO.setInstallationId(101L);
+        stoppedStatusDTO.setStatus(ServiceStatus.ServiceState.SUSPENDED_MAINTENANCE);
+        stoppedStatusDTO.setStatusReason("Service stopped by admin");
+        stoppedStatusDTO.setUpdatedBy("admin");
+        stoppedStatusDTO.setUpdatedAt(LocalDateTime.now());
+        stoppedStatusDTO.setActive(true);
+        
+        when(serviceStatusService.stopService(eq(101L), eq("admin"))).thenReturn(stoppedStatusDTO);
+        
+        mockMvc.perform(post("/api/service/status/installations/101/stop"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.installationId").value(101))
+                .andExpect(jsonPath("$.status").value("SUSPENDED_MAINTENANCE"))
+                .andExpect(jsonPath("$.statusReason").value("Service stopped by admin"));
+        
+        verify(serviceStatusService).stopService(101L, "admin");
+    }
+    
+    @Test
+    @WithMockUser(username = "admin", roles = {"ADMIN"})
+    void restartService() throws Exception {
+        // Create a mock response for the restartService operation
+        ServiceStatusDTO restartedStatusDTO = new ServiceStatusDTO();
+        restartedStatusDTO.setId(1L);
+        restartedStatusDTO.setInstallationId(101L);
+        restartedStatusDTO.setStatus(ServiceStatus.ServiceState.ACTIVE);
+        restartedStatusDTO.setStatusReason("Service restarted by admin");
+        restartedStatusDTO.setUpdatedBy("admin");
+        restartedStatusDTO.setUpdatedAt(LocalDateTime.now());
+        restartedStatusDTO.setActive(true);
+        
+        when(serviceStatusService.restartService(eq(101L), eq("admin"))).thenReturn(restartedStatusDTO);
+        
+        mockMvc.perform(post("/api/service/status/installations/101/restart"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.installationId").value(101))
+                .andExpect(jsonPath("$.status").value("ACTIVE"))
+                .andExpect(jsonPath("$.statusReason").value("Service restarted by admin"));
+        
+        verify(serviceStatusService).restartService(101L, "admin");
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = {"ADMIN"})
+    void scheduleStatusChange() throws Exception {
+        // Arrange
+        LocalDateTime scheduledTime = testTime.plusDays(1);
+        String scheduledTimeStr = scheduledTime.format(DateTimeFormatter.ISO_DATE_TIME);
+        
+        ServiceStatusDTO scheduledStatus = new ServiceStatusDTO();
+        scheduledStatus.setId(1L);
+        scheduledStatus.setStatus(ServiceStatus.ServiceState.ACTIVE);
+        scheduledStatus.setScheduledChange(ServiceStatus.ServiceState.SUSPENDED_MAINTENANCE);
+        scheduledStatus.setScheduledTime(scheduledTime);
+        scheduledStatus.setStatusReason("Upcoming maintenance");
+        scheduledStatus.setUpdatedBy("admin");
+        scheduledStatus.setActive(true);
+        scheduledStatus.setInstallationId(1L);
+
+        when(serviceStatusService.scheduleStatusChange(
+                eq(1L), 
+                eq(ServiceStatus.ServiceState.SUSPENDED_MAINTENANCE), 
+                anyString(), 
+                any(LocalDateTime.class), 
+                eq("admin")))
+                .thenReturn(scheduledStatus);
+
+        // Act & Assert
+        mockMvc.perform(post("/api/service/status/1/schedule")
+                .with(csrf())
+                .param("targetStatus", "SUSPENDED_MAINTENANCE")
+                .param("reason", "Upcoming maintenance")
+                .param("scheduledTime", scheduledTimeStr))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(1))
+                .andExpect(jsonPath("$.scheduledChange").value("SUSPENDED_MAINTENANCE"))
+                .andExpect(jsonPath("$.status").value("ACTIVE"));
+
+        verify(serviceStatusService).scheduleStatusChange(
+                eq(1L), 
+                eq(ServiceStatus.ServiceState.SUSPENDED_MAINTENANCE), 
+                anyString(), 
+                any(LocalDateTime.class), 
+                eq("admin"));
+        verify(operationalLogService).logOperation(
+                anyLong(), eq(OperationalLog.OperationType.STATUS_CHANGE_SCHEDULED), anyString(), contains("Scheduled status change"), anyString(), anyString(), anyString(), isNull(), eq(true), isNull());
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = {"ADMIN"})
+    void scheduleStatusChange_LocalDateTime() throws Exception {
+        // Arrange
+        LocalDateTime scheduledTime = testTime.plusDays(1);
+        String scheduledTimeStr = scheduledTime.format(DateTimeFormatter.ISO_DATE_TIME);
+        
+        ServiceStatusDTO scheduledStatus = new ServiceStatusDTO();
+        scheduledStatus.setId(1L);
+        scheduledStatus.setStatus(ServiceStatus.ServiceState.ACTIVE);
+        scheduledStatus.setScheduledChange(ServiceStatus.ServiceState.SUSPENDED_MAINTENANCE);
+        scheduledStatus.setScheduledTime(scheduledTime);
+        scheduledStatus.setStatusReason("Upcoming maintenance");
+        scheduledStatus.setUpdatedBy("admin");
+        scheduledStatus.setActive(true);
+        scheduledStatus.setInstallationId(1L);
+
+        when(serviceStatusService.scheduleStatusChange(
+                eq(1L), 
+                eq(ServiceStatus.ServiceState.SUSPENDED_MAINTENANCE), 
+                anyString(), 
+                any(LocalDateTime.class), 
+                eq("admin")))
+                .thenReturn(scheduledStatus);
+
+        // Act & Assert
+        mockMvc.perform(post("/api/service/status/1/schedule")
+                .with(csrf())
+                .param("targetStatus", "SUSPENDED_MAINTENANCE")
+                .param("reason", "Upcoming maintenance")
+                .param("scheduledTime", scheduledTimeStr))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(1))
+                .andExpect(jsonPath("$.scheduledChange").value("SUSPENDED_MAINTENANCE"))
+                .andExpect(jsonPath("$.status").value("ACTIVE"));
+
+        verify(serviceStatusService).scheduleStatusChange(
+                eq(1L), 
+                eq(ServiceStatus.ServiceState.SUSPENDED_MAINTENANCE), 
+                anyString(), 
+                any(LocalDateTime.class), 
+                eq("admin"));
+        verify(operationalLogService).logOperation(
+                anyLong(), eq(OperationalLog.OperationType.STATUS_CHANGE_SCHEDULED), anyString(), contains("Scheduled status change"), anyString(), anyString(), anyString(), isNull(), eq(true), isNull());
     }
 } 

@@ -85,6 +85,11 @@ public class OperationalLog {
         PAYMENT_STATUS_CHANGE,
         PROCESS_OVERDUE_PAYMENTS,
         TAMPER_EVENT_RECEIVED,
-        SECURITY_RESPONSE_PROCESSED
+        SECURITY_RESPONSE_PROCESSED,
+        
+        // New operation types for service control
+        SERVICE_STARTED,
+        SERVICE_STOPPED,
+        SERVICE_RESTARTED
     }
 } 

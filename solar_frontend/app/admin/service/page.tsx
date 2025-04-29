@@ -114,6 +114,13 @@ export default function ServicePage() {
   // Add state for commandStats
   const [commandStats, setCommandStats] = useState({})
 
+  // Add new states for scheduled changes and status history
+  const [scheduleLoading, setScheduleLoading] = useState(false)
+  const [scheduledChanges, setScheduledChanges] = useState([])
+  const [statusHistory, setStatusHistory] = useState([])
+  const [historyLoading, setHistoryLoading] = useState(false)
+  const [selectedHistoryInstallation, setSelectedHistoryInstallation] = useState(null)
+
   // Fetch installations and statuses
   useEffect(() => {
     const fetchData = async () => {
@@ -217,6 +224,16 @@ export default function ServicePage() {
     // If switching to commands tab, load the commands
     if (value === "commands") {
       fetchCommands()
+    }
+
+    // If switching to scheduled changes tab, load scheduled changes
+    if (value === "scheduled") {
+      fetchScheduledChanges()
+    }
+
+    // If switching to history tab, load status history for the first installation
+    if (value === "history" && installations.length > 0) {
+      fetchStatusHistory(installations[0].id)
     }
   }
 
@@ -879,6 +896,71 @@ export default function ServicePage() {
     setPage(0) // Reset to first page when changing page size
   }
 
+  // Function to fetch scheduled changes
+  const fetchScheduledChanges = async () => {
+    try {
+      setScheduleLoading(true)
+      
+      // Get all installations with scheduled changes
+      const scheduledInstallations = []
+      
+      // Process in batches to prevent overwhelming the server
+      const batchSize = 10
+      for (let i = 0; i < installations.length; i += batchSize) {
+        const batch = installations.slice(i, i + batchSize)
+        const batchIds = batch.filter(inst => inst && inst.id).map(inst => inst.id)
+        
+        if (batchIds.length > 0) {
+          const batchStatuses = await serviceControlApi.getBatchStatuses(batchIds)
+          
+          // Filter to only include statuses with scheduled changes
+          const withScheduledChanges = batchStatuses.filter(status => 
+            status && status.scheduledChange && status.scheduledTime
+          )
+          
+          if (withScheduledChanges.length > 0) {
+            scheduledInstallations.push(...withScheduledChanges)
+          }
+        }
+      }
+      
+      setScheduledChanges(scheduledInstallations)
+    } catch (error) {
+      console.error("Error fetching scheduled changes:", error)
+      toast({
+        title: "Error",
+        description: "Failed to load scheduled changes",
+        variant: "destructive",
+      })
+    } finally {
+      setScheduleLoading(false)
+    }
+  }
+
+  // Function to fetch status history for a specific installation
+  const fetchStatusHistory = async (installationId) => {
+    if (!installationId) return;
+    
+    try {
+      setHistoryLoading(true)
+      setSelectedHistoryInstallation(installationId)
+      
+      const history = await serviceControlApi.getStatusHistory(installationId)
+      setStatusHistory(history.content || [])
+      
+    } catch (error) {
+      console.error(`Error fetching status history for installation ${installationId}:`, error)
+      toast({
+        title: "Error",
+        description: "Failed to load status history",
+        variant: "destructive",
+      })
+      setStatusHistory([])
+    } finally {
+      setHistoryLoading(false)
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -995,7 +1077,7 @@ export default function ServicePage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {loading ? (
+              {scheduleLoading ? (
                 <div className="py-10 text-center">
                   <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-current border-r-transparent"></div>
                   <p className="mt-2 text-sm text-muted-foreground">Loading scheduled changes...</p>
@@ -1015,54 +1097,61 @@ export default function ServicePage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {/* This would ideally use real scheduled data from the API */}
-                      {installations.length === 0 ? (
-                        <TableRow>
-                          <TableCell colSpan={7} className="h-24 text-center">
-                            No installations found to display scheduled changes
-                          </TableCell>
-                        </TableRow>
-                      ) : (
+                      {scheduledChanges.length === 0 ? (
                         <TableRow>
                           <TableCell colSpan={7} className="h-24 text-center">
                             No scheduled changes found
                           </TableCell>
                         </TableRow>
+                      ) : (
+                        scheduledChanges.map((status) => (
+                          <TableRow key={status.id}>
+                            <TableCell className="font-medium">{status.id}</TableCell>
+                            <TableCell>{status.installationName || `Installation #${status.installationId}`}</TableCell>
+                            <TableCell>{getStatusBadge(status.status)}</TableCell>
+                            <TableCell>{getStatusBadge(status.scheduledChange)}</TableCell>
+                            <TableCell>
+                              <div className="flex items-center">
+                                <Clock className="mr-2 h-4 w-4 text-muted-foreground" />
+                                <span>{status.scheduledTime ? format(new Date(status.scheduledTime), "PPp") : "Not scheduled"}</span>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <span className="text-sm line-clamp-1">{status.statusReason || "No reason provided"}</span>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <div className="flex justify-end gap-2">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => {
+                                    // Cancel the scheduled change
+                                    serviceControlApi.cancelScheduledChange(status.installationId)
+                                      .then(() => {
+                                        toast({
+                                          title: "Success",
+                                          description: "Scheduled change cancelled successfully",
+                                          variant: "default",
+                                        })
+                                        fetchScheduledChanges() // Refresh the list
+                                      })
+                                      .catch((error) => {
+                                        console.error("Error cancelling scheduled change:", error)
+                                        toast({
+                                          title: "Error",
+                                          description: "Failed to cancel scheduled change",
+                                          variant: "destructive",
+                                        })
+                                      })
+                                  }}
+                                >
+                                  Cancel
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))
                       )}
-                      {/* Example of what a scheduled change would look like 
-                      <TableRow>
-                        <TableCell className="font-medium">SC-001</TableCell>
-                        <TableCell>Residential Solar #RT-542</TableCell>
-                        <TableCell>{getStatusBadge("SUSPENDED_MAINTENANCE")}</TableCell>
-                        <TableCell>{getStatusBadge("ACTIVE")}</TableCell>
-                        <TableCell>
-                          <div className="flex items-center">
-                            <Clock className="mr-2 h-4 w-4 text-muted-foreground" />
-                            <span>{format(new Date(Date.now() + 3 * 24 * 60 * 60 * 1000), "PPp")}</span>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <span className="text-sm line-clamp-1">Scheduled maintenance completion</span>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex justify-end gap-2">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                            >
-                              Apply Now
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              variant="destructive"
-                            >
-                              Cancel
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                      */}
                     </TableBody>
                   </Table>
                 </div>
@@ -1073,14 +1162,33 @@ export default function ServicePage() {
 
         <TabsContent value="history" className="space-y-4">
           <Card>
-            <CardHeader>
-              <CardTitle>Status Change History</CardTitle>
-              <CardDescription>
-                Historical record of service status changes
-              </CardDescription>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <div>
+                <CardTitle>Status Change History</CardTitle>
+                <CardDescription>
+                  View the history of service status changes for an installation
+                </CardDescription>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Select
+                  value={selectedHistoryInstallation?.toString() || ''}
+                  onValueChange={(value) => fetchStatusHistory(value)}
+                >
+                  <SelectTrigger className="w-[250px]">
+                    <SelectValue placeholder="Select an installation" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {installations.map((installation) => (
+                      <SelectItem key={installation.id} value={installation.id.toString()}>
+                        {installation.name || `Installation #${installation.id}`}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </CardHeader>
             <CardContent>
-              {loading ? (
+              {historyLoading ? (
                 <div className="py-10 text-center">
                   <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-current border-r-transparent"></div>
                   <p className="mt-2 text-sm text-muted-foreground">Loading status history...</p>
@@ -1091,81 +1199,38 @@ export default function ServicePage() {
                     <TableHeader>
                       <TableRow>
                         <TableHead className="w-[80px]">ID</TableHead>
-                        <TableHead>Installation</TableHead>
-                        <TableHead>Status Change</TableHead>
-                        <TableHead>Date</TableHead>
-                        <TableHead>Changed By</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Updated At</TableHead>
+                        <TableHead>Updated By</TableHead>
                         <TableHead>Reason</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {/* This would ideally fetch real history data from the API */}
-                      {installations.length === 0 ? (
+                      {statusHistory.length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={6} className="h-24 text-center">
-                            No installations found to display history
+                          <TableCell colSpan={5} className="h-24 text-center">
+                            No status history found
                           </TableCell>
                         </TableRow>
                       ) : (
-                        <TableRow>
-                          <TableCell colSpan={6} className="h-24 text-center">
-                            No status change history found
-                          </TableCell>
-                        </TableRow>
+                        statusHistory.map((status) => (
+                          <TableRow key={status.id}>
+                            <TableCell className="font-medium">{status.id}</TableCell>
+                            <TableCell>{getStatusBadge(status.status)}</TableCell>
+                            <TableCell>
+                              {status.updatedAt ? format(new Date(status.updatedAt), "PPp") : "Unknown"}
+                            </TableCell>
+                            <TableCell>{status.updatedBy || "System"}</TableCell>
+                            <TableCell>
+                              <span className="text-sm line-clamp-2">{status.statusReason || "No reason provided"}</span>
+                            </TableCell>
+                          </TableRow>
+                        ))
                       )}
-                      {/* Example of what history entries would look like
-                      <TableRow>
-                        <TableCell className="font-medium">SH-001</TableCell>
-                        <TableCell>Residential Solar #RT-542</TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            {getStatusBadge("ACTIVE")} 
-                            <span>→</span> 
-                            {getStatusBadge("SUSPENDED_MAINTENANCE")}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center">
-                            <Clock className="mr-2 h-4 w-4 text-muted-foreground" />
-                            <span>{format(new Date(Date.now() - 5 * 24 * 60 * 60 * 1000), "PPp")}</span>
-                          </div>
-                        </TableCell>
-                        <TableCell>Admin User</TableCell>
-                        <TableCell>
-                          <span className="text-sm line-clamp-1">Scheduled maintenance for panel replacement</span>
-                        </TableCell>
-                      </TableRow>
-                      <TableRow>
-                        <TableCell className="font-medium">SH-002</TableCell>
-                        <TableCell>Commercial Solar #SJ-128</TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            {getStatusBadge("ACTIVE")} 
-                            <span>→</span> 
-                            {getStatusBadge("SUSPENDED_PAYMENT")}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center">
-                            <Clock className="mr-2 h-4 w-4 text-muted-foreground" />
-                            <span>{format(new Date(Date.now() - 10 * 24 * 60 * 60 * 1000), "PPp")}</span>
-                          </div>
-                        </TableCell>
-                        <TableCell>System</TableCell>
-                        <TableCell>
-                          <span className="text-sm line-clamp-1">Automatic suspension due to payment delinquency</span>
-                        </TableCell>
-                      </TableRow>
-                      */}
                     </TableBody>
                   </Table>
                 </div>
               )}
-              <div className="flex justify-end mt-4">
-                <Button variant="outline" disabled={installations.length === 0}>
-                  Download Full History
-                </Button>
-              </div>
             </CardContent>
           </Card>
         </TabsContent>

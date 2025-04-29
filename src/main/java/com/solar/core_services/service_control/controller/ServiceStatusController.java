@@ -319,7 +319,7 @@ public class ServiceStatusController {
         
         String username = authentication.getName();
         ServiceStatusDTO scheduledStatus = serviceStatusService.scheduleStatusChange(
-                installationId, targetStatus, reason, username, scheduledTime);
+                installationId, targetStatus, reason, scheduledTime, username);
         
         // Log the operation with error handling
         try {
@@ -434,5 +434,128 @@ public class ServiceStatusController {
         List<ServiceStatusDTO> statuses = serviceStatusService.getBatchStatuses(installationIds);
         
         return ResponseEntity.ok(statuses);
+    }
+
+    @PostMapping("/installations/{installationId}/start")
+    @Operation(
+        summary = "Start service",
+        description = "Starts the service for a specific installation."
+    )
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Service started successfully", 
+                    content = @Content(schema = @Schema(implementation = ServiceStatusDTO.class))),
+        @ApiResponse(responseCode = "404", description = "Installation not found", content = @Content)
+    })
+    public ResponseEntity<ServiceStatusDTO> startService(
+            @Parameter(description = "Installation ID", required = true)
+            @PathVariable Long installationId,
+            Authentication authentication,
+            HttpServletRequest httpRequest) {
+        
+        String username = authentication.getName();
+        ServiceStatusDTO updatedStatus = serviceStatusService.startService(installationId, username);
+        
+        // Log the operation with error handling
+        try {
+            operationalLogService.logOperation(
+                    installationId,
+                    OperationalLog.OperationType.SERVICE_STARTED,
+                    username,
+                    "Started service for installation #" + installationId,
+                    "SERVICE_CONTROL",
+                    "START_SERVICE",
+                    httpRequest.getRemoteAddr(),
+                    httpRequest.getHeader("User-Agent"),
+                    true,
+                    null
+            );
+        } catch (Exception e) {
+            // Log the error but don't prevent the operation from succeeding
+            log.error("Failed to log operation: {}", e.getMessage());
+        }
+        
+        return ResponseEntity.ok(updatedStatus);
+    }
+
+    @PostMapping("/installations/{installationId}/stop")
+    @Operation(
+        summary = "Stop service",
+        description = "Stops the service for a specific installation."
+    )
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Service stopped successfully", 
+                    content = @Content(schema = @Schema(implementation = ServiceStatusDTO.class))),
+        @ApiResponse(responseCode = "404", description = "Installation not found", content = @Content)
+    })
+    public ResponseEntity<ServiceStatusDTO> stopService(
+            @Parameter(description = "Installation ID", required = true)
+            @PathVariable Long installationId,
+            Authentication authentication,
+            HttpServletRequest httpRequest) {
+        
+        String username = authentication.getName();
+        ServiceStatusDTO updatedStatus = serviceStatusService.stopService(installationId, username);
+        
+        // Log the operation with error handling
+        try {
+            operationalLogService.logOperation(
+                    installationId,
+                    OperationalLog.OperationType.SERVICE_STOPPED,
+                    username,
+                    "Stopped service for installation #" + installationId,
+                    "SERVICE_CONTROL",
+                    "STOP_SERVICE",
+                    httpRequest.getRemoteAddr(),
+                    httpRequest.getHeader("User-Agent"),
+                    true,
+                    null
+            );
+        } catch (Exception e) {
+            // Log the error but don't prevent the operation from succeeding
+            log.error("Failed to log operation: {}", e.getMessage());
+        }
+        
+        return ResponseEntity.ok(updatedStatus);
+    }
+
+    @PostMapping("/installations/{installationId}/restart")
+    @Operation(
+        summary = "Restart service",
+        description = "Restarts the service for a specific installation."
+    )
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Service restarted successfully", 
+                    content = @Content(schema = @Schema(implementation = ServiceStatusDTO.class))),
+        @ApiResponse(responseCode = "404", description = "Installation not found", content = @Content)
+    })
+    public ResponseEntity<ServiceStatusDTO> restartService(
+            @Parameter(description = "Installation ID", required = true)
+            @PathVariable Long installationId,
+            Authentication authentication,
+            HttpServletRequest httpRequest) {
+        
+        String username = authentication.getName();
+        ServiceStatusDTO updatedStatus = serviceStatusService.restartService(installationId, username);
+        
+        // Log the operation with error handling
+        try {
+            operationalLogService.logOperation(
+                    installationId,
+                    OperationalLog.OperationType.SERVICE_RESTARTED,
+                    username,
+                    "Restarted service for installation #" + installationId,
+                    "SERVICE_CONTROL",
+                    "RESTART_SERVICE",
+                    httpRequest.getRemoteAddr(),
+                    httpRequest.getHeader("User-Agent"),
+                    true,
+                    null
+            );
+        } catch (Exception e) {
+            // Log the error but don't prevent the operation from succeeding
+            log.error("Failed to log operation: {}", e.getMessage());
+        }
+        
+        return ResponseEntity.ok(updatedStatus);
     }
 } 
