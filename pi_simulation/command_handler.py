@@ -15,6 +15,7 @@ import random
 from datetime import datetime
 import requests
 from requests.exceptions import RequestException
+import os
 
 logger = logging.getLogger("CommandHandler")
 
@@ -37,7 +38,7 @@ class CommandHandler:
         self.command_success_rate = 0.95  # 95% success rate by default
         
         # Endpoints
-        self.command_endpoint = f"{server_url}/api/service/commands/{installation_id}"
+        self.command_endpoint = f"{server_url}/api/service/commands/{installation_id}/pending"
         self.response_endpoint = f"{server_url}/api/service/system/command-response"
         
         # Command processing stats
@@ -45,7 +46,44 @@ class CommandHandler:
         self.commands_succeeded = 0
         self.commands_failed = 0
         
-        logger.info(f"Command handler initialized for installation {installation_id}")
+        # Service state tracking
+        self.service_state_file = f"service_state_{installation_id}.json"
+        self._load_service_state()
+        
+        logger.info(f"Command handler initialized for installation {installation_id} with service state: {self.service_state['status']}")
+    
+    def _load_service_state(self):
+        """Load the service state from file or create default."""
+        try:
+            if os.path.exists(self.service_state_file):
+                with open(self.service_state_file, 'r') as f:
+                    self.service_state = json.load(f)
+                    logger.info(f"Loaded service state: {self.service_state}")
+            else:
+                self.service_state = {
+                    "status": "ACTIVE",
+                    "last_updated": datetime.now().isoformat(),
+                    "reason": "Initial state",
+                    "last_command_id": None
+                }
+                self._save_service_state()
+        except Exception as e:
+            logger.error(f"Error loading service state: {e}")
+            self.service_state = {
+                "status": "ACTIVE",
+                "last_updated": datetime.now().isoformat(),
+                "reason": "Error recovery default state",
+                "last_command_id": None
+            }
+            self._save_service_state()
+    
+    def _save_service_state(self):
+        """Save the current service state to file."""
+        try:
+            with open(self.service_state_file, 'w') as f:
+                json.dump(self.service_state, f)
+        except Exception as e:
+            logger.error(f"Error saving service state: {e}")
     
     def listen_for_commands(self, is_running):
         """Listen for commands from the server and process them."""
@@ -91,7 +129,6 @@ class CommandHandler:
             
             response = requests.get(
                 self.command_endpoint,
-                params={"status": "PENDING"},
                 headers=headers,
                 timeout=10
             )
@@ -160,12 +197,41 @@ class CommandHandler:
         
         elif command_type == "SUSPEND_SERVICE":
             reason = parameters.get("reason", "unknown")
-            logger.info(f"Simulating service suspension for installation {self.installation_id}, reason: {reason}")
-            # In a real system, this would suspend service
-        
+            grace_period = parameters.get("gracePeriodExpired", False)
+            logger.info(f"Service suspension for installation {self.installation_id}, reason: {reason}, grace period expired: {grace_period}")
+            
+            # Update service state
+            self.service_state["status"] = "SUSPENDED"
+            self.service_state["last_updated"] = datetime.now().isoformat()
+            self.service_state["reason"] = reason
+            self.service_state["last_command_id"] = command_id
+            self._save_service_state()
+            
+            # Simulate disabling power output
+            logger.info("POWER OUTPUT DISABLED - Installation suspended due to payment issues")
+            
+            # Write to simulation log for monitoring
+            with open("simulation.log", "a") as f:
+                f.write(f"{datetime.now().isoformat()} - SERVICE SUSPENDED - Reason: {reason}\n")
+            
         elif command_type == "RESTORE_SERVICE":
-            logger.info(f"Simulating service restoration for installation {self.installation_id}")
-            # In a real system, this would restore service
+            payment_id = parameters.get("paymentId", "unknown")
+            restoration_reason = parameters.get("restorationReason", "unknown")
+            logger.info(f"Service restoration for installation {self.installation_id}, payment ID: {payment_id}, reason: {restoration_reason}")
+            
+            # Update service state
+            self.service_state["status"] = "ACTIVE"
+            self.service_state["last_updated"] = datetime.now().isoformat()
+            self.service_state["reason"] = f"Service restored: {restoration_reason}"
+            self.service_state["last_command_id"] = command_id
+            self._save_service_state()
+            
+            # Simulate enabling power output
+            logger.info("POWER OUTPUT ENABLED - Installation active after payment")
+            
+            # Write to simulation log for monitoring
+            with open("simulation.log", "a") as f:
+                f.write(f"{datetime.now().isoformat()} - SERVICE RESTORED - Payment ID: {payment_id}\n")
         
         else:
             logger.warning(f"Unknown command type: {command_type}")
@@ -184,14 +250,16 @@ class CommandHandler:
         """Send a response for a processed command."""
         command_id = command.get("id", "unknown")
         correlation_id = command.get("correlationId", str(command_id))
+        command_type = command.get("commandType", "unknown")
         
         # Generate response data
         response_data = {
+            "commandId": command_id,
             "correlationId": correlation_id,
             "installationId": self.installation_id,
             "timestamp": datetime.now().isoformat(),
             "success": success,
-            "message": f"Command {command.get('commandType', 'unknown')} processed" if success else "Command failed",
+            "message": f"Command {command_type} processed" if success else "Command failed",
             "errorCode": None if success else f"ERR-{random.randint(100, 999)}",
             "errorDetails": None if success else self._generate_error_details(command),
             "result": self._generate_result(command) if success else None
@@ -203,6 +271,7 @@ class CommandHandler:
             # Get authentication headers
             from auth_helper import get_auth_helper
             headers = get_auth_helper().get_auth_headers()
+            headers["Content-Type"] = "application/json"
             
             response = requests.post(
                 self.response_endpoint,
@@ -304,12 +373,18 @@ class CommandHandler:
         
         elif command_type == "SUSPEND_SERVICE":
             result["suspensionTime"] = datetime.now().isoformat()
-            result["gracePeriodApplied"] = random.choice([True, False])
+            result["gracePeriodApplied"] = command.get("parameters", {}).get("gracePeriodExpired", False)
+            result["currentStatus"] = "SUSPENDED"
             result["affectedDevices"] = random.randint(1, 5)
         
         elif command_type == "RESTORE_SERVICE":
             result["restorationTime"] = datetime.now().isoformat()
-            result["powerRestored"] = random.choice([True, False])
+            result["powerRestored"] = True
+            result["currentStatus"] = "ACTIVE"
             result["resumedDevices"] = random.randint(1, 5)
         
         return result
+    
+    def get_service_status(self):
+        """Return the current service status."""
+        return self.service_state["status"]

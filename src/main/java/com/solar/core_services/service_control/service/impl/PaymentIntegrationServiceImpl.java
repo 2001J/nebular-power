@@ -1,7 +1,9 @@
 package com.solar.core_services.service_control.service.impl;
 
 import com.solar.core_services.payment_compliance.model.Payment;
+import com.solar.core_services.payment_compliance.repository.PaymentRepository;
 import com.solar.core_services.service_control.model.OperationalLog;
+import com.solar.core_services.service_control.service.DeviceCommandService;
 import com.solar.core_services.service_control.service.OperationalLogService;
 import com.solar.core_services.service_control.service.PaymentIntegrationService;
 import com.solar.core_services.service_control.service.ServiceStatusService;
@@ -9,6 +11,9 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * Implementation of the PaymentIntegrationService interface
@@ -21,6 +26,8 @@ public class PaymentIntegrationServiceImpl implements PaymentIntegrationService 
 
     private final ServiceStatusService serviceStatusService;
     private final OperationalLogService operationalLogService;
+    private final DeviceCommandService deviceCommandService;
+    private final PaymentRepository paymentRepository;
     
     // Default grace period in days
     private static final int DEFAULT_GRACE_PERIOD = 7;
@@ -32,9 +39,15 @@ public class PaymentIntegrationServiceImpl implements PaymentIntegrationService 
         log.info("Handling payment status change for payment {}: {} -> {}", 
                 paymentId, oldStatus, newStatus);
         
+        // Retrieve the payment to get installationId
+        Payment payment = paymentRepository.findById(paymentId)
+                .orElseThrow(() -> new RuntimeException("Payment not found with ID: " + paymentId));
+        
+        Long installationId = payment.getInstallation().getId();
+                
         // Log the payment status change
         operationalLogService.logOperation(
-                null, // Installation ID will be determined from the payment in a real implementation
+                installationId,
                 OperationalLog.OperationType.PAYMENT_STATUS_CHANGE,
                 "SYSTEM",
                 "Payment status changed from " + oldStatus + " to " + newStatus + " for payment " + paymentId,
@@ -46,24 +59,48 @@ public class PaymentIntegrationServiceImpl implements PaymentIntegrationService 
                 null
         );
         
-        // In a real implementation, we would:
-        // 1. Retrieve the payment details to get the installation ID
-        // 2. Check if the new status requires any service status changes
-        // 3. Update the service status accordingly
-        
-        // For example, if payment status changed to PAID, we might restore service
+        // If payment status changed to PAID, restore service
         if (newStatus == Payment.PaymentStatus.PAID && 
                 (oldStatus == Payment.PaymentStatus.OVERDUE || oldStatus == Payment.PaymentStatus.PENDING)) {
-            // In a real implementation, we would get the installation ID from the payment
-            // For now, we'll just log that we would restore service
-            log.info("Payment {} is now paid. Service would be restored for the associated installation.", paymentId);
+            restoreServiceAfterPayment(installationId, paymentId);
         }
         
-        // If payment status changed to OVERDUE, we might need to suspend service
-        if (newStatus == Payment.PaymentStatus.OVERDUE) {
-            // In a real implementation, we would get the installation ID and check grace period
-            // For now, we'll just log that we would consider suspending service
-            log.info("Payment {} is now overdue. Service suspension may be required for the associated installation.", paymentId);
+        // If payment status changed to OVERDUE or SUSPENSION_PENDING, consider suspending service
+        if (newStatus == Payment.PaymentStatus.OVERDUE || newStatus == Payment.PaymentStatus.SUSPENSION_PENDING) {
+            // In a real implementation, check if grace period has expired before suspending
+            log.info("Payment {} is now overdue. Service suspension may be required for installation {}", 
+                     paymentId, installationId);
+            
+            // If status is SUSPENSION_PENDING, it means grace period has expired
+            if (newStatus == Payment.PaymentStatus.SUSPENSION_PENDING) {
+                log.info("Grace period expired for payment {}. Suspending service for installation {}", 
+                         paymentId, installationId);
+                
+                // Suspend service
+                serviceStatusService.suspendServiceForPayment(
+                        installationId,
+                        "Service suspended due to payment " + paymentId + " being overdue",
+                        "PAYMENT_SYSTEM"
+                );
+                
+                // Send device command to suspend service
+                Map<String, Object> parameters = new HashMap<>();
+                parameters.put("reason", "Payment overdue - ID: " + paymentId);
+                parameters.put("gracePeriodExpired", true);
+                
+                try {
+                    deviceCommandService.sendCommand(
+                            installationId,
+                            "SUSPEND_SERVICE",
+                            parameters,
+                            "PAYMENT_SYSTEM"
+                    );
+                    log.info("Sent SUSPEND_SERVICE command to installation {}", installationId);
+                } catch (Exception e) {
+                    log.error("Failed to send SUSPEND_SERVICE command to installation {}: {}", 
+                             installationId, e.getMessage(), e);
+                }
+            }
         }
     }
 
@@ -104,6 +141,18 @@ public class PaymentIntegrationServiceImpl implements PaymentIntegrationService 
             serviceStatusService.restoreService(
                     installationId,
                     "Service restored after payment " + paymentId,
+                    "PAYMENT_SYSTEM"
+            );
+            
+            // Send device command to restore service
+            Map<String, Object> parameters = new HashMap<>();
+            parameters.put("paymentId", paymentId);
+            parameters.put("restorationReason", "Payment received");
+            
+            deviceCommandService.sendCommand(
+                    installationId,
+                    "RESTORE_SERVICE",
+                    parameters,
                     "PAYMENT_SYSTEM"
             );
             

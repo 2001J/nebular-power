@@ -11,8 +11,9 @@ including daily patterns, weather effects, and realistic power curves.
 import time
 import math
 import json
-import random
 import logging
+import random
+import os
 from datetime import datetime
 import requests
 from requests.exceptions import RequestException
@@ -53,7 +54,22 @@ class EnergySimulator:
             "STORMY": 0.1       # 10% generation
         }
         
+        # Service state data
+        self.service_state_file = f"service_state_{installation_id}.json"
+        
         logger.info(f"Energy simulator initialized for installation {installation_id}")
+    
+    def _get_service_status(self):
+        """Get the current service status from the command handler state file"""
+        try:
+            if os.path.exists(self.service_state_file):
+                with open(self.service_state_file, 'r') as f:
+                    service_state = json.load(f)
+                    return service_state.get("status", "ACTIVE")
+            return "ACTIVE"  # Default to active if file doesn't exist
+        except Exception as e:
+            logger.error(f"Error reading service state: {e}")
+            return "ACTIVE"  # Default to active on error
     
     def run_simulation(self, is_running):
         """Run the energy data simulation."""
@@ -68,8 +84,11 @@ class EnergySimulator:
                     self.daily_yield_kwh = 0.0
                     self.last_reset_day = now.day
                 
+                # Check service status before generating energy data
+                service_status = self._get_service_status()
+                
                 # Generate energy data
-                energy_data = self._generate_energy_data()
+                energy_data = self._generate_energy_data(service_status)
                 
                 # Send the data
                 self._send_energy_data(energy_data)
@@ -81,7 +100,7 @@ class EnergySimulator:
                 logger.error(f"Error in energy simulation: {e}", exc_info=True)
                 time.sleep(5)  # Wait a bit before retrying
     
-    def _generate_energy_data(self):
+    def _generate_energy_data(self, service_status="ACTIVE"):
         """Generate realistic energy data based on time of day and simulated weather."""
         now = datetime.now()
         
@@ -93,71 +112,69 @@ class EnergySimulator:
         # Realistic solar curve (bell-shaped peaking at noon)
         hour = now.hour + now.minute / 60.0  # Decimal hour
         
-        # Solar generation - bell curve from sunrise to sunset
-        # For April, approximate sunrise at 6AM and sunset at 7PM
-        if 6 <= hour <= 19:  # Daylight hours
-            # Create a bell curve centered at 1PM (solar noon in April)
-            hour_factor = 1.0 - abs(hour - 13.0) / 7.0
-            generation_factor = math.sin(hour_factor * math.pi)
-            
-            # Calculate base generation - more realistic values for a 5.5kW system
-            # Peak capacity is typically 80-90% of rated capacity in optimal conditions
-            max_realistic_output = self.peak_generation * 0.85  # ~85% of rated peak is realistic
-            
-            # Base generation calculation with more realistic curve
-            power_generation = max_realistic_output * generation_factor
-            
-            # Apply weather effects if enabled
-            if self.simulate_weather:
-                weather_factor = self.weather_conditions.get(self.weather_condition, 1.0)
-                power_generation *= weather_factor
-            
-            # Add some random noise to make the curve look more natural
-            power_generation *= random.uniform(0.92, 1.08)
-            
-            # Ensure morning/evening ramp-up/down is more gradual
-            if hour < 7:  # Early morning
-                power_generation *= (hour - 6) / 1.0  # Gradual ramp-up
-            elif hour > 18:  # Evening
-                power_generation *= (19 - hour) / 1.0  # Gradual ramp-down
+        # If service is suspended, generate almost no power
+        if service_status == "SUSPENDED":
+            # Minimal generation (simulating system is powered down, just reporting status)
+            power_generation = random.uniform(0, 2)  # Nearly zero generation
+            logger.debug(f"Service SUSPENDED: Generating minimal power data ({power_generation:.2f}W)")
         else:
-            # Near-zero generation during night hours (occasional tiny values for sensor noise)
-            power_generation = random.uniform(0, 5)  # 0-5 watts representing noise/minimal moonlight
+            # Normal power generation - bell curve from sunrise to sunset
+            # For April, approximate sunrise at 6AM and sunset at 7PM
+            if 6 <= hour <= 19:  # Daylight hours
+                # Create a bell curve centered at 1PM (solar noon in April)
+                hour_factor = 1.0 - abs(hour - 13.0) / 7.0
+                generation_factor = math.sin(hour_factor * math.pi)
+                
+                # Calculate base generation - more realistic values for a 5.5kW system
+                # Peak capacity is typically 80-90% of rated capacity in optimal conditions
+                max_realistic_output = self.peak_generation * 0.85  # ~85% of rated peak is realistic
+                
+                # Base generation calculation with more realistic curve
+                power_generation = max_realistic_output * generation_factor
+                
+                # Apply weather effects if enabled
+                if self.simulate_weather:
+                    weather_factor = self.weather_conditions.get(self.weather_condition, 1.0)
+                    power_generation *= weather_factor
+                
+                # Add some random noise to make the curve look more natural
+                power_generation *= random.uniform(0.92, 1.08)
+                
+                # Ensure morning/evening ramp-up/down is more gradual
+                if hour < 7:  # Early morning
+                    power_generation *= (hour - 6) / 1.0  # Gradual ramp-up
+                elif hour > 18:  # Evening
+                    power_generation *= (19 - hour) / 1.0  # Gradual ramp-down
+            else:
+                # Near-zero generation during night hours (occasional tiny values for sensor noise)
+                power_generation = random.uniform(0, 5)  # 0-5 watts representing noise/minimal moonlight
         
         # Calculate consumption - more realistic pattern for a residential home
-        # Average home uses 1-2kW as base load, with peaks in morning and evening
-        if 5 <= hour < 9:  # Morning peak (getting ready for work/school)
-            base_consumption = 3000  # ~3kW
-            variation = 800
-        elif 17 <= hour < 22:  # Evening peak (dinner, TV, etc.)
-            base_consumption = 3500  # ~3.5kW
-            variation = 1000
-        elif 22 <= hour or hour < 5:  # Night (sleeping)
-            base_consumption = 800  # ~0.8kW base load (refrigerator, standby devices)
-            variation = 200
-        else:  # Daytime (most people at work/school)
-            base_consumption = 1200  # ~1.2kW
-            variation = 300
-        
-        # Add randomization to consumption
-        power_consumption = base_consumption + random.uniform(-variation, variation)
+        # When service is suspended, consumption should be from grid only, not solar
+        power_consumption = self._calculate_consumption(hour, service_status)
         
         # Calculate yield in kWh for this interval (power in watts * hours)
         interval_hours = self.interval / 3600.0  # convert seconds to hours
         
-        # Increase the daily and total yields
-        interval_kwh = (power_generation / 1000.0) * interval_hours
-        self.daily_yield_kwh += interval_kwh
-        self.total_yield_kwh += interval_kwh
+        # Only increase yield if service is active
+        if service_status == "ACTIVE":
+            # Increase the daily and total yields
+            interval_kwh = (power_generation / 1000.0) * interval_hours
+            self.daily_yield_kwh += interval_kwh
+            self.total_yield_kwh += interval_kwh
         
         # Generate battery level between 10% and 100%
-        # Make battery level correlate with solar production (higher during day)
-        if 10 <= hour <= 16:  # Peak solar hours
-            battery_level = random.uniform(70.0, 100.0)
-        elif (7 <= hour < 10) or (16 < hour <= 19):  # Morning/afternoon
-            battery_level = random.uniform(50.0, 85.0)
-        else:  # Night
-            battery_level = random.uniform(30.0, 60.0)
+        # If service is suspended, battery should be lower or decreasing
+        if service_status == "SUSPENDED":
+            battery_level = random.uniform(5.0, 30.0)  # Low battery when suspended
+        else:
+            # Make battery level correlate with solar production (higher during day)
+            if 10 <= hour <= 16:  # Peak solar hours
+                battery_level = random.uniform(70.0, 100.0)
+            elif (7 <= hour < 10) or (16 < hour <= 19):  # Morning/afternoon
+                battery_level = random.uniform(50.0, 85.0)
+            else:  # Night
+                battery_level = random.uniform(30.0, 60.0)
         
         # Generate voltage around nominal values with small variations
         # 110V in US, 220-240V in most other countries
@@ -178,13 +195,39 @@ class EnergySimulator:
             "batteryLevel": round(battery_level, 1),
             "voltage": round(voltage, 1),
             "currentAmps": round(current_amps, 2),
+            "serviceStatus": service_status,
             "isSimulated": True
         }
         
-        if power_generation > 100:  # Only log significant generation
+        if service_status == "SUSPENDED":
+            logger.info(f"SERVICE SUSPENDED: Generation: {round(power_generation, 2)}W, Consumption: {round(power_consumption, 2)}W")
+        elif power_generation > 100:  # Only log significant generation
             logger.debug(f"Generated energy data: {energy_data['timestamp']} - Generation: {round(power_generation, 2)}W, Consumption: {round(power_consumption, 2)}W")
         
         return energy_data
+    
+    def _calculate_consumption(self, hour, service_status):
+        """Calculate power consumption based on time of day and service status."""
+        # First calculate baseline consumption regardless of solar contribution
+        if 5 <= hour < 9:  # Morning peak (getting ready for work/school)
+            base_consumption = 3000  # ~3kW
+            variation = 800
+        elif 17 <= hour < 22:  # Evening peak (dinner, TV, etc.)
+            base_consumption = 3500  # ~3.5kW
+            variation = 1000
+        elif 22 <= hour or hour < 5:  # Night (sleeping)
+            base_consumption = 800  # ~0.8kW base load (refrigerator, standby devices)
+            variation = 200
+        else:  # Daytime (most people at work/school)
+            base_consumption = 1200  # ~1.2kW
+            variation = 300
+        
+        # Add randomization to consumption
+        power_consumption = base_consumption + random.uniform(-variation, variation)
+        
+        # If service is suspended, there's no solar contribution
+        # Consumption readings show only grid power usage
+        return power_consumption
     
     def _update_weather(self):
         """Simulate weather changes."""

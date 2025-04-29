@@ -132,11 +132,6 @@ export default function AdminLayout({
       icon: FileText,
       href: "/admin/logs",
     },
-    {
-      title: "Settings",
-      icon: Settings,
-      href: "/admin/settings",
-    },
   ]
 
   // Define security and compliance menu items

@@ -2781,6 +2781,32 @@ export const securityApi = {
       return [];
     }
   },
+  
+  getUnresolvedEvents: async () => {
+    try {
+      console.log("Fetching unresolved security alerts from API");
+      const response = await apiClient.get('/api/security/admin/alerts');
+      
+      if (response && response.data) {
+        console.log("Unresolved security alerts response:", response.data);
+        return Array.isArray(response.data) ? response.data : [];
+      } else {
+        console.log("No unresolved security alerts data received");
+        return [];
+      }
+    } catch (error: any) {
+      console.error("Error fetching unresolved security alerts:", error);
+      if (error.response) {
+        console.error("Server response:", error.response.status, error.response.data);
+      } else if (error.request) {
+        console.error("No response received from server");
+      } else {
+        console.error("Error setting up request:", error.message);
+      }
+      // Return empty array instead of null to avoid additional null checks
+      return [];
+    }
+  },
 
   // Add this method for customer dashboard
   getInstallationAlerts: async (installationId: string) => {
@@ -3109,6 +3135,18 @@ export const tamperDetectionApi = {
     } catch (error: any) {
       console.error(`Error starting monitoring for installation ${installationId}:`, error);
       throw error;
+    }
+  },
+
+  isMonitoring: async (installationId: string) => {
+    try {
+      const response = await apiClient.get(`/api/security/detection/installations/${installationId}/status`);
+      // Return the monitoring status boolean from the response
+      return response.data && response.data.isMonitoring === true;
+    } catch (error: any) {
+      console.error(`Error checking if installation ${installationId} is being monitored:`, error);
+      // Return false by default to avoid UI errors
+      return false;
     }
   },
 
