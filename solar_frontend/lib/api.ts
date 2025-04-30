@@ -483,14 +483,14 @@ export const authApi = {
       if (!email) {
         const user = JSON.parse(localStorage.getItem('user') || sessionStorage.getItem('user') || '{}');
         email = user?.email;
-        
+
         if (!email) {
           throw new Error("User email is required for password change");
         }
       }
-      
+
       console.log("Making change password request with email:", email.substring(0, 3) + "..." + email.substring(email.indexOf('@')));
-      
+
       // The server expects email and newPassword in the body, currentPassword as query param
       const response = await apiClient.post('/api/auth/change-password', {
         email, // Include email in the request body
@@ -499,7 +499,7 @@ export const authApi = {
       }, {
         params: { currentPassword } // Current password as query parameter
       });
-      
+
       console.log("Password change successful");
       return response.data;
     } catch (error: any) {
@@ -659,12 +659,12 @@ export const userApi = {
   getActivityLogs: async (page = 0, size = 10) => {
     try {
       console.log(`Fetching activity logs page ${page}, size ${size}`);
-      
+
       // Get auth token for explicit header inclusion
       const token = typeof window !== 'undefined'
         ? localStorage.getItem("token") || sessionStorage.getItem("token")
         : null;
-      
+
       if (!token) {
         console.error("No authentication token found for activity logs request");
         return {
@@ -676,7 +676,7 @@ export const userApi = {
           error: "Authentication required"
         };
       }
-      
+
       // Add cache control headers and timeout to avoid hanging requests
       const response = await apiClient.get('/api/profile/activity', {
         params: {
@@ -955,13 +955,13 @@ export const energyApi = {
   getInstallationDashboard: async (installationId: string) => {
     try {
       const response = await apiClient.get(`/monitoring/dashboard/installation/${installationId}`);
-      
+
       // Ensure proper response handling
       if (!response || !response.data) {
         console.error(`No dashboard data received for installation ${installationId}`);
         return null;
       }
-      
+
       // Log the data for debugging
       console.log(`Installation dashboard data for ${installationId}:`, {
         todayGen: response.data.todayGenerationKWh,
@@ -970,7 +970,7 @@ export const energyApi = {
         currentGeneration: response.data.currentPowerGenerationWatts,
         currentConsumption: response.data.currentPowerConsumptionWatts
       });
-      
+
       return response.data;
     } catch (error: any) {
       console.error(`Error fetching installation dashboard for ${installationId}:`, error.message);
@@ -1099,17 +1099,17 @@ export const energyApi = {
   calculateInstallationAverageEfficiency: async (installationId: string) => {
     try {
       const dashboardData = await energyApi.getInstallationDashboard(installationId);
-      
+
       if (!dashboardData) {
         return 0;
       }
-      
+
       const recentReadings = await energyApi.getRecentReadings(installationId, 30);
-      
+
       if (recentReadings && recentReadings.length > 0) {
         let efficiencySum = 0;
         let validReadingsCount = 0;
-        
+
         recentReadings.forEach((reading: EnergyReading) => {
           if (reading.powerGenerationWatts > 0 && reading.powerConsumptionWatts > 0) {
             const readingEfficiency = Math.min(100, (reading.powerGenerationWatts / reading.powerConsumptionWatts) * 100);
@@ -1117,13 +1117,13 @@ export const energyApi = {
             validReadingsCount++;
           }
         });
-        
+
         if (validReadingsCount > 0) {
           const averageEfficiency = efficiencySum / validReadingsCount;
           return Math.round(averageEfficiency * 100) / 100;
         }
       }
-      
+
       return dashboardData.currentEfficiencyPercentage || 0;
     } catch (error: any) {
       console.error(`Error calculating average efficiency for installation ${installationId}:`, error.message);
@@ -1401,14 +1401,14 @@ export const paymentApi = {
   getAdminPayments: async (page = 0, size = 20, sortBy = 'dueDate', direction = 'desc') => {
     try {
       console.log("Fetching admin payments with params:", { page, size, sortBy, direction });
-      
+
       const today = new Date();
       const thirtyDaysAgo = new Date();
       thirtyDaysAgo.setDate(today.getDate() - 30);
-      
+
       const startDate = thirtyDaysAgo.toISOString().split('T')[0];
       const endDate = today.toISOString().split('T')[0];
-      
+
       const response = await apiClient.get('/api/admin/payments/reports/revenue', {
         params: { 
           startDate,
@@ -1433,16 +1433,16 @@ export const paymentApi = {
         //   "totalRevenue": 0,
         //   "startDate": "2025-03-22T00:00:00"
         // }
-        
+
         // Generate graph data from the revenue metrics
         // Parse start and end dates from the response
         const startDateTime = revenueData.startDate ? new Date(revenueData.startDate) : thirtyDaysAgo;
         const endDateTime = revenueData.endDate ? new Date(revenueData.endDate) : today;
-        
+
         // Calculate the number of days in the period
         const diffTime = Math.abs(endDateTime.getTime() - startDateTime.getTime());
         const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-        
+
         // Generate graph data based on the time range
         let timeRange = 'week';
         if (diffDays <= 7) {
@@ -1452,11 +1452,11 @@ export const paymentApi = {
         } else {
           timeRange = 'month';
         }
-        
+
         // Generate graph data points
         const graphData = [];
         const totalRevenue = revenueData.totalRevenue || 0;
-        
+
         if (timeRange === 'day') {
           // Daily view - 24 hours
           for (let hour = 0; hour < 24; hour++) {
@@ -1467,7 +1467,7 @@ export const paymentApi = {
             } else if (hour >= 20 || hour <= 6) {
               factor = 0.3; // Lower during night hours
             }
-            
+
             graphData.push({
               name: `${hour}:00`,
               revenue: Math.round((totalRevenue / 24) * factor * 100) / 100
@@ -1477,7 +1477,7 @@ export const paymentApi = {
           // Weekly view - 7 days
           const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
           const dailyAverage = totalRevenue / 7;
-          
+
           dayNames.forEach((day, index) => {
             // Weekends typically have less revenue
             let factor = 1;
@@ -1486,7 +1486,7 @@ export const paymentApi = {
             } else if (index === 2 || index === 3) { // Mid-week peak
               factor = 1.3;
             }
-            
+
             graphData.push({
               name: day,
               revenue: Math.round(dailyAverage * factor * 100) / 100
@@ -1496,21 +1496,21 @@ export const paymentApi = {
           // Monthly view
           const daysInPeriod = Math.min(diffDays, 30);
           const dailyAverage = totalRevenue / daysInPeriod;
-          
+
           for (let i = 0; i < daysInPeriod; i++) {
             const date = new Date(startDateTime);
             date.setDate(startDateTime.getDate() + i);
-            
+
             // Add some random variation
             const factor = 0.7 + Math.random() * 0.6; // Random factor between 0.7 and 1.3
-            
+
             graphData.push({
               name: `${date.getDate()}`,
               revenue: Math.round(dailyAverage * factor * 100) / 100
             });
           }
         }
-        
+
         // Return the data
         return {
           content: [], // No individual payment records
@@ -1555,29 +1555,29 @@ export const paymentApi = {
   getPaymentReports: async (reportType = 'all', startDate?: string, endDate?: string) => {
     try {
       console.log(`Fetching payment reports of type: ${reportType}`);
-      
+
       // Format dates if not provided - default to last 30 days
       // Only use the date part (YYYY-MM-DD) as the backend processes time on its side
       if (!startDate || !endDate) {
         const today = new Date();
         const thirtyDaysAgo = new Date();
         thirtyDaysAgo.setDate(today.getDate() - 30);
-        
+
         if (!startDate) startDate = thirtyDaysAgo.toISOString().split('T')[0];
         if (!endDate) endDate = today.toISOString().split('T')[0];
       }
-      
+
       // Just ensure we're just using the date part if full ISO strings are passed
       if (startDate && startDate.includes('T')) {
         startDate = startDate.split('T')[0];
       }
-      
+
       if (endDate && endDate.includes('T')) {
         endDate = endDate.split('T')[0];
       }
-      
+
       console.log(`Using date range for ${reportType} report:`, { startDate, endDate });
-      
+
       const params: any = {
         startDate,
         endDate
@@ -1596,11 +1596,11 @@ export const paymentApi = {
       // For compliance and revenue reports, transform into the expected format
       if (reportType === 'compliance' || reportType === 'revenue') {
         const reportData = response.data;
-        
+
         // If we received a valid report object
         if (reportData && typeof reportData === 'object') {
           console.log(`Received ${reportType} report data:`, reportData);
-          
+
           // Create a standardized report structure
           return {
             reportType: reportType,
@@ -1635,7 +1635,7 @@ export const paymentApi = {
       if (error.response) {
         console.error("Server response:", error.response.status, error.response.data);
       }
-      
+
       // Return a formatted error object for easier handling in the UI
       return {
         reportType: reportType,
@@ -1657,11 +1657,11 @@ export const paymentApi = {
   getPaymentHistoryReport: async (installationId: string, startDate?: string, endDate?: string, timestamp?: number) => {
     try {
       const params: Record<string, any> = {};
-      
+
       if (startDate) params.startDate = startDate;
       if (endDate) params.endDate = endDate;
       if (timestamp) params._t = timestamp;
-      
+
       const response = await apiClient.get(`/api/admin/payments/reports/history/${installationId}`, { params });
       return response.data;
     } catch (error: any) {
@@ -1675,7 +1675,7 @@ export const paymentApi = {
     try {
       const params: any = {};
       if (timestamp) params._t = timestamp;
-      
+
       const response = await apiClient.get(`/api/admin/payments/installations/${installationId}`, {
         params,
         headers: {
@@ -1695,7 +1695,7 @@ export const paymentApi = {
     try {
       const params: any = {};
       if (timestamp) params._t = timestamp;
-      
+
       const response = await apiClient.get(`/api/admin/payments/reports/payment-plan/${paymentPlanId}`, {
         params,
         headers: {
@@ -1714,11 +1714,11 @@ export const paymentApi = {
   getPaymentPlansByStatusReport: async (status: string, startDate?: string, endDate?: string, timestamp?: number) => {
     try {
       const params: any = {};
-      
+
       if (startDate) params.startDate = startDate;
       if (endDate) params.endDate = endDate;
       if (timestamp) params._t = timestamp;
-      
+
       const response = await apiClient.get(`/api/admin/payments/reports/payment-plans/status/${status}`, {
         params,
         headers: {
@@ -1897,7 +1897,7 @@ export const paymentComplianceApi = {
       const customerIdValue = typeof customerId === 'object' && customerId !== null 
         ? (customerId as { id: string | number }).id 
         : customerId;
-        
+
       if (!customerIdValue) {
         throw new Error("Customer ID is required for updating a payment plan");
       }
@@ -1927,7 +1927,7 @@ export const paymentComplianceApi = {
     try {
       const params: any = {};
       if (timestamp) params._t = timestamp;
-      
+
       const response = await apiClient.get(`/api/admin/payments/installations/${installationId}`, {
         params,
         headers: {
@@ -1977,11 +1977,11 @@ export const paymentComplianceApi = {
   getPaymentPlansByStatusReport: async (status: string, startDate: string, endDate: string, timestamp?: number) => {
     try {
       const params: any = {};
-      
+
       if (startDate) params.startDate = startDate;
       if (endDate) params.endDate = endDate;
       if (timestamp) params._t = timestamp;
-      
+
       const response = await apiClient.get(`/api/admin/payments/reports/payment-plans/status/${status}`, {
         params,
         headers: {
@@ -2001,7 +2001,7 @@ export const paymentComplianceApi = {
     try {
       const params: any = {};
       if (timestamp) params._t = timestamp;
-      
+
       const response = await apiClient.get(`/api/admin/payments/reports/payment-plan/${paymentPlanId}`, {
         params,
         headers: {
@@ -2012,6 +2012,17 @@ export const paymentComplianceApi = {
       return response.data;
     } catch (error) {
       console.error(`Error fetching payment plan ${paymentPlanId} report:`, error);
+      throw error;
+    }
+  },
+
+  // Get payment plan by ID
+  getPaymentPlanById: async (planId: string | number): Promise<PaymentPlan> => {
+    try {
+      const response = await apiClient.get(`/api/admin/payments/plans/${planId}`);
+      return response.data;
+    } catch (error) {
+      console.error(`Error fetching payment plan ${planId}:`, error);
       throw error;
     }
   },
@@ -2121,12 +2132,12 @@ export const serviceApi = {
       const token = typeof window !== 'undefined' 
         ? localStorage.getItem("token") || sessionStorage.getItem("token")
         : null;
-      
+
       if (!token) {
         console.error("No token available for logs by time range request");
         return { content: [], totalElements: 0, totalPages: 0 };
       }
-      
+
       // Make request with correct parameter names (start/end) as seen in Swagger
       const response = await apiClient.get('/api/service/logs/time-range', {
         params: { 
@@ -2144,9 +2155,9 @@ export const serviceApi = {
           'X-Timestamp': Date.now()
         }
       });
-      
+
       console.log("Logs API response:", response.status, response.data ? (Array.isArray(response.data) ? response.data.length : 'object') : 0);
-      
+
       // Handle different response formats
       if (Array.isArray(response.data)) {
         // If we get an array directly, wrap it in a pageable structure
@@ -2158,15 +2169,15 @@ export const serviceApi = {
           number: page
         };
       }
-      
+
       return response.data || { content: [], totalElements: 0, totalPages: 0 };
     } catch (error: any) {
       console.error(`Error fetching logs by time range:`, error);
-      
+
       // Provide user feedback in case of authentication error
       if (axios.isAxiosError(error) && error.response?.status === 401) {
         console.error("Authentication failed for logs by time range - token may be invalid or expired");
-        
+
         // Show toast notification
         toast({
           title: "Authentication Error",
@@ -2174,7 +2185,7 @@ export const serviceApi = {
           variant: "destructive"
         });
       }
-      
+
       // Return empty result structure for better error handling
       return { content: [], totalElements: 0, totalPages: 0 };
     }
@@ -2291,7 +2302,7 @@ export const serviceApi = {
       return [];
     }
   },
-  
+
   // Service control operations
   startService: async (installationId: string) => {
     try {
@@ -2302,7 +2313,7 @@ export const serviceApi = {
       throw error;
     }
   },
-  
+
   stopService: async (installationId: string) => {
     try {
       const response = await apiClient.post(`/api/service/status/installations/${installationId}/stop`);
@@ -2312,7 +2323,7 @@ export const serviceApi = {
       throw error;
     }
   },
-  
+
   restartService: async (installationId: string) => {
     try {
       const response = await apiClient.post(`/api/service/status/installations/${installationId}/restart`);
@@ -2333,7 +2344,7 @@ export const serviceControlApi = {
       return response.data;
     } catch (error: any) {
       console.error(`Error fetching service status for installation ${installationId}:`, error);
-      
+
       // Check if it's the specific "No active service status found" error
       if (error.response?.status === 500 && 
           error.response?.data?.message?.includes("No active service status found")) {
@@ -2351,7 +2362,7 @@ export const serviceControlApi = {
           active: true
         };
       }
-      
+
       throw error;
     }
   },
@@ -2374,18 +2385,18 @@ export const serviceControlApi = {
       if (!statusData || !statusData.status) {
         throw new Error("Status data is required");
       }
-      
+
       // Ensure the status is in the correct format - backend expects an enum
       const validStatusValues = [
         "ACTIVE", "SUSPENDED_PAYMENT", "SUSPENDED_SECURITY", 
         "SUSPENDED_MAINTENANCE", "TRANSITIONING", "PENDING"
       ];
-      
+
       const status = statusData.status.toString().toUpperCase();
       if (!validStatusValues.includes(status)) {
         throw new Error(`Invalid status value: ${status}. Must be one of: ${validStatusValues.join(", ")}`);
       }
-      
+
       // Ensure the payload has the correct format
       const formattedData = {
         status: status,
@@ -2394,15 +2405,15 @@ export const serviceControlApi = {
         scheduledChange: statusData.scheduledChange || null,
         scheduledTime: statusData.scheduledTime || null
       };
-      
+
       const response = await apiClient.put(`/api/service/status/${installationId}`, formattedData);
       return response.data;
     } catch (error: any) {
       console.error(`Error updating service status for installation ${installationId}:`, error);
-      
+
       // More detailed error information
       let errorMessage = "Failed to update service status";
-      
+
       if (error.response) {
         // The request was made and the server responded with astatus code
         // that falls out of the range of 2xx
@@ -2417,7 +2428,7 @@ export const serviceControlApi = {
         // Something happened in setting up the request that triggered an Error
         errorMessage += `: ${error.message}`;
       }
-      
+
       const enhancedError = new Error(errorMessage);
       (enhancedError as any).originalError = error;
       throw enhancedError;
@@ -2519,16 +2530,16 @@ export const serviceControlApi = {
     try {
       // Only send valid IDs to avoid backend errors
       const validIds = installationIds.filter(id => id && !isNaN(Number(id)));
-      
+
       if (validIds.length === 0) {
         return [];
       }
-      
+
       const response = await apiClient.post('/api/service/status/batch', validIds);
       return response.data;
     } catch (error: any) {
       console.error('Error fetching batch statuses:', error);
-      
+
       // Return a list of default status objects for the requested installations
       return installationIds.map(id => ({
         id: null,
@@ -2671,13 +2682,13 @@ export const serviceControlApi = {
       const token = typeof window !== 'undefined' 
         ? localStorage.getItem("token") || sessionStorage.getItem("token")
         : null;
-      
+
       if (!token) {
         console.error("No token available for logs by time range request");
         // Return empty result to avoid errors in the UI
         return { content: [], totalElements: 0, totalPages: 0 };
       }
-      
+
       // Make request with correct parameter names (start/end) as seen in the Swagger docs
       const response = await apiClient.get('/api/service/logs/time-range', {
         params: { 
@@ -2695,9 +2706,9 @@ export const serviceControlApi = {
           'X-Timestamp': Date.now().toString()
         }
       });
-      
+
       console.log(`Logs time-range API response: status=${response.status}, data count=${Array.isArray(response.data) ? response.data.length : 'object'}`);
-      
+
       // Handle different response formats
       if (Array.isArray(response.data)) {
         // API returns array directly - wrap it in a pageable object
@@ -2709,15 +2720,15 @@ export const serviceControlApi = {
           number: page
         };
       }
-      
+
       // Otherwise assume it's already a pageable object
       return response.data || { content: [], totalElements: 0, totalPages: 0 };
     } catch (error) {
       console.error(`Error fetching logs by time range:`, error);
-      
+
       if (error.response?.status === 401) {
         console.error("Authentication failed for logs by time range - token may be invalid or expired");
-        
+
         // If available, use toast to provide user feedback about authentication error
         if (typeof toast === "function") {
           toast({
@@ -2727,7 +2738,7 @@ export const serviceControlApi = {
           });
         }
       }
-      
+
       // Return empty result structure for better error handling
       return { 
         content: [], 
@@ -2838,12 +2849,12 @@ export const securityApi = {
       return [];
     }
   },
-  
+
   getUnresolvedEvents: async () => {
     try {
       console.log("Fetching unresolved security alerts from API");
       const response = await apiClient.get('/api/security/admin/alerts');
-      
+
       if (response && response.data) {
         console.log("Unresolved security alerts response:", response.data);
         return Array.isArray(response.data) ? response.data : [];
@@ -3159,7 +3170,7 @@ export const securityApi = {
     try {
       // First try to get security status from events endpoint
       const alerts = await securityApi.getInstallationAlerts(installationId);
-      
+
       // Build a security status response
       return {
         tamperDetected: alerts.some((alert: any) => alert.type === 'TAMPER_DETECTION' && !alert.resolved),

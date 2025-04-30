@@ -157,18 +157,18 @@ export default function EditLoanPage({ params }: { params: EditLoanParams }) {
     const fetchLoanDetails = async () => {
       try {
         setLoading(true)
-        
+
         // Get the payment plan details
-        const loanData = await paymentComplianceApi.getPaymentPlanReport(loanId)
-        
+        const loanData = await paymentComplianceApi.getPaymentPlanById(loanId)
+
         if (loanData) {
           console.log("Retrieved loan data:", loanData)
           setLoan(loanData)
-          
+
           // Format dates properly
           const startDate = loanData.startDate ? new Date(loanData.startDate) : new Date();
           const endDate = loanData.endDate ? new Date(loanData.endDate) : new Date(new Date().setFullYear(new Date().getFullYear() + 1));
-          
+
           // Update form values
           form.reset({
             installationId: loanData.installationId || 0,
@@ -213,7 +213,7 @@ export default function EditLoanPage({ params }: { params: EditLoanParams }) {
   const onSubmit = async (data: LoanFormValues) => {
     try {
       setSubmitting(true)
-      
+
       // Format the data for the API
       const formattedData = {
         ...data,
@@ -221,32 +221,32 @@ export default function EditLoanPage({ params }: { params: EditLoanParams }) {
         startDate: format(data.startDate, "yyyy-MM-dd"),
         endDate: format(data.endDate, "yyyy-MM-dd"),
       }
-      
+
       if (!loan) {
         throw new Error("Loan details not found");
       }
 
       // Get installation ID from the form data
       const installationId = data.installationId;
-      
+
       console.log("Submitting loan update:", {
         installationId,
         planId: parseInt(unwrappedParams.id),
         loanData: formattedData
       });
-      
+
       // Update the payment plan
       await paymentComplianceApi.updatePaymentPlan(
         loan.customerId, // This should be the user ID associated with the installation
         parseInt(unwrappedParams.id), // planId
         formattedData // planData
       )
-      
+
       toast({
         title: "Success",
         description: "Loan details updated successfully",
       })
-      
+
       // Navigate back to the loans list
       router.push("/admin/loans")
     } catch (error) {
@@ -525,7 +525,7 @@ export default function EditLoanPage({ params }: { params: EditLoanParams }) {
                   </FormItem>
                 )}
               />
-              
+
               <FormField
                 control={form.control}
                 name="sendPaymentReminders"

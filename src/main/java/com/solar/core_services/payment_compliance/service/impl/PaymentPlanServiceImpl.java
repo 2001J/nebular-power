@@ -123,7 +123,7 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
                     paymentPlan.getFrequency());
             log.info("Calculated {} payments based on date range and frequency", numberOfPayments);
         }
-        
+
         paymentPlan.setNumberOfPayments(numberOfPayments);
 
         PaymentPlan savedPlan = paymentPlanRepository.save(paymentPlan);
@@ -143,17 +143,17 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
         if (planId == null) {
             throw new IllegalArgumentException("Payment plan ID cannot be null");
         }
-        
+
         if (request == null) {
             throw new IllegalArgumentException("Payment plan request cannot be null");
         }
-        
+
         if (request.getInstallationId() == null) {
             throw new IllegalArgumentException("Installation ID cannot be null");
         }
-        
+
         log.info("Updating payment plan with ID: {}, installation ID: {}", planId, request.getInstallationId());
-        
+
         PaymentPlan paymentPlan = getPaymentPlanEntityById(planId);
 
         // Validate the installation ID matches
@@ -306,7 +306,7 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
         // Get number of payments from the payment plan
         int numberOfPayments = paymentPlan.getNumberOfPayments();
         log.info("Plan specifies {} payments", numberOfPayments);
-        
+
         // Verify the installment amount makes sense for the total amount and number of payments
         if (paymentPlan.getInstallmentAmount() == null
                 || paymentPlan.getInstallmentAmount().compareTo(BigDecimal.ZERO) == 0) {
@@ -319,7 +319,7 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
             if (calculatedTotal.compareTo(paymentPlan.getTotalAmount()) != 0) {
                 log.warn("Warning: installment amount ({}) * number of payments ({}) = {} does not match total amount ({})",
                          paymentPlan.getInstallmentAmount(), numberOfPayments, calculatedTotal, paymentPlan.getTotalAmount());
-                
+
                 // Adjust the final payment to make the sum equal to the total amount
                 log.info("Will adjust final payment to ensure total matches");
             }
@@ -342,11 +342,11 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
         // Start date for payments
         LocalDateTime dueDateTime = startDate.atTime(0, 0);
         BigDecimal totalPlanned = BigDecimal.ZERO;
-        
+
         for (int i = 0; i < numberOfPayments; i++) {
             boolean isLastPayment = (i == numberOfPayments - 1);
             BigDecimal paymentAmount = paymentPlan.getInstallmentAmount();
-            
+
             // For the last payment, adjust amount if needed to match total exactly
             if (isLastPayment) {
                 BigDecimal remaining = paymentPlan.getTotalAmount().subtract(totalPlanned);
@@ -356,7 +356,7 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
                     paymentAmount = remaining;
                 }
             }
-            
+
             // Skip if this date already has a payment
             if (!paymentsByDueDate.containsKey(dueDateTime)) {
                 Payment payment = new Payment();
@@ -404,7 +404,7 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
 
         // Verify the payments sum to the total amount
         log.info("Plan total amount: {}, Sum of all payments: {}", paymentPlan.getTotalAmount(), totalPlanned);
-        
+
         // Save all new payments
         if (!newPayments.isEmpty()) {
             paymentRepository.saveAll(newPayments);
@@ -416,11 +416,11 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
         // Calculate total installments based on the numberOfPayments field
         // This is more reliable than counting payments which might include system entries
         int totalInstallments = plan.getNumberOfPayments();
-        
+
         // Count remaining installments that are still scheduled
         int remainingInstallments = paymentRepository.findByPaymentPlanAndStatus(
                 plan, Payment.PaymentStatus.SCHEDULED).size();
-                
+
         // Find next payment date
         LocalDateTime nextPaymentDate = null;
         if (plan.getPayments() != null && !plan.getPayments().isEmpty()) {
@@ -436,6 +436,7 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
         return PaymentPlanDTO.builder()
                 .id(plan.getId())
                 .installationId(plan.getInstallation().getId())
+                .customerId(plan.getInstallation().getUser().getId())
                 .customerName(plan.getInstallation().getUser().getFullName())
                 .customerEmail(plan.getInstallation().getUser().getEmail())
                 .name(plan.getName())

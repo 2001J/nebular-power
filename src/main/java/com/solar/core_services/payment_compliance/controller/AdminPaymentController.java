@@ -79,6 +79,24 @@ public class AdminPaymentController {
                 return ResponseEntity.ok(overduePayments);
         }
 
+        @GetMapping("/plans/{planId}")
+        @Operation(summary = "Get payment plan by ID", description = "Retrieves a specific payment plan by its ID.")
+        @ApiResponses(value = {
+                        @ApiResponse(responseCode = "200", description = "Payment plan retrieved successfully"),
+                        @ApiResponse(responseCode = "401", description = "Unauthorized", content = @Content),
+                        @ApiResponse(responseCode = "403", description = "Forbidden - requires ADMIN role", content = @Content),
+                        @ApiResponse(responseCode = "404", description = "Payment plan not found", content = @Content)
+        })
+        public ResponseEntity<PaymentPlanDTO> getPaymentPlanById(
+                        @Parameter(description = "ID of the payment plan to retrieve", required = true) @PathVariable Long planId) {
+            try {
+                PaymentPlanDTO paymentPlan = paymentPlanService.getPaymentPlanById(planId);
+                return ResponseEntity.ok(paymentPlan);
+            } catch (ResourceNotFoundException e) {
+                return ResponseEntity.notFound().build();
+            }
+        }
+
         @GetMapping("/customers/{customerId}/plan")
         @Operation(summary = "Get customer payment plans", description = "Retrieves all payment plans associated with a specific customer.")
         @ApiResponses(value = {
@@ -346,7 +364,7 @@ public class AdminPaymentController {
             try {
                 // Run the status update job
                 paymentService.updatePaymentStatuses();
-                
+
                 Map<String, String> response = new HashMap<>();
                 response.put("status", "success");
                 response.put("message", "Payment status update completed successfully");

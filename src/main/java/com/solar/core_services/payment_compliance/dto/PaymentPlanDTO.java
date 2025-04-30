@@ -21,6 +21,7 @@ import java.util.stream.Collectors;
 public class PaymentPlanDTO {
     private Long id;
     private Long installationId;
+    private Long customerId;
     private String customerName;
     private String customerEmail;
     private String name;
@@ -43,14 +44,14 @@ public class PaymentPlanDTO {
     private LocalDateTime nextPaymentDate;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
-    
+
     public static PaymentPlanDTO fromEntity(PaymentPlan paymentPlan) {
         int paidPayments = (int) paymentPlan.getPayments().stream()
                 .filter(p -> p.getStatus() == Payment.PaymentStatus.PAID)
                 .count();
-        
+
         int remainingPayments = paymentPlan.getNumberOfPayments() - paidPayments;
-        
+
         LocalDateTime nextPaymentDate = null;
         if (paymentPlan.getPayments() != null && !paymentPlan.getPayments().isEmpty()) {
             nextPaymentDate = paymentPlan.getPayments().stream()
@@ -61,10 +62,11 @@ public class PaymentPlanDTO {
                     .map(Payment::getDueDate)
                     .orElse(null);
         }
-        
+
         return PaymentPlanDTO.builder()
                 .id(paymentPlan.getId())
                 .installationId(paymentPlan.getInstallation().getId())
+                .customerId(paymentPlan.getInstallation().getUser().getId())
                 .customerName(paymentPlan.getInstallation().getUser().getFullName())
                 .customerEmail(paymentPlan.getInstallation().getUser().getEmail())
                 .name(paymentPlan.getName())
@@ -91,7 +93,7 @@ public class PaymentPlanDTO {
                 .updatedAt(paymentPlan.getUpdatedAt())
                 .build();
     }
-    
+
     public static PaymentPlanDTO fromEntityWithoutPayments(PaymentPlan paymentPlan) {
         PaymentPlanDTO dto = fromEntity(paymentPlan);
         dto.setPayments(null);
