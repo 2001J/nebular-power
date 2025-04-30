@@ -87,7 +87,7 @@ public class PaymentServiceImpl implements PaymentService {
                 installation,
                 futureDate,
                 Payment.PaymentStatus.SCHEDULED);
-        
+
         // Check for overdue payments
         List<Payment.PaymentStatus> overdueStatuses = Arrays.asList(
                 Payment.PaymentStatus.OVERDUE,
@@ -120,19 +120,19 @@ public class PaymentServiceImpl implements PaymentService {
         } else if (activePlan.getRemainingAmount().compareTo(BigDecimal.ZERO) > 0) {
             // If no upcoming payments but there's still a remaining amount, calculate the next due date
             // based on the last paid payment and payment frequency
-            
+
             // Find the last paid payment
             Payment lastPaidPayment = paymentRepository.findByPaymentPlan(activePlan).stream()
                     .filter(p -> p.getStatus() == Payment.PaymentStatus.PAID)
                     .max(Comparator.comparing(Payment::getDueDate))
                     .orElse(null);
-            
+
             if (lastPaidPayment != null) {
                 // Calculate the next due date based on the payment frequency
                 LocalDateTime lastDueDate = lastPaidPayment.getDueDate();
                 nextPaymentDueDate = calculateNextDueDate(lastDueDate, activePlan.getFrequency());
                 nextPaymentAmount = activePlan.getInstallmentAmount();
-                
+
                 // Create a new scheduled payment if one doesn't exist for this date
                 if (paymentRepository.findByPaymentPlanAndDueDate(activePlan, nextPaymentDueDate).isEmpty()) {
                     log.info("Creating new scheduled payment for date: {}", nextPaymentDueDate);
@@ -144,7 +144,7 @@ public class PaymentServiceImpl implements PaymentService {
                     newPayment.setStatus(Payment.PaymentStatus.SCHEDULED);
                     newPayment.setStatusReason("Payment scheduled as part of payment plan");
                     paymentRepository.save(newPayment);
-                    
+
                     // Add to upcoming payments list
                     upcomingPayments.add(newPayment);
                 }
@@ -160,7 +160,7 @@ public class PaymentServiceImpl implements PaymentService {
 
         // Convert active plan to DTO
         PaymentPlanDTO activePlanDTO = paymentPlanService.getPaymentPlanById(activePlan.getId());
-        
+
         // Remove grace period details from customer view
         if (activePlanDTO != null) {
             activePlanDTO.setGracePeriodDays(null);
@@ -341,21 +341,21 @@ public class PaymentServiceImpl implements PaymentService {
     @Transactional
     private void recheckPendingPayments() {
         log.info("Rechecking all pending and scheduled payments");
-        
+
         // Get all pending/scheduled payments
         List<Payment.PaymentStatus> statusesToCheck = Arrays.asList(
             Payment.PaymentStatus.PENDING,
             Payment.PaymentStatus.SCHEDULED,
             Payment.PaymentStatus.UPCOMING
         );
-        
+
         List<Payment> pendingPayments = paymentRepository.findByStatusIn(statusesToCheck);
         log.info("Found {} pending/scheduled payments to check", pendingPayments.size());
-        
+
         LocalDateTime now = LocalDateTime.now();
         LocalDateTime startOfToday = now.toLocalDate().atStartOfDay();
         LocalDateTime endOfToday = startOfToday.plusDays(1).minusNanos(1);
-        
+
         for (Payment payment : pendingPayments) {
             // If payment is due today
             if (payment.getDueDate().isAfter(startOfToday) && payment.getDueDate().isBefore(endOfToday)) {
@@ -423,7 +423,7 @@ public class PaymentServiceImpl implements PaymentService {
         // Find payments that were due today or earlier and still not paid
         LocalDateTime now = LocalDateTime.now();
         LocalDateTime cutoffDate = now.toLocalDate().atStartOfDay();
-        
+
         // Include multiple statuses that could be marked overdue
         List<Payment.PaymentStatus> statusesToCheck = Arrays.asList(
             Payment.PaymentStatus.DUE_TODAY,
@@ -431,7 +431,7 @@ public class PaymentServiceImpl implements PaymentService {
             Payment.PaymentStatus.SCHEDULED,
             Payment.PaymentStatus.UPCOMING
         );
-        
+
         List<Payment> overduePayments = paymentRepository.findByDueDateBeforeAndStatusIn(
                 cutoffDate, statusesToCheck);
 
@@ -444,7 +444,7 @@ public class PaymentServiceImpl implements PaymentService {
                 payment.getStatus() == Payment.PaymentStatus.SUSPENSION_PENDING) {
                 continue;
             }
-            
+
             // Update status to OVERDUE
             updatePaymentStatus(payment, Payment.PaymentStatus.OVERDUE,
                     "Payment date has passed without payment");
@@ -614,22 +614,22 @@ public class PaymentServiceImpl implements PaymentService {
             // First, check if there are any SCHEDULED payments left
             List<Payment> upcomingPayments = paymentRepository.findByPaymentPlanAndStatus(
                     paymentPlan, Payment.PaymentStatus.SCHEDULED);
-            
+
             if (upcomingPayments.isEmpty()) {
                 // No upcoming payments, so generate the next one
                 LocalDateTime nextDueDate = calculateNextDueDate(payment.getDueDate(), paymentPlan.getFrequency());
-                
+
                 // Check if a payment already exists for this date
                 if (paymentRepository.findByPaymentPlanAndDueDate(paymentPlan, nextDueDate).isEmpty()) {
                     log.info("Creating new scheduled payment for date: {}", nextDueDate);
-                    
+
                     // Calculate the amount for the next payment
                     BigDecimal nextAmount = paymentPlan.getInstallmentAmount();
                     // If the remaining amount is less than the installment amount, use the remaining amount
                     if (paymentPlan.getRemainingAmount().compareTo(nextAmount) < 0) {
                         nextAmount = paymentPlan.getRemainingAmount();
                     }
-                    
+
                     // Create a new payment
                     Payment nextPayment = new Payment();
                     nextPayment.setPaymentPlan(paymentPlan);
@@ -702,12 +702,47 @@ public class PaymentServiceImpl implements PaymentService {
         return overduePayments.map(this::mapToDTO);
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public Object getCustomerPaymentPlan(Long userId) {
+        log.info("Fetching payment plan for user ID: {}", userId);
+
+        // Find all installations for this user
+        List<SolarInstallation> installations = installationRepository.findByUserId(userId);
+        if (installations.isEmpty()) {
+            log.warn("No solar installations found for user ID: {}", userId);
+            return null;
+        }
+
+        // For simplicity, we'll use the first installation
+        SolarInstallation installation = installations.get(0);
+
+        try {
+            // Try to get the active payment plan
+            PaymentPlanDTO activePlan = paymentPlanService.getActivePaymentPlan(installation.getId());
+            log.info("Found active payment plan for installation ID: {}", installation.getId());
+            return activePlan;
+        } catch (ResourceNotFoundException e) {
+            log.info("No active payment plan found for installation ID: {}", installation.getId());
+
+            // Try to get any payment plan for this installation
+            List<PaymentPlanDTO> plans = paymentPlanService.getPaymentPlansByInstallation(installation.getId());
+            if (!plans.isEmpty()) {
+                log.info("Found {} payment plans for installation ID: {}", plans.size(), installation.getId());
+                return plans;
+            }
+
+            log.warn("No payment plans found for installation ID: {}", installation.getId());
+            return null;
+        }
+    }
+
     // Helper method to calculate the next due date based on payment frequency
     private LocalDateTime calculateNextDueDate(LocalDateTime lastDueDate, PaymentPlan.PaymentFrequency frequency) {
         if (lastDueDate == null || frequency == null) {
             return LocalDateTime.now().plusMonths(1);
         }
-        
+
         switch (frequency) {
             case MONTHLY:
                 return lastDueDate.plusMonths(1);

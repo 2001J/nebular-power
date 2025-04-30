@@ -4,6 +4,7 @@ import com.solar.core_services.payment_compliance.dto.MakePaymentRequest;
 import com.solar.core_services.payment_compliance.dto.PaymentDTO;
 import com.solar.core_services.payment_compliance.dto.PaymentDashboardDTO;
 import com.solar.core_services.payment_compliance.service.PaymentService;
+import com.solar.user_management.security.UserPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -66,27 +67,27 @@ public class CustomerPaymentController {
     public ResponseEntity<List<PaymentDTO>> getPaymentHistory(
             @Parameter(description = "Authentication object containing user credentials", hidden = true)
             Authentication authentication,
-            
+
             @Parameter(description = "Page number (zero-based)")
             @RequestParam(defaultValue = "0") int page,
-            
+
             @Parameter(description = "Number of items per page")
             @RequestParam(defaultValue = "10") int size,
-            
+
             @Parameter(description = "Field to sort by (e.g., dueDate, amount, status)")
             @RequestParam(defaultValue = "dueDate") String sortBy,
-            
+
             @Parameter(description = "Sort direction (asc or desc)")
             @RequestParam(defaultValue = "desc") String direction) {
-        
+
         Long userId = getUserIdFromAuthentication(authentication);
         Sort.Direction sortDirection = direction.equalsIgnoreCase("asc") ? Sort.Direction.ASC : Sort.Direction.DESC;
-        
+
         List<PaymentDTO> payments = paymentService.getPaymentHistory(
                 userId, 
                 PageRequest.of(page, size, Sort.by(sortDirection, sortBy))
         );
-        
+
         return ResponseEntity.ok(payments);
     }
 
@@ -123,10 +124,10 @@ public class CustomerPaymentController {
     public ResponseEntity<PaymentDTO> makePayment(
             @Parameter(description = "Authentication object containing user credentials", hidden = true)
             Authentication authentication,
-            
+
             @Parameter(description = "Payment request details", required = true)
             @Valid @RequestBody MakePaymentRequest request) {
-        
+
         Long userId = getUserIdFromAuthentication(authentication);
         PaymentDTO payment = paymentService.makePayment(userId, request);
         return ResponseEntity.status(HttpStatus.CREATED).body(payment);
@@ -147,23 +148,67 @@ public class CustomerPaymentController {
     public ResponseEntity<byte[]> downloadReceipt(
             @Parameter(description = "Authentication object containing user credentials", hidden = true)
             Authentication authentication,
-            
+
             @Parameter(description = "ID of the payment to generate receipt for", required = true)
             @PathVariable Long paymentId) {
-        
+
         Long userId = getUserIdFromAuthentication(authentication);
         byte[] receipt = paymentService.generatePaymentReceipt(userId, paymentId);
-        
+
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.TEXT_PLAIN);
         headers.setContentDispositionFormData("attachment", "payment_receipt_" + paymentId + ".txt");
-        
+
         return new ResponseEntity<>(receipt, headers, HttpStatus.OK);
     }
-    
+
+    @GetMapping("/customers/{userId}/plan")
+    @Operation(
+        summary = "Get customer payment plan",
+        description = "Retrieves the payment plan for a specific customer."
+    )
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Payment plan retrieved successfully"),
+        @ApiResponse(responseCode = "401", description = "Unauthorized", content = @Content),
+        @ApiResponse(responseCode = "403", description = "Forbidden", content = @Content),
+        @ApiResponse(responseCode = "404", description = "Payment plan not found", content = @Content)
+    })
+    public ResponseEntity<?> getCustomerPaymentPlan(
+            @Parameter(description = "Authentication object containing user credentials", hidden = true)
+            Authentication authentication,
+
+            @Parameter(description = "ID of the customer to retrieve payment plan for", required = true)
+            @PathVariable Long userId) {
+
+        // Verify the authenticated user is requesting their own data
+        Long authenticatedUserId = getUserIdFromAuthentication(authentication);
+        if (!authenticatedUserId.equals(userId) && !hasAdminRole(authentication)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Access denied");
+        }
+
+        try {
+            // Get the active payment plan for the user
+            return ResponseEntity.ok(paymentService.getCustomerPaymentPlan(userId));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Payment plan not found: " + e.getMessage());
+        }
+    }
+
+    private boolean hasAdminRole(Authentication authentication) {
+        return authentication.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+    }
+
     private Long getUserIdFromAuthentication(Authentication authentication) {
-        // In a real implementation, this would extract the user ID from the authentication object
-        // For now, we'll just return a placeholder value
-        return 1L; // Placeholder
+        if (authentication == null || !authentication.isAuthenticated()) {
+            throw new IllegalStateException("User not authenticated");
+        }
+
+        Object principal = authentication.getPrincipal();
+        if (principal instanceof UserPrincipal) {
+            return ((UserPrincipal) principal).getId();
+        }
+
+        throw new IllegalStateException("User principal not found or not of expected type");
     }
 } 

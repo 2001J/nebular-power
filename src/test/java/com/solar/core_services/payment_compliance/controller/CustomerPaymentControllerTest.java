@@ -2,6 +2,7 @@ package com.solar.core_services.payment_compliance.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.solar.user_management.model.User;
+import com.solar.user_management.security.UserPrincipal;
 import com.solar.core_services.payment_compliance.dto.MakePaymentRequest;
 import com.solar.core_services.payment_compliance.dto.PaymentDTO;
 import com.solar.core_services.payment_compliance.dto.PaymentDashboardDTO;
@@ -17,6 +18,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -34,6 +36,8 @@ import static org.hamcrest.Matchers.is;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -56,11 +60,17 @@ public class CustomerPaymentControllerTest {
 
     @Mock
     private PaymentService paymentService;
-    
+
+    @Mock
+    private Authentication authentication;
+
     @InjectMocks
     private CustomerPaymentController controller;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
+
+    private User testUser;
+    private UserPrincipal userPrincipal;
 
     private PaymentDashboardDTO testDashboard;
     private PaymentDTO testPaymentDTO1;
@@ -69,13 +79,29 @@ public class CustomerPaymentControllerTest {
 
     @BeforeEach
     void setUp() {
-        // Set up MockMvc
-        mockMvc = MockMvcBuilders.standaloneSetup(controller).build();
-        
+        // Create test user
+        testUser = new User();
+        testUser.setId(1L);
+        testUser.setEmail("test@example.com");
+        testUser.setFullName("Test User");
+        testUser.setRole(User.UserRole.CUSTOMER);
+        testUser.setEnabled(true);
+
+        // Create UserPrincipal
+        userPrincipal = new UserPrincipal(testUser);
+
+        // Set up Authentication mock with lenient mode to avoid UnnecessaryStubbingException
+        lenient().when(authentication.getPrincipal()).thenReturn(userPrincipal);
+        lenient().when(authentication.isAuthenticated()).thenReturn(true);
+
+        // Set up MockMvc with controller advice to handle exceptions
+        mockMvc = MockMvcBuilders.standaloneSetup(controller)
+                .build();
+
         // Configure ObjectMapper for Java 8 date/time types
         objectMapper.registerModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule());
         objectMapper.disable(com.fasterxml.jackson.databind.SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
-        
+
         // Create test payment DTOs
         testPaymentDTO1 = PaymentDTO.builder()
                 .id(1L)
@@ -92,7 +118,7 @@ public class CustomerPaymentControllerTest {
                 .transactionId("TX123456")
                 .paymentMethod("CREDIT_CARD")
                 .build();
-        
+
         testPaymentDTO2 = PaymentDTO.builder()
                 .id(2L)
                 .installationId(1L)
@@ -105,7 +131,7 @@ public class CustomerPaymentControllerTest {
                 .status(Payment.PaymentStatus.DUE_TODAY)
                 .statusReason("Payment due today")
                 .build();
-        
+
         // Create test dashboard
         testDashboard = PaymentDashboardDTO.builder()
                 .installationId(1L)
@@ -120,7 +146,7 @@ public class CustomerPaymentControllerTest {
                 .recentPayments(Collections.singletonList(testPaymentDTO1))
                 .upcomingPayments(Collections.singletonList(testPaymentDTO2))
                 .build();
-        
+
         // Create test payment request
         testPaymentRequest = MakePaymentRequest.builder()
                 .paymentId(2L)
@@ -131,15 +157,15 @@ public class CustomerPaymentControllerTest {
     }
 
     @Test
-    @WithMockUser(username = "test@example.com")
     @DisplayName("Should get payment dashboard")
     void shouldGetPaymentDashboard() throws Exception {
         // Given
-        when(paymentService.getCustomerDashboard(anyLong())).thenReturn(testDashboard);
-        
+        when(paymentService.getCustomerDashboard(eq(1L))).thenReturn(testDashboard);
+
         // When/Then
         mockMvc.perform(get("/api/payments/dashboard")
-                .contentType(MediaType.APPLICATION_JSON))
+                .contentType(MediaType.APPLICATION_JSON)
+                .principal(authentication))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.installationId", is(1)))
                 .andExpect(jsonPath("$.totalAmount", is(10000.00)))
@@ -153,18 +179,18 @@ public class CustomerPaymentControllerTest {
     }
 
     @Test
-    @WithMockUser(username = "test@example.com")
     @DisplayName("Should get payment history")
     void shouldGetPaymentHistory() throws Exception {
         // Given
         List<PaymentDTO> paymentHistory = Arrays.asList(testPaymentDTO1, testPaymentDTO2);
-        when(paymentService.getPaymentHistory(anyLong(), any())).thenReturn(paymentHistory);
-        
+        when(paymentService.getPaymentHistory(eq(1L), any())).thenReturn(paymentHistory);
+
         // When/Then
         mockMvc.perform(get("/api/payments/history")
                 .param("page", "0")
                 .param("size", "10")
-                .contentType(MediaType.APPLICATION_JSON))
+                .contentType(MediaType.APPLICATION_JSON)
+                .principal(authentication))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$", hasSize(2)))
                 .andExpect(jsonPath("$[0].id", is(1)))
@@ -172,16 +198,16 @@ public class CustomerPaymentControllerTest {
     }
 
     @Test
-    @WithMockUser(username = "test@example.com")
     @DisplayName("Should get upcoming payments")
     void shouldGetUpcomingPayments() throws Exception {
         // Given
         List<PaymentDTO> upcomingPayments = Collections.singletonList(testPaymentDTO2);
-        when(paymentService.getUpcomingPayments(anyLong())).thenReturn(upcomingPayments);
-        
+        when(paymentService.getUpcomingPayments(eq(1L))).thenReturn(upcomingPayments);
+
         // When/Then
         mockMvc.perform(get("/api/payments/upcoming")
-                .contentType(MediaType.APPLICATION_JSON))
+                .contentType(MediaType.APPLICATION_JSON)
+                .principal(authentication))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$", hasSize(1)))
                 .andExpect(jsonPath("$[0].id", is(2)))
@@ -189,53 +215,67 @@ public class CustomerPaymentControllerTest {
     }
 
     @Test
-    @WithMockUser(username = "test@example.com")
     @DisplayName("Should make payment")
     void shouldMakePayment() throws Exception {
         // Given
-        when(paymentService.makePayment(anyLong(), any(MakePaymentRequest.class))).thenReturn(testPaymentDTO1);
-        
+        when(paymentService.makePayment(eq(1L), any(MakePaymentRequest.class))).thenReturn(testPaymentDTO1);
+
         // When/Then
         mockMvc.perform(post("/api/payments/make-payment")
                 .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(testPaymentRequest)))
+                .content(objectMapper.writeValueAsString(testPaymentRequest))
+                .principal(authentication))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.id", is(1)))
                 .andExpect(jsonPath("$.status", is("PAID")))
                 .andExpect(jsonPath("$.transactionId", is("TX123456")));
-        
-        verify(paymentService, times(1)).makePayment(anyLong(), any(MakePaymentRequest.class));
+
+        verify(paymentService, times(1)).makePayment(eq(1L), any(MakePaymentRequest.class));
     }
 
     @Test
-    @WithMockUser(username = "test@example.com")
     @DisplayName("Should download payment receipt")
     void shouldDownloadPaymentReceipt() throws Exception {
         // Given
         byte[] receiptData = "Test Receipt Content".getBytes();
-        when(paymentService.generatePaymentReceipt(anyLong(), eq(1L))).thenReturn(receiptData);
-        
+        when(paymentService.generatePaymentReceipt(eq(1L), eq(1L))).thenReturn(receiptData);
+
         // When/Then
         mockMvc.perform(get("/api/payments/receipts/1")
-                .contentType(MediaType.APPLICATION_JSON))
+                .contentType(MediaType.APPLICATION_JSON)
+                .principal(authentication))
                 .andExpect(status().isOk())
                 .andExpect(content().contentType(MediaType.TEXT_PLAIN))
                 .andExpect(content().bytes(receiptData));
-        
-        verify(paymentService, times(1)).generatePaymentReceipt(anyLong(), eq(1L));
+
+        verify(paymentService, times(1)).generatePaymentReceipt(eq(1L), eq(1L));
     }
 
     @Test
-    @DisplayName("Should return unauthorized when not authenticated")
+    @DisplayName("Should return error when not authenticated")
     void shouldReturnUnauthorizedWhenNotAuthenticated() throws Exception {
-        // For this test, we'll skip it since it requires a full Spring Security context
-        // In a real test environment with a complete Spring context, this would work properly
-        // Here we'll just verify that the controller calls the service with the user ID
-        mockMvc.perform(get("/api/payments/dashboard")
-                .contentType(MediaType.APPLICATION_JSON))
-                .andExpect(status().isOk());
-        
-        // We're not verifying any service calls since this is just a placeholder test
+        // Reset the authentication mock to return false for isAuthenticated
+        when(authentication.isAuthenticated()).thenReturn(false);
+
+        try {
+            // When/Then - expect an exception to be thrown
+            mockMvc.perform(get("/api/payments/dashboard")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .principal(authentication));
+        } catch (Exception e) {
+            // Verify that the exception is related to authentication
+            if (!(e.getCause() instanceof IllegalStateException) || 
+                !e.getCause().getMessage().contains("User not authenticated")) {
+                throw e; // Re-throw if it's not the expected exception
+            }
+            // Otherwise, this is the expected exception, so the test passes
+        } finally {
+            // Reset the authentication mock back to its original state for other tests
+            lenient().when(authentication.isAuthenticated()).thenReturn(true);
+        }
+
+        // Verify that the service was not called
+        verify(paymentService, times(0)).getCustomerDashboard(anyLong());
     }
 } 
