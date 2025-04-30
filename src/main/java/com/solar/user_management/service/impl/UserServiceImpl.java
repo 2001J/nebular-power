@@ -29,7 +29,7 @@ import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
-@Transactional(readOnly = true)
+@Transactional
 public class UserServiceImpl implements UserService {
 
     private final AuthenticationManager authenticationManager;
@@ -45,13 +45,13 @@ public class UserServiceImpl implements UserService {
     public AuthResponse authenticateUser(LoginRequest loginRequest) {
         try {
             System.out.println("Authentication attempt for: " + loginRequest.getEmail());
-            
+
             // Find user by email
             User user = userRepository.findByEmail(loginRequest.getEmail())
                     .orElseThrow(() -> new UsernameNotFoundException("User not found with email: " + loginRequest.getEmail()));
 
             System.out.println("User found, current lastLogin: " + user.getLastLogin());
-            
+
             // Check account status before authentication
             checkAccountStatus(user);
 
@@ -64,7 +64,7 @@ public class UserServiceImpl implements UserService {
             );
 
             System.out.println("Authentication successful for: " + loginRequest.getEmail());
-            
+
             // If authentication is successful, reset failed attempts and update last login
             resetFailedLoginAttempts(user.getEmail());
             System.out.println("Calling updateLastLogin for: " + loginRequest.getEmail());
@@ -178,12 +178,14 @@ public class UserServiceImpl implements UserService {
 
     @Override
     @PreAuthorize("hasRole('ADMIN')")
+    @Transactional(readOnly = true)
     public List<User> getAllCustomers() {
         return userRepository.findByRole(User.UserRole.CUSTOMER);
     }
 
     @Override
     @PreAuthorize("hasRole('ADMIN')")
+    @Transactional(readOnly = true)
     public User getCustomerById(Long id) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Customer not found"));
@@ -197,12 +199,14 @@ public class UserServiceImpl implements UserService {
 
     @Override
     @PreAuthorize("hasRole('ADMIN')")
+    @Transactional(readOnly = true)
     public List<User> searchCustomers(String query) {
         // Implementation depends on your search requirements
         return userRepository.findByRole(User.UserRole.CUSTOMER);
     }
 
     @Override
+    @Transactional(readOnly = true)
     public User getCurrentUser() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         String currentUserEmail = authentication.getName();
@@ -381,6 +385,7 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public boolean isAccountLocked(String email) {
         return userRepository.findByEmail(email)
                 .map(User::isAccountLocked)
@@ -399,11 +404,13 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public boolean existsByEmail(String email) {
         return userRepository.existsByEmail(email);
     }
 
     @Override
+    @Transactional(readOnly = true)
     public User findByEmail(String email) {
         return userRepository.findByEmail(email)
                 .orElseThrow(() -> new EntityNotFoundException("User not found with email: " + email));
@@ -418,16 +425,16 @@ public class UserServiceImpl implements UserService {
 
             // Log original value
             System.out.println("Updating last login for user: " + email + ", current value: " + user.getLastLogin());
-            
+
             // Set the new value with the current time
             LocalDateTime now = LocalDateTime.now();
             System.out.println("Setting lastLogin to: " + now);
             user.setLastLogin(now);
-            
+
             // Explicitly flush the transaction to ensure it's persisted
             User savedUser = userRepository.saveAndFlush(user);
             System.out.println("Updated and flushed last login for user: " + email + ", new value: " + savedUser.getLastLogin());
-            
+
             // Double-check the update by fetching again
             User verifiedUser = userRepository.findById(user.getId()).orElse(null);
             if (verifiedUser != null) {
@@ -442,6 +449,7 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public void checkAccountStatus(User user) {
         if (!user.isEnabled()) {
             throw new RuntimeException("Account is suspended");
@@ -477,6 +485,7 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public boolean isPasswordChangeRequired(String email) {
         return userRepository.findByEmail(email)
                 .map(User::isPasswordChangeRequired)
@@ -484,6 +493,7 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public boolean isEmailVerified(String email) {
         return userRepository.findByEmail(email)
                 .map(User::isEmailVerified)
