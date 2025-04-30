@@ -117,10 +117,10 @@ public class TamperDetectionController {
     public ResponseEntity<Void> adjustSensitivity(
             @Parameter(description = "ID of the installation to adjust sensitivity for", required = true)
             @PathVariable Long installationId,
-            
+
             @Parameter(description = "Type of tamper event (e.g., PHYSICAL_MOVEMENT, VOLTAGE_FLUCTUATION)", required = true)
             @PathVariable String eventType,
-            
+
             @Parameter(description = "New threshold value (0.0-1.0, where higher values require stronger signals to trigger)", required = true)
             @RequestParam double threshold) {
         tamperDetectionService.adjustSensitivity(installationId, eventType, threshold);
@@ -128,7 +128,7 @@ public class TamperDetectionController {
     }
 
     @PostMapping("/installations/{installationId}/simulate/movement")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'CUSTOMER')")
     @Operation(
         summary = "Simulate physical movement",
         description = "Simulates physical movement detection for testing the tamper detection system."
@@ -142,10 +142,10 @@ public class TamperDetectionController {
     public ResponseEntity<TamperEventDTO> simulateMovement(
             @Parameter(description = "ID of the installation to simulate movement for", required = true)
             @PathVariable Long installationId,
-            
+
             @Parameter(description = "Simulated movement value (e.g., acceleration in g)", required = true)
             @RequestParam double movementValue,
-            
+
             @Parameter(description = "Optional raw sensor data in JSON format")
             @RequestParam(required = false) String rawData) {
         TamperEventDTO tamperEventDTO = tamperDetectionService.processPhysicalMovementData(
@@ -154,7 +154,7 @@ public class TamperDetectionController {
     }
 
     @PostMapping("/installations/{installationId}/simulate/voltage")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'CUSTOMER')")
     @Operation(
         summary = "Simulate voltage fluctuation",
         description = "Simulates voltage fluctuation detection for testing the tamper detection system."
@@ -168,10 +168,10 @@ public class TamperDetectionController {
     public ResponseEntity<TamperEventDTO> simulateVoltageFluctuation(
             @Parameter(description = "ID of the installation to simulate voltage fluctuation for", required = true)
             @PathVariable Long installationId,
-            
+
             @Parameter(description = "Simulated voltage value (in volts)", required = true)
             @RequestParam double voltageValue,
-            
+
             @Parameter(description = "Optional raw sensor data in JSON format")
             @RequestParam(required = false) String rawData) {
         TamperEventDTO tamperEventDTO = tamperDetectionService.processVoltageFluctuationData(
@@ -180,7 +180,7 @@ public class TamperDetectionController {
     }
 
     @PostMapping("/installations/{installationId}/simulate/connection")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'CUSTOMER')")
     @Operation(
         summary = "Simulate connection interruption",
         description = "Simulates connection interruption detection for testing the tamper detection system."
@@ -194,10 +194,10 @@ public class TamperDetectionController {
     public ResponseEntity<TamperEventDTO> simulateConnectionInterruption(
             @Parameter(description = "ID of the installation to simulate connection interruption for", required = true)
             @PathVariable Long installationId,
-            
+
             @Parameter(description = "Connection status (true = connected, false = disconnected)", required = true)
             @RequestParam boolean connected,
-            
+
             @Parameter(description = "Optional raw sensor data in JSON format")
             @RequestParam(required = false) String rawData) {
         TamperEventDTO tamperEventDTO = tamperDetectionService.processConnectionInterruptionData(
@@ -206,7 +206,7 @@ public class TamperDetectionController {
     }
 
     @PostMapping("/installations/{installationId}/simulate/location")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'CUSTOMER')")
     @Operation(
         summary = "Simulate location change",
         description = "Simulates location change detection for testing the tamper detection system."
@@ -220,13 +220,13 @@ public class TamperDetectionController {
     public ResponseEntity<TamperEventDTO> simulateLocationChange(
             @Parameter(description = "ID of the installation to simulate location change for", required = true)
             @PathVariable Long installationId,
-            
+
             @Parameter(description = "New location coordinates or description", required = true)
             @RequestParam String newLocation,
-            
+
             @Parameter(description = "Previous location coordinates or description", required = true)
             @RequestParam String previousLocation,
-            
+
             @Parameter(description = "Optional raw sensor data in JSON format")
             @RequestParam(required = false) String rawData) {
         TamperEventDTO tamperEventDTO = tamperDetectionService.processLocationChangeData(
@@ -235,7 +235,7 @@ public class TamperDetectionController {
     }
 
     @PostMapping("/installations/{installationId}/simulate/tamper")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'CUSTOMER')")
     @Operation(
         summary = "Simulate generic tampering",
         description = "Simulates a generic tampering event for testing the tamper detection system."
@@ -249,16 +249,16 @@ public class TamperDetectionController {
     public ResponseEntity<TamperEventDTO> simulateTampering(
             @Parameter(description = "ID of the installation to simulate tampering for", required = true)
             @PathVariable Long installationId,
-            
+
             @Parameter(description = "Type of tamper event to simulate", required = true)
             @RequestParam TamperEvent.TamperEventType eventType,
-            
+
             @Parameter(description = "Confidence score for the tamper detection (0.0-1.0)", required = true)
             @RequestParam double confidenceScore,
-            
+
             @Parameter(description = "Description of the simulated tampering event", required = true)
             @RequestParam String description,
-            
+
             @Parameter(description = "Optional raw sensor data in JSON format")
             @RequestParam(required = false) String rawData) {
         TamperEventDTO tamperEventDTO = tamperDetectionService.detectTampering(
