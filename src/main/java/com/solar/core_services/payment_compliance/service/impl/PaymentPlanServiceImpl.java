@@ -168,6 +168,25 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
         paymentPlan.setEndDate(request.getEndDate().atStartOfDay());
         paymentPlan.setTotalAmount(request.getTotalAmount());
 
+        // Recalculate number of payments based on the new values
+        int numberOfPayments;
+        if (request.getInstallmentAmount() != null && request.getInstallmentAmount().compareTo(BigDecimal.ZERO) > 0) {
+            // If installment amount is provided, calculate number of payments by dividing total by installment
+            numberOfPayments = request.getTotalAmount().divide(request.getInstallmentAmount(), 0, RoundingMode.CEILING).intValue();
+            log.info("Recalculated {} payments based on total amount {} and installment amount {}", 
+                     numberOfPayments, request.getTotalAmount(), request.getInstallmentAmount());
+        } else {
+            // Otherwise, calculate based on date range and frequency
+            numberOfPayments = calculateNumberOfPayments(
+                    paymentPlan.getStartDate().toLocalDate(),
+                    paymentPlan.getEndDate().toLocalDate(),
+                    paymentPlan.getFrequency());
+            log.info("Recalculated {} payments based on date range and frequency", numberOfPayments);
+        }
+
+        // Update the number of payments
+        paymentPlan.setNumberOfPayments(numberOfPayments);
+
         // Handle late fee settings
         if (!request.isApplyLateFee()) {
             // If late fees are disabled, set the amount to zero and don't use global
