@@ -647,20 +647,19 @@ public class PaymentServiceImpl implements PaymentService {
     }
 
     private String generateTextReceipt(Payment payment) {
-        StringBuilder receipt = new StringBuilder();
-        receipt.append("PAYMENT RECEIPT\n");
-        receipt.append("==============\n\n");
-        receipt.append("Receipt ID: ").append(payment.getId()).append("\n");
-        receipt.append("Transaction ID: ").append(payment.getTransactionId()).append("\n");
-        receipt.append("Date: ").append(payment.getPaidAt()).append("\n\n");
-        receipt.append("Customer: ").append(payment.getInstallation().getUser().getFullName()).append("\n");
-        receipt.append("Installation ID: ").append(payment.getInstallation().getId()).append("\n\n");
-        receipt.append("Amount Paid: $").append(payment.getAmount()).append("\n");
-        receipt.append("Payment Method: ").append(payment.getPaymentMethod()).append("\n");
-        receipt.append("Status: ").append(payment.getStatus()).append("\n\n");
-        receipt.append("Thank you for your payment!\n");
+        String receipt = "PAYMENT RECEIPT\n" +
+                "==============\n\n" +
+                "Receipt ID: " + payment.getId() + "\n" +
+                "Transaction ID: " + payment.getTransactionId() + "\n" +
+                "Date: " + payment.getPaidAt() + "\n\n" +
+                "Customer: " + payment.getInstallation().getUser().getFullName() + "\n" +
+                "Installation ID: " + payment.getInstallation().getId() + "\n\n" +
+                "Amount Paid: $" + payment.getAmount() + "\n" +
+                "Payment Method: " + payment.getPaymentMethod() + "\n" +
+                "Status: " + payment.getStatus() + "\n\n" +
+                "Thank you for your payment!\n";
 
-        return receipt.toString();
+        return receipt;
     }
 
     private PaymentDTO mapToDTO(Payment payment) {
