@@ -49,7 +49,7 @@ public class AlertConfigControllerTest {
     @MockBean
     private AlertConfigService alertConfigService;
 
-    private Long installationId = 1L;
+    private final Long installationId = 1L;
     private AlertConfigDTO testAlertConfigDTO;
     private AlertConfigUpdateDTO testUpdateDTO;
 

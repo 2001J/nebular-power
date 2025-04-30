@@ -96,7 +96,7 @@ public class AdminPaymentControllerTest {
     @InjectMocks
     private AdminPaymentController controller;
 
-    private ObjectMapper objectMapper = new ObjectMapper();
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     private PaymentDTO testPaymentDTO;
     private Page<PaymentDTO> testPaymentPage;

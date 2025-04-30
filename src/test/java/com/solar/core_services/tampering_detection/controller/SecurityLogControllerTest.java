@@ -27,6 +27,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.LocalDateTime;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
 import static org.mockito.ArgumentMatchers.*;
@@ -62,7 +63,7 @@ public class SecurityLogControllerTest {
     @MockBean
     private com.solar.core_services.tampering_detection.repository.SecurityLogRepository securityLogRepository;
 
-    private Long installationId = 1L;
+    private final Long installationId = 1L;
     private SecurityLogDTO testSecurityLogDTO;
     private List<SecurityLogDTO> testSecurityLogDTOList;
     private Page<SecurityLogDTO> testSecurityLogDTOPage;
@@ -91,7 +92,7 @@ public class SecurityLogControllerTest {
         testSecurityLogDTO.setLocation("Server Room");
         
         // Create a list of security log DTOs
-        testSecurityLogDTOList = Arrays.asList(testSecurityLogDTO);
+        testSecurityLogDTOList = List.of(testSecurityLogDTO);
         
         // Create a page of security log DTOs
         testSecurityLogDTOPage = new PageImpl<>(testSecurityLogDTOList);
@@ -201,7 +202,7 @@ public class SecurityLogControllerTest {
     void shouldGetSecurityLogsByCurrentUser() throws Exception {
         // Arrange
         when(userService.getCurrentUser()).thenReturn(testUser);
-        when(installationRepository.findByUser(testUser)).thenReturn(Arrays.asList(testInstallation));
+        when(installationRepository.findByUser(testUser)).thenReturn(Collections.singletonList(testInstallation));
         when(securityLogService.getSecurityLogsByInstallationIds(anyList(), any(Pageable.class)))
             .thenReturn(testSecurityLogDTOPage);
 

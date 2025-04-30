@@ -68,9 +68,9 @@ public class TamperDetectionServiceTest {
     private SolarInstallation testInstallation;
     private AlertConfig testAlertConfig;
     private TamperEventDTO testTamperEventDTO;
-    private Long installationId = 1L;
+    private final Long installationId = 1L;
     private TamperEvent testTamperEvent;
-    private Long eventId = 1L;
+    private final Long eventId = 1L;
     private MonitoringStatus testMonitoringStatus;
     
     // Reference to private lastKnownValues map for testing

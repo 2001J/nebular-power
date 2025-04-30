@@ -61,9 +61,9 @@ public class TamperResponseServiceTest {
     private SolarInstallation testInstallation;
     private TamperEvent testEvent;
     private TamperResponse testResponse;
-    private Long installationId = 1L;
-    private Long eventId = 1L;
-    private Long responseId = 1L;
+    private final Long installationId = 1L;
+    private final Long eventId = 1L;
+    private final Long responseId = 1L;
 
     @BeforeEach
     void setUp() {

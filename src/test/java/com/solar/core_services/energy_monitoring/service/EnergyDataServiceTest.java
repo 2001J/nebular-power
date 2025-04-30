@@ -55,7 +55,7 @@ public class EnergyDataServiceTest {
     private EnergyData energyData1;
     private EnergyData energyData2;
     private EnergyDataRequest energyDataRequest;
-    private LocalDateTime now = LocalDateTime.now();
+    private final LocalDateTime now = LocalDateTime.now();
 
     @BeforeEach
     public void setup() {

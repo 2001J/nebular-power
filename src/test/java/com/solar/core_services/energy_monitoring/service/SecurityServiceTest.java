@@ -41,7 +41,7 @@ public class SecurityServiceTest {
     private SolarInstallation installation;
     private UserPrincipal userPrincipal;
     private Authentication authentication;
-    private LocalDateTime now = LocalDateTime.now();
+    private final LocalDateTime now = LocalDateTime.now();
 
     @BeforeEach
     public void setup() {

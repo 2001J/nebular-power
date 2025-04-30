@@ -5,8 +5,7 @@ import org.junit.jupiter.api.Test;
 
 import java.time.LocalDateTime;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Test class for ReminderConfig entity
@@ -78,6 +77,6 @@ public class ReminderConfigTest {
         
         // Then
         // Check that the updated date is after the old date
-        assertEquals(true, config.getUpdatedAt().isAfter(oldDate));
+        assertTrue(config.getUpdatedAt().isAfter(oldDate));
     }
 } 

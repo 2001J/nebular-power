@@ -51,7 +51,7 @@ public class EnergySummaryControllerTest {
     private EnergySummaryDTO dailySummaryDTO;
     private EnergySummaryDTO weeklySummaryDTO;
     private EnergySummaryDTO monthlySummaryDTO;
-    private LocalDate today = LocalDate.now();
+    private final LocalDate today = LocalDate.now();
 
     @BeforeEach
     public void setup() {
@@ -183,7 +183,7 @@ public class EnergySummaryControllerTest {
     @WithMockUser(roles = "ADMIN")
     public void testGetSummariesByPeriodAndDateRange() throws Exception {
         // Given
-        List<EnergySummaryDTO> summaries = Arrays.asList(dailySummaryDTO);
+        List<EnergySummaryDTO> summaries = Collections.singletonList(dailySummaryDTO);
         when(summaryService.getSummariesByPeriodAndDateRange(
                 eq(1L), 
                 eq(EnergySummary.SummaryPeriod.DAILY), 
@@ -205,7 +205,7 @@ public class EnergySummaryControllerTest {
     @WithMockUser(roles = "CUSTOMER")
     public void testGetSummariesByPeriodAndDateRange_AsCustomer_Authorized() throws Exception {
         // Given
-        List<EnergySummaryDTO> summaries = Arrays.asList(dailySummaryDTO);
+        List<EnergySummaryDTO> summaries = Collections.singletonList(dailySummaryDTO);
         when(securityService.hasAccessToInstallation(1L)).thenReturn(true);
         when(summaryService.getSummariesByPeriodAndDateRange(
                 eq(1L), 

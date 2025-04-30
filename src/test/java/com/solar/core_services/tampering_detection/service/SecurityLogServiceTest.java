@@ -48,8 +48,8 @@ public class SecurityLogServiceTest {
 
     private SolarInstallation testInstallation;
     private SecurityLog testLog;
-    private Long installationId = 1L;
-    private Long logId = 1L;
+    private final Long installationId = 1L;
+    private final Long logId = 1L;
 
     @BeforeEach
     void setUp() {

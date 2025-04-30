@@ -60,7 +60,7 @@ public class SolarInstallationControllerTest {
         private SolarInstallationDTO installationDTO2;
         private DeviceStatusRequest deviceStatusRequest;
         private SystemOverviewResponse systemOverviewResponse;
-        private LocalDateTime now = LocalDateTime.now();
+        private final LocalDateTime now = LocalDateTime.now();
 
         @BeforeEach
         public void setup() {

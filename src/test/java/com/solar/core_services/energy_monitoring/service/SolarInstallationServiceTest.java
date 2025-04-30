@@ -25,8 +25,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
@@ -61,7 +60,7 @@ public class SolarInstallationServiceTest {
     private SolarInstallation installation2;
     private SolarInstallationDTO installationDTO1;
     private SolarInstallationDTO installationDTO2;
-    private LocalDateTime now = LocalDateTime.now();
+    private final LocalDateTime now = LocalDateTime.now();
 
     @BeforeEach
     public void setup() {
@@ -170,7 +169,7 @@ public class SolarInstallationServiceTest {
         assertEquals(5.0, result.getInstalledCapacityKW());
         assertEquals("Location 1", result.getLocation());
         assertEquals(SolarInstallation.InstallationStatus.ACTIVE, result.getStatus());
-        assertEquals(false, result.isTamperDetected());
+        assertFalse(result.isTamperDetected());
 
         verify(installationRepository, times(1)).findById(1L);
     }
@@ -217,7 +216,7 @@ public class SolarInstallationServiceTest {
         assertEquals(4.0, result.getInstalledCapacityKW());
         assertEquals("New Location", result.getLocation());
         assertEquals(SolarInstallation.InstallationStatus.ACTIVE, result.getStatus());
-        assertEquals(false, result.isTamperDetected());
+        assertFalse(result.isTamperDetected());
 
         verify(userRepository, times(1)).findById(1L);
         verify(installationRepository, times(1)).save(any(SolarInstallation.class));
@@ -299,7 +298,7 @@ public class SolarInstallationServiceTest {
         assertEquals(5.0, result.getInstalledCapacityKW());
         assertEquals("Location 1", result.getLocation());
         assertEquals(SolarInstallation.InstallationStatus.ACTIVE, result.getStatus());
-        assertEquals(false, result.isTamperDetected());
+        assertFalse(result.isTamperDetected());
 
         verify(installationRepository, times(1)).findById(1L);
         verify(installationRepository, times(1)).save(any(SolarInstallation.class));
@@ -355,7 +354,7 @@ public class SolarInstallationServiceTest {
         assertThat(result).isNotNull();
         assertEquals(1L, result.getId());
         assertEquals(1L, result.getUserId());
-        assertEquals(true, result.isTamperDetected());
+        assertTrue(result.isTamperDetected());
 
         verify(installationRepository, times(1)).findById(1L);
         verify(installationRepository, times(1)).save(any(SolarInstallation.class));
@@ -424,7 +423,7 @@ public class SolarInstallationServiceTest {
         assertThat(result).isNotEmpty();
         assertThat(result).hasSize(1);
         assertEquals(2L, result.get(0).getId());
-        assertEquals(true, result.get(0).isTamperDetected());
+        assertTrue(result.get(0).isTamperDetected());
 
         verify(installationRepository, times(1)).findByTamperDetectedTrue();
     }
@@ -489,7 +488,7 @@ public class SolarInstallationServiceTest {
         assertEquals(4.0, result.getInstalledCapacityKW());
         assertEquals("New Location", result.getLocation());
         assertEquals(SolarInstallation.InstallationStatus.ACTIVE, result.getStatus());
-        assertEquals(false, result.isTamperDetected());
+        assertFalse(result.isTamperDetected());
 
         verify(userRepository, times(1)).findById(1L);
         verify(installationRepository, times(1)).save(any(SolarInstallation.class));

@@ -46,7 +46,7 @@ public class TamperDetectionControllerTest {
     @MockBean
     private TamperDetectionService tamperDetectionService;
 
-    private Long installationId = 1L;
+    private final Long installationId = 1L;
     private TamperEventDTO testTamperEventDTO;
 
     @BeforeEach

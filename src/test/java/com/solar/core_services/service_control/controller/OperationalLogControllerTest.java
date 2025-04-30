@@ -59,7 +59,7 @@ public class OperationalLogControllerTest {
         sampleLogDTO.setInstallationId(1L);
         sampleLogDTO.setInstallationName("Test Installation");
 
-        sampleLogDTOList = Arrays.asList(sampleLogDTO);
+        sampleLogDTOList = List.of(sampleLogDTO);
     }
 
     @Test

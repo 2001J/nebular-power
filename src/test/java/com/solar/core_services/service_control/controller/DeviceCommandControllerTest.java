@@ -63,7 +63,7 @@ public class DeviceCommandControllerTest {
         sampleCommandDTO.setInstallationId(1L);
         sampleCommandDTO.setInstallationName("Test Installation");
 
-        sampleCommandDTOList = Arrays.asList(sampleCommandDTO);
+        sampleCommandDTOList = List.of(sampleCommandDTO);
     }
 
     @Test

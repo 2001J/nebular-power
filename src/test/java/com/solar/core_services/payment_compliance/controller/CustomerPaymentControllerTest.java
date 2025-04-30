@@ -60,7 +60,7 @@ public class CustomerPaymentControllerTest {
     @InjectMocks
     private CustomerPaymentController controller;
 
-    private ObjectMapper objectMapper = new ObjectMapper();
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     private PaymentDashboardDTO testDashboard;
     private PaymentDTO testPaymentDTO1;

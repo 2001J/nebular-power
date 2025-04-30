@@ -184,7 +184,7 @@ public class PaymentRepositoryTest {
     void shouldFindOverduePayments() {
         // Given
         LocalDateTime cutoffDate = LocalDateTime.now();
-        List<Payment.PaymentStatus> statuses = Arrays.asList(Payment.PaymentStatus.PAID);
+        List<Payment.PaymentStatus> statuses = List.of(Payment.PaymentStatus.PAID);
         
         // When
         List<Payment> overduePayments = paymentRepository.findOverduePayments(cutoffDate, statuses);
@@ -237,7 +237,7 @@ public class PaymentRepositoryTest {
     void shouldFindUpcomingPayments() {
         // Given
         LocalDateTime futureDate = LocalDateTime.now().plusDays(60);
-        List<Payment.PaymentStatus> statuses = Arrays.asList(Payment.PaymentStatus.UPCOMING);
+        List<Payment.PaymentStatus> statuses = List.of(Payment.PaymentStatus.UPCOMING);
         
         // When
         List<Payment> upcomingPayments = paymentRepository.findUpcomingPaymentsByStatuses(
@@ -252,7 +252,7 @@ public class PaymentRepositoryTest {
     @DisplayName("Should count overdue payments by installation")
     void shouldCountOverduePaymentsByInstallation() {
         // Given
-        List<Payment.PaymentStatus> statuses = Arrays.asList(Payment.PaymentStatus.PAID);
+        List<Payment.PaymentStatus> statuses = List.of(Payment.PaymentStatus.PAID);
         
         // When
         Long count = paymentRepository.countOverduePaymentsByInstallation(testInstallation, statuses);

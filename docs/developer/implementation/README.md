@@ -250,7 +250,7 @@ public class SolarInstallation {
     private List<EnergyData> energyData = new ArrayList<>();
 
     @OneToMany(mappedBy = "installation", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<EnergySummary> energySummaries = new ArrayList<>();
+    private final List<EnergySummary> energySummaries = new ArrayList<>();
 
     @CreationTimestamp
     private LocalDateTime createdAt;

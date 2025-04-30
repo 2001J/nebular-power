@@ -27,6 +27,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.LocalDateTime;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -120,7 +121,7 @@ class UserProfileControllerTest {
     @Test
     @WithMockUser(username = "test@example.com")
     void getUserActivityLogs_Success() throws Exception {
-        List<UserActivityLog> logs = Arrays.asList(userActivityLog);
+        List<UserActivityLog> logs = Collections.singletonList(userActivityLog);
         Page<UserActivityLog> page = new PageImpl<>(logs, PageRequest.of(0, 10), logs.size());
         
         when(userService.getCurrentUser()).thenReturn(user);

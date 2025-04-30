@@ -89,7 +89,7 @@ class ServiceStatusServiceImplTest {
         when(installationRepository.findById(101L)).thenReturn(Optional.of(testInstallation));
         when(serviceStatusRepository.findActiveByInstallationId(101L)).thenReturn(Optional.of(testStatus));
         when(serviceStatusRepository.save(any(ServiceStatus.class))).thenAnswer(i -> {
-            ServiceStatus status = (ServiceStatus) i.getArgument(0);
+            ServiceStatus status = i.getArgument(0);
             status.setId(2L); // New status record
             return status;
         });
@@ -116,7 +116,7 @@ class ServiceStatusServiceImplTest {
         when(installationRepository.findById(101L)).thenReturn(Optional.of(testInstallation));
         when(serviceStatusRepository.findActiveByInstallationId(101L)).thenReturn(Optional.of(testStatus));
         when(serviceStatusRepository.save(any(ServiceStatus.class))).thenAnswer(i -> {
-            ServiceStatus status = (ServiceStatus) i.getArgument(0);
+            ServiceStatus status = i.getArgument(0);
             status.setId(2L); // New status record
             return status;
         });
@@ -143,7 +143,7 @@ class ServiceStatusServiceImplTest {
         when(installationRepository.findById(101L)).thenReturn(Optional.of(testInstallation));
         when(serviceStatusRepository.findActiveByInstallationId(101L)).thenReturn(Optional.of(testStatus));
         when(serviceStatusRepository.save(any(ServiceStatus.class))).thenAnswer(i -> {
-            ServiceStatus status = (ServiceStatus) i.getArgument(0);
+            ServiceStatus status = i.getArgument(0);
             if (!status.isActive()) {
                 // For the deactivated old status
                 return status;

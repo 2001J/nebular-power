@@ -56,8 +56,8 @@ public class EnergySummaryServiceTest {
     private EnergySummary monthlySummary;
     private EnergyData energyData1;
     private EnergyData energyData2;
-    private LocalDate today = LocalDate.now();
-    private LocalDateTime now = LocalDateTime.now();
+    private final LocalDate today = LocalDate.now();
+    private final LocalDateTime now = LocalDateTime.now();
 
     @BeforeEach
     public void setup() {
@@ -248,7 +248,7 @@ public class EnergySummaryServiceTest {
         // Given
         when(installationRepository.findById(1L)).thenReturn(Optional.of(installation));
         when(summaryRepository.findByInstallationAndPeriodOrderByDateDesc(installation, EnergySummary.SummaryPeriod.DAILY))
-                .thenReturn(Arrays.asList(dailySummary));
+                .thenReturn(Collections.singletonList(dailySummary));
 
         // When
         List<EnergySummaryDTO> result = summaryService.getSummariesByPeriod(1L, EnergySummary.SummaryPeriod.DAILY);
@@ -288,7 +288,7 @@ public class EnergySummaryServiceTest {
         when(installationRepository.findById(1L)).thenReturn(Optional.of(installation));
         when(summaryRepository.findByInstallationAndPeriodAndDateBetweenOrderByDateDesc(
                 installation, EnergySummary.SummaryPeriod.DAILY, startDate, endDate))
-                .thenReturn(Arrays.asList(dailySummary));
+                .thenReturn(Collections.singletonList(dailySummary));
 
         // When
         List<EnergySummaryDTO> result = summaryService.getSummariesByPeriodAndDateRange(

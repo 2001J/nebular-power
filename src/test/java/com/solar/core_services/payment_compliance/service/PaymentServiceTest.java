@@ -33,9 +33,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
@@ -183,7 +181,7 @@ public class PaymentServiceTest {
         assertNotNull(dashboard);
         assertEquals(2, dashboard.getRecentPayments().size());
         assertEquals(0, dashboard.getUpcomingPayments().size());
-        assertEquals(false, dashboard.isHasOverduePayments());
+        assertFalse(dashboard.isHasOverduePayments());
         verify(installationRepository, times(1)).findByUserId(testUser.getId());
         verify(paymentRepository, times(1)).findByInstallation(eq(testInstallation), any(Pageable.class));
         verify(paymentRepository, times(1)).findUpcomingPaymentsByInstallation(eq(testInstallation), any(LocalDateTime.class), eq(Payment.PaymentStatus.SCHEDULED));

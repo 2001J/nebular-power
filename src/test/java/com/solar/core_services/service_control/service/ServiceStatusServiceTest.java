@@ -21,6 +21,7 @@ import org.springframework.data.domain.Pageable;
 
 import java.time.LocalDateTime;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 
@@ -292,7 +293,7 @@ public class ServiceStatusServiceTest {
         scheduledStatus.setUpdatedAt(LocalDateTime.now().minusDays(1));
         scheduledStatus.setActive(true);
         
-        List<ServiceStatus> dueChanges = Arrays.asList(scheduledStatus);
+        List<ServiceStatus> dueChanges = List.of(scheduledStatus);
         
         when(serviceStatusRepository.findByScheduledChangeIsNotNullAndScheduledTimeBefore(any(LocalDateTime.class)))
             .thenReturn(dueChanges);
@@ -312,7 +313,7 @@ public class ServiceStatusServiceTest {
     @DisplayName("Should get statuses by user ID")
     void shouldGetStatusesByUserId() {
         // Arrange
-        List<ServiceStatus> userStatuses = Arrays.asList(activeStatus);
+        List<ServiceStatus> userStatuses = Collections.singletonList(activeStatus);
         
         when(serviceStatusRepository.findActiveByUserId(1L)).thenReturn(userStatuses);
         
@@ -331,7 +332,7 @@ public class ServiceStatusServiceTest {
     @DisplayName("Should get installations by status")
     void shouldGetInstallationsByStatus() {
         // Arrange
-        List<ServiceStatus> statusList = Arrays.asList(activeStatus);
+        List<ServiceStatus> statusList = Collections.singletonList(activeStatus);
         Page<ServiceStatus> statusPage = new PageImpl<>(statusList);
         Pageable pageable = PageRequest.of(0, 10);
         

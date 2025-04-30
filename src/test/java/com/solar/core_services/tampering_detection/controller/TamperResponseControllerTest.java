@@ -60,9 +60,9 @@ public class TamperResponseControllerTest {
     @MockBean
     private SolarInstallationRepository installationRepository;
 
-    private Long installationId = 1L;
-    private Long tamperEventId = 1L;
-    private Long tamperResponseId = 1L;
+    private final Long installationId = 1L;
+    private final Long tamperEventId = 1L;
+    private final Long tamperResponseId = 1L;
     private TamperResponseDTO testResponseDTO;
     private List<TamperResponseDTO> testResponseDTOList;
     private Page<TamperResponseDTO> testResponseDTOPage;
@@ -91,7 +91,7 @@ public class TamperResponseControllerTest {
         testResponseDTO.setResponseDetails("Test response description");
         
         // Create a list of response DTOs
-        testResponseDTOList = Arrays.asList(testResponseDTO);
+        testResponseDTOList = List.of(testResponseDTO);
         
         // Create a page of response DTOs
         testResponseDTOPage = new PageImpl<>(testResponseDTOList);

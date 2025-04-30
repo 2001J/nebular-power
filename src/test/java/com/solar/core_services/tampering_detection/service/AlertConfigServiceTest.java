@@ -51,8 +51,8 @@ public class AlertConfigServiceTest {
     private SolarInstallation testInstallation;
     private AlertConfig testAlertConfig;
     private AlertConfigUpdateDTO testUpdateDTO;
-    private Long installationId = 1L;
-    private Long configId = 1L;
+    private final Long installationId = 1L;
+    private final Long configId = 1L;
 
     @BeforeEach
     void setUp() {

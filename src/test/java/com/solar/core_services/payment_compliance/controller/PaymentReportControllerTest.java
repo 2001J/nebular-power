@@ -60,7 +60,7 @@ public class PaymentReportControllerTest {
     @InjectMocks
     private PaymentReportController controller;
 
-    private ObjectMapper objectMapper = new ObjectMapper();
+    private final ObjectMapper objectMapper = new ObjectMapper();
     
     private User testUser;
     private SolarInstallation testInstallation;

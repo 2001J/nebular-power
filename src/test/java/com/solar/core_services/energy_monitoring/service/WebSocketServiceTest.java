@@ -15,8 +15,7 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 
 import java.time.LocalDateTime;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
@@ -187,7 +186,7 @@ class WebSocketServiceTest {
         assertEquals(installationDTO.getId(), firstCapture.getId());
         assertEquals(installationDTO.getUserId(), firstCapture.getUserId());
         assertEquals(installationDTO.getStatus(), firstCapture.getStatus());
-        assertEquals(true, firstCapture.isTamperDetected());
+        assertTrue(firstCapture.isTamperDetected());
     }
 
     @Test

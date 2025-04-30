@@ -59,8 +59,8 @@ public class TamperEventServiceTest {
     private TamperEvent testEvent;
     private TamperEventCreateDTO testCreateDTO;
     private TamperEventUpdateDTO testUpdateDTO;
-    private Long installationId = 1L;
-    private Long eventId = 1L;
+    private final Long installationId = 1L;
+    private final Long eventId = 1L;
 
     @BeforeEach
     void setUp() {

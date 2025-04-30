@@ -68,7 +68,7 @@ public class ServiceStatusControllerTest {
         sampleStatusDTO.setInstallationId(1L);
         sampleStatusDTO.setInstallationName("Test Installation");
 
-        sampleStatusDTOList = Arrays.asList(sampleStatusDTO);
+        sampleStatusDTOList = List.of(sampleStatusDTO);
     }
 
     @Test

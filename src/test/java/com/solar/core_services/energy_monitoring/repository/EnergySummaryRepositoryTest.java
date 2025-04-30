@@ -35,7 +35,7 @@ public class EnergySummaryRepositoryTest {
     private EnergySummary dailySummary3;
     private EnergySummary weeklySummary1;
     private EnergySummary weeklySummary2;
-    private LocalDate today = LocalDate.now();
+    private final LocalDate today = LocalDate.now();
 
     @BeforeEach
     public void setup() {

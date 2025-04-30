@@ -18,6 +18,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDateTime;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
 import static org.mockito.ArgumentMatchers.*;
@@ -115,7 +116,7 @@ public class TamperDetectionSchedulerTest {
     @DisplayName("Should handle exceptions during diagnostics")
     void shouldHandleExceptionsDuringDiagnostics() {
         // Arrange
-        List<SolarInstallation> installations = Arrays.asList(activeInstallation);
+        List<SolarInstallation> installations = Collections.singletonList(activeInstallation);
         when(solarInstallationRepository.findAll()).thenReturn(installations);
         when(tamperDetectionService.isMonitoring(activeInstallation.getId())).thenReturn(true);
         doThrow(new RuntimeException("Test exception")).when(tamperDetectionService).runDiagnostics(activeInstallation.getId());
@@ -186,7 +187,7 @@ public class TamperDetectionSchedulerTest {
     @DisplayName("Should handle exceptions during monitoring status check")
     void shouldHandleExceptionsDuringMonitoringStatusCheck() {
         // Arrange
-        List<SolarInstallation> installations = Arrays.asList(activeInstallation);
+        List<SolarInstallation> installations = Collections.singletonList(activeInstallation);
         when(solarInstallationRepository.findAll()).thenReturn(installations);
         when(tamperDetectionService.isMonitoring(activeInstallation.getId())).thenReturn(false);
         doThrow(new RuntimeException("Test exception")).when(tamperDetectionService).startMonitoring(activeInstallation.getId());

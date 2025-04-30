@@ -63,8 +63,8 @@ public class TamperEventControllerTest {
     @MockBean
     private UserService userService;
 
-    private Long installationId = 1L;
-    private Long eventId = 1L;
+    private final Long installationId = 1L;
+    private final Long eventId = 1L;
     private TamperEventDTO testTamperEventDTO;
     private TamperEventCreateDTO testCreateDTO;
     private TamperEventUpdateDTO testUpdateDTO;
