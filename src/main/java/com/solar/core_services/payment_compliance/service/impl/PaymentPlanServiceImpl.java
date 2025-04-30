@@ -199,14 +199,32 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
                     request.getGracePeriodDays(), planId);
         }
 
-        // Recalculate remaining amount based on payments made
-        BigDecimal paidAmount = paymentPlan.getTotalAmount().subtract(paymentPlan.getRemainingAmount());
-        paymentPlan.setRemainingAmount(request.getTotalAmount().subtract(paidAmount));
+        // Get all existing payments for this plan
+        List<Payment> existingPayments = paymentRepository.findByPaymentPlan(paymentPlan);
+
+        // Calculate the actual paid amount by summing up all the paid and partially paid payments
+        BigDecimal paidAmount = existingPayments.stream()
+                .filter(p -> p.getStatus() == Payment.PaymentStatus.PAID || 
+                        p.getStatus() == Payment.PaymentStatus.PARTIALLY_PAID)
+                .map(Payment::getAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        // Set the new remaining amount based on the new total amount and the actual paid amount
+        BigDecimal newRemainingAmount = request.getTotalAmount().subtract(paidAmount);
+
+        // Ensure the remaining amount doesn't go below zero
+        if (newRemainingAmount.compareTo(BigDecimal.ZERO) < 0) {
+            newRemainingAmount = BigDecimal.ZERO;
+        }
+
+        log.info("Updating remaining amount for payment plan ID: {}. Old total: {}, New total: {}, Paid amount: {}, New remaining: {}",
+                planId, paymentPlan.getTotalAmount(), request.getTotalAmount(), paidAmount, newRemainingAmount);
+
+        paymentPlan.setRemainingAmount(newRemainingAmount);
 
         PaymentPlan updatedPlan = paymentPlanRepository.save(paymentPlan);
 
         // Clear existing future payments and regenerate schedule
-        List<Payment> existingPayments = paymentRepository.findByPaymentPlan(paymentPlan);
         List<Payment> paymentsToKeep = existingPayments.stream()
                 .filter(p -> p.getStatus() == Payment.PaymentStatus.PAID ||
                         p.getStatus() == Payment.PaymentStatus.PARTIALLY_PAID)
