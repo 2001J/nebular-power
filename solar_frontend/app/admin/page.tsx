@@ -344,7 +344,7 @@ export default function AdminDashboardPage() {
     }
 
     fetchDashboardData();
-  }, [user, toast, selectedPeriod]);
+  }, [user, toast, selectedPeriod])
 
   // Handle customer search
   const handleSearch = (e) => {
@@ -414,6 +414,49 @@ export default function AdminDashboardPage() {
     { name: ">90 days", value: overduePaymentRanges[">90 days"] || 0, color: "#ef4444" },
   ].filter(item => item.value > 0);
 
+  // Calculate total energy production from all installations
+  const calculateTotalEnergyProduction = () => {
+    // First priority: use the todayTotalGenerationKWh from systemOverview
+    if (systemOverview?.todayTotalGenerationKWh !== undefined) {
+      return formatEnergyValue(systemOverview.todayTotalGenerationKWh);
+    }
+    
+    // If no todayTotalGenerationKWh but we have totalEnergyProduction, use that as fallback
+    if (systemOverview?.totalEnergyProduction) {
+      return `${parseFloat(systemOverview.totalEnergyProduction).toFixed(1)} MWh`;
+    }
+    
+    // If system overview doesn't have total energy, calculate from installations data
+    let totalEnergy = 0;
+    
+    // Check if we have any installations with today's data
+    if (installations && installations.length > 0) {
+      installations.forEach(installation => {
+        if (installation.todayGenerationKWh !== undefined) {
+          totalEnergy += parseFloat(installation.todayGenerationKWh) || 0;
+        }
+      });
+      
+      if (totalEnergy > 0) {
+        return formatEnergyValue(totalEnergy);
+      }
+    }
+    
+    // Default fallback
+    return "0.0 kWh"; // Show zero instead of "No data"
+  };
+  
+  // Format energy value with appropriate unit
+  const formatEnergyValue = (value) => {
+    if (value >= 1000000) {
+      return `${(value / 1000000).toFixed(2)} GWh`;
+    } else if (value >= 1000) {
+      return `${(value / 1000).toFixed(2)} MWh`;
+    } else {
+      return `${value.toFixed(2)} kWh`;
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -433,24 +476,16 @@ export default function AdminDashboardPage() {
           <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Admin Dashboard</h1>
           <p className="text-muted-foreground">Welcome back, {user.name}! Here's an overview of the system.</p>
         </div>
-
-        <div className="flex flex-wrap items-center gap-2 md:gap-4">
-          <Button variant="outline" size="icon">
-            <Filter className="h-4 w-4" />
-          </Button>
-
-          <Button variant="outline" size="icon">
-            <Download className="h-4 w-4" />
-          </Button>
-        </div>
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Customers</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
+            <div className="h-8 w-8 flex items-center justify-center rounded-full bg-blue-100">
+              <Users className="h-4 w-4 text-blue-600" />
+            </div>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{customers.length}</div>
@@ -458,165 +493,27 @@ export default function AdminDashboardPage() {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Energy Production</CardTitle>
-            <Sun className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium">Today's Energy Production</CardTitle>
+            <div className="h-8 w-8 flex items-center justify-center rounded-full bg-amber-100">
+              <Sun className="h-4 w-4 text-amber-600" />
+            </div>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {systemOverview?.totalEnergyProduction
-                ? `${parseFloat(systemOverview.totalEnergyProduction).toFixed(1)} MWh`
-                : "No data"}
+              {calculateTotalEnergyProduction()}
             </div>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Monthly Revenue</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {systemOverview?.monthlyRevenue
-                ? `$${parseFloat(systemOverview.monthlyRevenue).toLocaleString()}`
-                : "No data"}
+            <CardTitle className="text-sm font-medium">Total Installations</CardTitle>
+            <div className="h-8 w-8 flex items-center justify-center rounded-full bg-green-100">
+              <BarChart3 className="h-4 w-4 text-green-600" />
             </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Security Alerts</CardTitle>
-            <ShieldAlert className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{securityAlerts.length}</div>
+            <div className="text-2xl font-bold">{installations.length}</div>
           </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-7 gap-6">
-        <Card className="lg:col-span-7">
-          <CardHeader>
-            <CardTitle>System Overview</CardTitle>
-            <CardDescription>Total energy production across all installations</CardDescription>
-            <Tabs defaultValue="production" className="w-full">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                <TabsList>
-                  <TabsTrigger value="production">Production</TabsTrigger>
-                  <TabsTrigger value="revenue">Revenue</TabsTrigger>
-                </TabsList>
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant={selectedPeriod === "day" ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setSelectedPeriod("day")}
-                  >
-                    Day
-                  </Button>
-                  <Button
-                    variant={selectedPeriod === "week" ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setSelectedPeriod("week")}
-                  >
-                    Week
-                  </Button>
-                  <Button
-                    variant={selectedPeriod === "month" ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setSelectedPeriod("month")}
-                  >
-                    Month
-                  </Button>
-                </div>
-              </div>
-              <TabsContent value="production" className="mt-4">
-                {loading ? (
-                  <div className="flex justify-center py-12">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-                  </div>
-                ) : energyData.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-12 text-center">
-                    <BarChart3 className="h-16 w-16 text-muted-foreground mb-4" />
-                    <h3 className="text-lg font-medium">No Production Data Available</h3>
-                    <p className="text-sm text-muted-foreground max-w-md mt-2">
-                      There is no energy production data available for the selected time range.
-                    </p>
-                  </div>
-                ) : (
-                  <Chart>
-                    <ChartContainer>
-                      <ResponsiveContainer width="100%" height={350}>
-                        <BarChart
-                          data={energyData}
-                          margin={{ top: 10, right: 10, left: 10, bottom: 40 }}
-                        >
-                          <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                          <XAxis dataKey="name" />
-                          <YAxis tickFormatter={(value) => `${value} kWh`} />
-                          <Tooltip formatter={(value) => [`${value} kWh`, ""]} />
-                          <Legend wrapperStyle={{ bottom: 0, left: 25 }} />
-                          {energyData[0]?.residential !== undefined && (
-                            <Bar dataKey="residential" name="Residential" fill="#3b82f6" />
-                          )}
-                          {energyData[0]?.commercial !== undefined && (
-                            <Bar dataKey="commercial" name="Commercial" fill="#10b981" />
-                          )}
-                          {energyData[0]?.industrial !== undefined && (
-                            <Bar dataKey="industrial" name="Industrial" fill="#f59e0b" />
-                          )}
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </ChartContainer>
-                  </Chart>
-                )}
-              </TabsContent>
-              <TabsContent value="revenue" className="mt-4">
-                {loading ? (
-                  <div className="flex justify-center py-12">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-                  </div>
-                ) : !payments || !payments.graphData || !payments.graphData.data || payments.graphData.data.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-12 text-center">
-                    <BarChart3 className="h-16 w-16 text-muted-foreground mb-4" />
-                    <h3 className="text-lg font-medium">No Revenue Data Available</h3>
-                    <p className="text-sm text-muted-foreground max-w-md mt-2">
-                      There is no revenue data available for the selected time range.
-                    </p>
-                  </div>
-                ) : (
-                  <Chart>
-                    <ChartContainer>
-                      <ResponsiveContainer width="100%" height={350}>
-                        <AreaChart
-                          data={payments.graphData.data}
-                          margin={{ top: 10, right: 10, left: 10, bottom: 40 }}
-                        >
-                          <defs>
-                            <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.8} />
-                              <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
-                            </linearGradient>
-                          </defs>
-                          <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                          <XAxis dataKey="name" />
-                          <YAxis tickFormatter={(value) => `$${value}`} />
-                          <Tooltip formatter={(value) => [`$${value}`, "Revenue"]} />
-                          <Legend wrapperStyle={{ bottom: 0, left: 25 }} />
-                          <Area
-                            type="monotone"
-                            dataKey="revenue"
-                            stroke="#3b82f6"
-                            fillOpacity={1}
-                            fill="url(#colorRevenue)"
-                            name="Revenue"
-                          />
-                        </AreaChart>
-                      </ResponsiveContainer>
-                    </ChartContainer>
-                  </Chart>
-                )}
-              </TabsContent>
-            </Tabs>
-          </CardHeader>
         </Card>
       </div>
 

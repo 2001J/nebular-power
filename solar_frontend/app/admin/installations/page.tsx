@@ -219,39 +219,30 @@ export default function InstallationsPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <Card>
-          <CardHeader className="pb-2">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Installations</CardTitle>
+            <div className="h-8 w-8 flex items-center justify-center rounded-full bg-blue-100">
+              <Sun className="h-4 w-4 text-blue-600" />
+            </div>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{systemStats.totalInstallations}</div>
-            <p className="text-xs text-muted-foreground">
-              {loading ? "Loading..." : `${installations.filter(i => i.status === "Active").length} active installations`}
-            </p>
           </CardContent>
         </Card>
 
         <Card>
-          <CardHeader className="pb-2">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Capacity</CardTitle>
+            <div className="h-8 w-8 flex items-center justify-center rounded-full bg-green-100">
+              <Zap className="h-4 w-4 text-green-600" />
+            </div>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{formatCapacity(systemStats.totalCapacity)}</div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-muted-foreground mt-1">
               Combined system capacity
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Scheduled Installations</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{systemStats.scheduledInstallations}</div>
-            <p className="text-xs text-muted-foreground">
-              {systemStats.nextScheduledDate ? `Next: ${new Date(systemStats.nextScheduledDate).toLocaleDateString()}` : "No scheduled installations"}
             </p>
           </CardContent>
         </Card>
@@ -356,26 +347,27 @@ export default function InstallationsPage() {
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
-                          <User className="h-4 w-4 text-muted-foreground" />
+                          <User className="h-4 w-4 text-blue-500" />
                           <span>{installation.username || installation.customerName || "N/A"}</span>
                         </div>
                       </TableCell>
                       <TableCell className="hidden md:table-cell">
                         <div className="flex items-center gap-2">
-                          <MapPin className="h-4 w-4 text-muted-foreground" />
+                          <MapPin className="h-4 w-4 text-amber-500" />
                           <span>{installation.location || "N/A"}</span>
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Badge variant="outline">{installation.type || "Unknown"}</Badge>
+                        <Badge variant="outline" className="bg-slate-100">{installation.type || "Unknown"}</Badge>
                       </TableCell>
                       <TableCell>
                         <Badge
+                          variant="outline"
                           className={
-                            installation.status === "ACTIVE" ? "bg-green-500" :
-                              installation.status === "MAINTENANCE" ? "bg-amber-500" :
-                                installation.status === "PENDING" ? "bg-blue-500" :
-                                  "bg-red-500"
+                            installation.status === "ACTIVE" || installation.status === "Active" ? "bg-green-100 text-green-700 border-green-200" :
+                            installation.status === "MAINTENANCE" || installation.status === "Maintenance" ? "bg-amber-100 text-amber-700 border-amber-200" :
+                            installation.status === "PENDING" || installation.status === "Pending" ? "bg-blue-100 text-blue-700 border-blue-200" :
+                            "bg-red-100 text-red-700 border-red-200"
                           }
                         >
                           {installation.status}
@@ -383,13 +375,13 @@ export default function InstallationsPage() {
                       </TableCell>
                       <TableCell className="hidden md:table-cell">
                         <div className="flex items-center gap-2">
-                          <CalendarClock className="h-4 w-4 text-muted-foreground" />
+                          <CalendarClock className="h-4 w-4 text-purple-500" />
                           <span>{installation.installationDate ? new Date(installation.installationDate).toLocaleDateString() : "N/A"}</span>
                         </div>
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
-                          <Zap className="h-4 w-4 text-muted-foreground" />
+                          <Zap className="h-4 w-4 text-green-500" />
                           <span>{formatCapacity(installation.installedCapacityKW)}</span>
                         </div>
                       </TableCell>
@@ -408,4 +400,4 @@ export default function InstallationsPage() {
       </Card>
     </div>
   )
-} 
+}

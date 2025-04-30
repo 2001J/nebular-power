@@ -390,11 +390,11 @@ export default function SecurityAlertsPage() {
   const getSeverityBadge = (severity) => {
     switch (severity.toUpperCase()) {
       case 'HIGH':
-        return <Badge variant="destructive">High</Badge>
+        return <Badge className="bg-red-100 text-red-700 border-red-200">High</Badge>
       case 'MEDIUM':
-        return <Badge variant="warning">Medium</Badge>
+        return <Badge className="bg-amber-100 text-amber-700 border-amber-200">Medium</Badge>
       case 'LOW':
-        return <Badge variant="secondary">Low</Badge>
+        return <Badge className="bg-blue-100 text-blue-700 border-blue-200">Low</Badge>
       default:
         return <Badge variant="outline">{severity}</Badge>
     }
@@ -404,15 +404,15 @@ export default function SecurityAlertsPage() {
   const getStatusBadge = (status) => {
     switch (status.toUpperCase()) {
       case 'OPEN':
-        return <Badge variant="destructive">Open</Badge>
+        return <Badge className="bg-red-100 text-red-700 border-red-200">Open</Badge>
       case 'ACKNOWLEDGED':
-        return <Badge variant="warning">Acknowledged</Badge>
+        return <Badge className="bg-amber-100 text-amber-700 border-amber-200">Acknowledged</Badge>
       case 'IN_PROGRESS':
-        return <Badge variant="warning">In Progress</Badge>
+        return <Badge className="bg-purple-100 text-purple-700 border-purple-200">In Progress</Badge>
       case 'RESOLVED':
-        return <Badge variant="success">Resolved</Badge>
+        return <Badge className="bg-green-100 text-green-700 border-green-200">Resolved</Badge>
       case 'FALSE_ALARM':
-        return <Badge variant="secondary">False Alarm</Badge>
+        return <Badge className="bg-slate-100 text-slate-700 border-slate-200">False Alarm</Badge>
       default:
         return <Badge variant="outline">{status}</Badge>
     }
@@ -476,6 +476,56 @@ export default function SecurityAlertsPage() {
           <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
           Refresh
         </Button>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Alerts</CardTitle>
+            <div className="h-8 w-8 flex items-center justify-center rounded-full bg-red-100">
+              <ShieldAlert className="h-4 w-4 text-red-600" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{tamperEvents.length}</div>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Open Alerts</CardTitle>
+            <div className="h-8 w-8 flex items-center justify-center rounded-full bg-amber-100">
+              <AlertTriangle className="h-4 w-4 text-amber-600" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{tamperEvents.filter(event => event.status === 'OPEN').length}</div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">High Severity</CardTitle>
+            <div className="h-8 w-8 flex items-center justify-center rounded-full bg-purple-100">
+              <AlertTriangle className="h-4 w-4 text-purple-600" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{tamperEvents.filter(event => event.severity === 'HIGH').length}</div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Resolved</CardTitle>
+            <div className="h-8 w-8 flex items-center justify-center rounded-full bg-green-100">
+              <CheckCircle2 className="h-4 w-4 text-green-600" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{tamperEvents.filter(event => event.status === 'RESOLVED').length}</div>
+          </CardContent>
+        </Card>
       </div>
 
       <div className="grid gap-4">
@@ -833,4 +883,4 @@ export default function SecurityAlertsPage() {
       </Dialog>
     </div>
   )
-} 
+}
