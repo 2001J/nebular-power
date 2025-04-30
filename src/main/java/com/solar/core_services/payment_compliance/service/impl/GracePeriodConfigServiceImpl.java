@@ -4,7 +4,6 @@ import com.solar.core_services.payment_compliance.dto.GracePeriodConfigDTO;
 import com.solar.core_services.payment_compliance.model.GracePeriodConfig;
 import com.solar.core_services.payment_compliance.repository.GracePeriodConfigRepository;
 import com.solar.core_services.payment_compliance.service.GracePeriodConfigService;
-import com.solar.exception.ResourceNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
