@@ -123,7 +123,7 @@ export default function LogsPage() {
             page,
             pageSize
           );
-          
+
           console.log("✅ Logs fetched successfully with ISO format:", 
             logsData && logsData.content ? 
               `Found ${logsData.content.length} logs` : 
@@ -172,7 +172,7 @@ export default function LogsPage() {
         }
       } catch (error) {
         console.error("❌ Error fetching logs data:", error);
-        
+
         // Show toast error
         toast({
           title: "Error",
@@ -216,7 +216,7 @@ export default function LogsPage() {
   // Handle refreshing logs
   const handleRefreshLogs = () => {
     setPage(0) // Reset to first page
-    
+
     if (activeTab === "operational") {
       // Force refresh by changing a dependency
       setTimeRange(prev => {
@@ -234,7 +234,7 @@ export default function LogsPage() {
   const handleFetchSecurityLogs = async () => {
     try {
       setLoading(true);
-      
+
       console.log("🔎 Fetching security logs with filters:", { 
         logType, 
         timeRange,
@@ -245,7 +245,7 @@ export default function LogsPage() {
       const token = typeof window !== 'undefined' 
         ? localStorage.getItem("token") || sessionStorage.getItem("token")
         : null;
-        
+
       if (!token) {
         console.error("Missing authentication token for security logs request");
         toast({
@@ -311,7 +311,7 @@ export default function LogsPage() {
         if (logType !== "all" && !logType.startsWith("sec_inst_")) {
           filterApplied = true;
           console.log(`🔍 Filtering by activity type: ${logType}`);
-          
+
           try {
             requestAttempts++;
             // Get all admin logs filtered by activity type
@@ -340,7 +340,7 @@ export default function LogsPage() {
           filterApplied = true;
           const installationId = logType.replace("sec_inst_", "");
           console.log(`🔍 Fetching security logs for installation ${installationId}`);
-          
+
           try {
             requestAttempts++;
             // Try to get logs by time range for this specific installation
@@ -349,7 +349,7 @@ export default function LogsPage() {
               startTimeFormatted,
               endTimeFormatted
             );
-            
+
             if (installationLogs && Array.isArray(installationLogs) && installationLogs.length > 0) {
               securityLogsData = installationLogs;
               fetchedData = true;
@@ -370,17 +370,17 @@ export default function LogsPage() {
             console.warn(`Could not fetch logs for installation ${installationId}:`, error);
           }
         }
-        
+
         // If not filtering or the filter returned no results AND we're showing "all", get logs for multiple installations
         if (!fetchedData && logType === "all") {
           const combinedLogs = [];
           console.log(`🔍 Fetching security logs for all installations`);
-          
+
           // Try to get logs for the available installations
           if (installations.length > 0) {
             // Only get logs for up to 5 installations to avoid too many requests
             const installationsToFetch = installations.slice(0, 5);
-            
+
             for (const installation of installationsToFetch as Array<{id: number | string, name?: string}>) {
               try {
                 requestAttempts++;
@@ -390,7 +390,7 @@ export default function LogsPage() {
                   startTimeFormatted,
                   endTimeFormatted
                 );
-                
+
                 if (Array.isArray(installationLogs) && installationLogs.length > 0) {
                   combinedLogs.push(...installationLogs);
                   fetchedData = true;
@@ -405,7 +405,7 @@ export default function LogsPage() {
               }
             }
           }
-          
+
           // If we got logs by installation
           if (combinedLogs.length > 0) {
             securityLogsData = combinedLogs;
@@ -418,7 +418,7 @@ export default function LogsPage() {
             try {
               requestAttempts++;
               const userLogsData = await securityApi.getUserSecurityLogs(0, 100);
-              
+
               if (userLogsData && userLogsData.content) {
                 securityLogsData = userLogsData.content;
                 setTotalPages(userLogsData.totalPages || 1);
@@ -437,7 +437,7 @@ export default function LogsPage() {
             }
           }
         }
-        
+
         // Filter by activity type if we're viewing logs for a specific installation
         if (logType.startsWith("sec_inst_") && logType !== "all" && securityLogsData.length > 0) {
           const parts = logType.split("_");
@@ -454,16 +454,16 @@ export default function LogsPage() {
             }
           }
         }
-        
+
         // Sort logs by timestamp descending (newest first)
         if (securityLogsData.length > 0) {
           securityLogsData.sort((a: any, b: any) => {
             return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
           });
         }
-        
+
         setSecurityLogs(securityLogsData);
-        
+
         if (securityLogsData.length > 0) {
           toast({
             title: "Security Logs Refreshed",
@@ -472,7 +472,7 @@ export default function LogsPage() {
         } else {
           // Provide guidance if no logs were found
           let suggestion = '';
-          
+
           if (filterApplied) {
             if (logType !== "all" && !logType.startsWith("sec_inst_")) {
               suggestion = `No data found for activity type "${logType}". Try a different activity type or time range.`;
@@ -489,7 +489,7 @@ export default function LogsPage() {
           } else if (timeRange === 'today' || timeRange === 'yesterday') {
             suggestion = 'Try expanding your time range to last 7 or 30 days.';
           }
-          
+
           toast({
             title: "No Security Logs Found",
             description: suggestion,
@@ -517,7 +517,7 @@ export default function LogsPage() {
     // Reset filters when switching tabs to ensure independence
     setSearchTerm("");
     setLogType("all");
-    
+
     // Update active tab
     setActiveTab(value);
 
@@ -624,12 +624,12 @@ export default function LogsPage() {
   const handleExportLogs = async () => {
     try {
       setExporting(true)
-      
+
       // Check for authentication token first
       const token = typeof window !== 'undefined' 
         ? localStorage.getItem("token") || sessionStorage.getItem("token")
         : null;
-        
+
       if (!token) {
         console.error("Missing authentication token for logs export request");
         toast({
@@ -696,7 +696,7 @@ export default function LogsPage() {
 
       // Export with all current filters
       const blobData = await serviceControlApi.exportLogs(filters)
-      
+
       // Create and trigger download
       const url = window.URL.createObjectURL(new Blob([blobData]))
       const link = document.createElement('a')
@@ -705,7 +705,7 @@ export default function LogsPage() {
       document.body.appendChild(link)
       link.click()
       link.remove()
-      
+
       toast({
         title: "Export Successful",
         description: "Logs have been exported successfully",
@@ -784,15 +784,33 @@ export default function LogsPage() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="all">All Types</SelectItem>
-                        <SelectItem value="op_SERVICE_STATUS_CHANGE">Status Change</SelectItem>
-                        <SelectItem value="op_DEVICE_COMMAND">Device Command</SelectItem>
-                        <SelectItem value="op_MAINTENANCE">Maintenance</SelectItem>
-                        <SelectItem value="op_SECURITY_ALERT">Security Alert</SelectItem>
-                        <SelectItem value="op_PAYMENT_EVENT">Payment Event</SelectItem>
-                        <SelectItem value="src_SERVICE_CONTROL">Service Control</SelectItem>
-                        <SelectItem value="src_SECURITY">Security System</SelectItem>
-                        <SelectItem value="src_PAYMENT">Payment System</SelectItem>
-                        <SelectItem value="src_DEVICE">Device</SelectItem>
+                        <SelectItem value="op_SERVICE_STATUS_CHANGE">Service Status Change</SelectItem>
+                        <SelectItem value="op_COMMAND_SENT">Command Sent</SelectItem>
+                        <SelectItem value="op_COMMAND_RESPONSE">Command Response</SelectItem>
+                        <SelectItem value="op_DEVICE_HEARTBEAT">Device Heartbeat</SelectItem>
+                        <SelectItem value="op_DEVICE_CONFIGURATION">Device Configuration</SelectItem>
+                        <SelectItem value="op_DEVICE_FIRMWARE_UPDATE">Device Firmware Update</SelectItem>
+                        <SelectItem value="op_DEVICE_REBOOT">Device Reboot</SelectItem>
+                        <SelectItem value="op_DEVICE_POWER_CHANGE">Device Power Change</SelectItem>
+                        <SelectItem value="op_MAINTENANCE_MODE">Maintenance Mode</SelectItem>
+                        <SelectItem value="op_SECURITY_ACTION">Security Action</SelectItem>
+                        <SelectItem value="op_PAYMENT_ACTION">Payment Action</SelectItem>
+                        <SelectItem value="op_SYSTEM_ALERT">System Alert</SelectItem>
+                        <SelectItem value="op_USER_ACTION">User Action</SelectItem>
+                        <SelectItem value="op_SERVICE_STATUS_UPDATE">Service Status Update</SelectItem>
+                        <SelectItem value="op_SERVICE_SUSPENSION">Service Suspension</SelectItem>
+                        <SelectItem value="op_SERVICE_RESTORATION">Service Restoration</SelectItem>
+                        <SelectItem value="op_STATUS_CHANGE_SCHEDULED">Status Change Scheduled</SelectItem>
+                        <SelectItem value="op_SCHEDULED_CHANGE_CANCELLED">Scheduled Change Cancelled</SelectItem>
+                        <SelectItem value="op_COMMAND_CANCELLED">Command Cancelled</SelectItem>
+                        <SelectItem value="op_COMMAND_RETRIED">Command Retried</SelectItem>
+                        <SelectItem value="op_PAYMENT_STATUS_CHANGE">Payment Status Change</SelectItem>
+                        <SelectItem value="op_PROCESS_OVERDUE_PAYMENTS">Process Overdue Payments</SelectItem>
+                        <SelectItem value="op_TAMPER_EVENT_RECEIVED">Tamper Event Received</SelectItem>
+                        <SelectItem value="op_SECURITY_RESPONSE_PROCESSED">Security Response Processed</SelectItem>
+                        <SelectItem value="op_SERVICE_STARTED">Service Started</SelectItem>
+                        <SelectItem value="op_SERVICE_STOPPED">Service Stopped</SelectItem>
+                        <SelectItem value="op_SERVICE_RESTARTED">Service Restarted</SelectItem>
                       </SelectContent>
                     </Select>
 
@@ -942,7 +960,7 @@ export default function LogsPage() {
                     <span>Loading security logs...</span>
                   </div>
                 )}
-                
+
                 {!loading && logType !== "all" && (
                   <div className="mt-2 text-sm text-blue-500 bg-blue-50 dark:bg-blue-950/30 p-2 rounded-md flex items-center">
                     <Info className="h-4 w-4 mr-2" />
@@ -1087,7 +1105,7 @@ export default function LogsPage() {
                               <TableCell className="font-mono text-xs">
                                 {log.timestamp ? format(new Date(log.timestamp), "yyyy-MM-dd HH:mm:ss") : "N/A"}
                               </TableCell>
-                              
+
                               {activeTab === "operational" ? (
                                 <>
                                   <TableCell>{log.operation || "N/A"}</TableCell>
@@ -1327,7 +1345,7 @@ export default function LogsPage() {
                               </div>
                             </div>
                           </div>
-                          
+
                           <div className="flex justify-between items-center">
                             <div className="flex items-center">
                               <div className="w-4 h-4 rounded-full bg-green-500 mr-2"></div>
@@ -1351,7 +1369,7 @@ export default function LogsPage() {
             </Card>
           </div>
         )}
-        
+
         {/* For security logs, maybe add a different dashboard or info panel */}
         {activeTab === "security" && (
           <div className="mt-4">

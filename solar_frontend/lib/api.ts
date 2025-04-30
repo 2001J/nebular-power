@@ -2752,8 +2752,8 @@ export const serviceControlApi = {
 
   getLogsByOperation: async (operation: string, page = 0, size = 20) => {
     try {
-      const response = await apiClient.get('/api/service/logs/operation', {
-        params: { operation, page, size }
+      const response = await apiClient.get(`/api/service/logs/operation/${operation}`, {
+        params: { page, size }
       });
       return response.data;
     } catch (error: any) {
