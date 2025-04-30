@@ -247,7 +247,7 @@ public class SolarInstallation {
     private User owner;
 
     @OneToMany(mappedBy = "installation", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<EnergyData> energyData = new ArrayList<>();
+    private final List<EnergyData> energyData = new ArrayList<>();
 
     @OneToMany(mappedBy = "installation", cascade = CascadeType.ALL, orphanRemoval = true)
     private final List<EnergySummary> energySummaries = new ArrayList<>();
