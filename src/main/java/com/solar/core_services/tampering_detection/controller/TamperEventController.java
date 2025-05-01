@@ -79,15 +79,15 @@ public class TamperEventController {
     public ResponseEntity<Page<TamperEventDTO>> getTamperEventsByCurrentUser(Pageable pageable) {
         User currentUser = userService.getCurrentUser();
         List<SolarInstallation> userInstallations = installationRepository.findByUser(currentUser);
-        
+
         if (userInstallations.isEmpty()) {
             return ResponseEntity.ok(Page.empty(pageable));
         }
-        
+
         List<Long> installationIds = userInstallations.stream()
             .map(SolarInstallation::getId)
             .collect(Collectors.toList());
-            
+
         return ResponseEntity.ok(tamperEventService.getTamperEventsByInstallationIds(installationIds, pageable));
     }
 
@@ -97,11 +97,11 @@ public class TamperEventController {
     public ResponseEntity<TamperEventDTO> acknowledgeTamperEvent(@PathVariable Long eventId) {
         User currentUser = userService.getCurrentUser();
         String username = currentUser.getFullName();
-        
+
         TamperEventUpdateDTO updateDTO = new TamperEventUpdateDTO();
         updateDTO.setStatus(TamperEvent.TamperEventStatus.ACKNOWLEDGED);
         updateDTO.setResolvedBy(username);
-        
+
         TamperEventDTO tamperEventDTO = tamperEventService.updateTamperEventStatus(eventId, updateDTO);
         return ResponseEntity.ok(tamperEventDTO);
     }
@@ -121,8 +121,28 @@ public class TamperEventController {
                     TamperEvent.TamperSeverity.CRITICAL
             );
         }
-        
+
         Page<TamperEventDTO> tamperEvents = tamperEventService.getUnresolvedTamperEvents(severities, pageable);
+        return ResponseEntity.ok(tamperEvents);
+    }
+
+    @GetMapping("/admin/all-alerts")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Get all events", description = "Get all tamper events, including resolved ones, with specified severities")
+    public ResponseEntity<Page<TamperEventDTO>> getAllTamperEvents(
+            @RequestParam(required = false) List<TamperEvent.TamperSeverity> severities,
+            Pageable pageable) {
+        // If no severities are provided, use all severities
+        if (severities == null || severities.isEmpty()) {
+            severities = List.of(
+                    TamperEvent.TamperSeverity.LOW,
+                    TamperEvent.TamperSeverity.MEDIUM,
+                    TamperEvent.TamperSeverity.HIGH,
+                    TamperEvent.TamperSeverity.CRITICAL
+            );
+        }
+
+        Page<TamperEventDTO> tamperEvents = tamperEventService.getAllTamperEvents(severities, pageable);
         return ResponseEntity.ok(tamperEvents);
     }
 

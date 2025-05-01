@@ -50,12 +50,12 @@ export default function AlertsPage() {
 
     try {
       setRefreshing(true)
-      
+
       // Step 1: Fetch customer installations
       const installationsData = await installationApi.getCustomerInstallations(user.id)
       if (Array.isArray(installationsData) && installationsData.length > 0) {
         setInstallations(installationsData)
-        
+
         // Step 2: Fetch alerts for each installation
         let allAlerts: Alert[] = []
         for (const installation of installationsData) {
@@ -77,7 +77,7 @@ export default function AlertsPage() {
             allAlerts = [...allAlerts, ...formattedAlerts]
           }
         }
-        
+
         setAlerts(allAlerts)
       } else {
         setInstallations([])
@@ -116,7 +116,7 @@ export default function AlertsPage() {
       "MEDIUM": "warning",
       "LOW": "info"
     }
-    
+
     return typeMap[type?.toUpperCase()] || "info"
   }
 
@@ -130,7 +130,7 @@ export default function AlertsPage() {
     alert.status.toUpperCase() !== "RESOLVED" && 
     !alert.resolvedAt
   )
-  
+
   const resolvedAlerts = alerts.filter(alert => 
     alert.status.toUpperCase() === "RESOLVED" || 
     alert.resolvedAt
@@ -343,10 +343,6 @@ export default function AlertsPage() {
                                     <Clock className="h-3 w-3 mr-1" />
                                     {formatDate(alert.timestamp)}
                                   </span>
-                                  <Button variant="ghost" size="sm">
-                                    <Check className="h-4 w-4 mr-1" />
-                                    Resolve
-                                  </Button>
                                 </div>
                               </div>
                               <p className="text-sm text-gray-500 mt-1">{alert.description || alert.message}</p>
@@ -631,4 +627,3 @@ function Download(props: React.SVGProps<SVGSVGElement>) {
     </svg>
   )
 }
-

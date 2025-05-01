@@ -101,7 +101,7 @@ export default function SecurityAlertsPage() {
   })
   const [eventType, setEventType] = useState("all")
   const [severity, setSeverity] = useState("all")
-  const [status, setStatus] = useState("OPEN")
+  const [status, setStatus] = useState("NEW")
   const [installation, setInstallation] = useState("all")
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedEvent, setSelectedEvent] = useState(null)
@@ -140,62 +140,37 @@ export default function SecurityAlertsPage() {
           }
           setInstallations([])
         }
-        
+
         // Check if there's an installation parameter in the URL
         const urlInstallation = searchParams.get('installation')
         if (urlInstallation) {
           setInstallation(urlInstallation)
         }
 
-        // Fetch tamper events based on the status filter
+        // Always fetch all tamper events and apply filters client-side
         let events = []
         try {
-          if (status === "OPEN") {
-            // Unresolved events only
-            const unresolvedEvents = await securityApi.getUnresolvedEvents()
-            events = Array.isArray(unresolvedEvents) ? unresolvedEvents : []
-          } else {
-            // Get events by time range
-            const startDate = dateRange.from ? dateRange.from.toISOString() : undefined
-            const endDate = dateRange.to ? dateRange.to.toISOString() : undefined
+          // Get all events, including resolved ones
+          const allEvents = await securityApi.getAllTamperEvents()
+          events = Array.isArray(allEvents) ? allEvents : []
 
-            // For a specific installation
-            if (installation !== "all" && installation) {
-              const timeRangeEvents = await securityApi.getEventsByTimeRange(installation, startDate, endDate)
-              events = Array.isArray(timeRangeEvents) ? timeRangeEvents : 
-                       (timeRangeEvents && timeRangeEvents.content ? timeRangeEvents.content : [])
-            } else {
-              // Since there's no API to get all events across installations by time range,
-              // we need to fetch events for each installation individually
-              for (const inst of installationsData?.content || []) {
-                try {
-                  if (!inst || !inst.id) continue
-                  
-                  const installationEvents = await securityApi.getEventsByTimeRange(
-                    inst.id,
-                    startDate,
-                    endDate
-                  )
-                  
-                  // Ensure installationEvents is an array before adding to events
-                  const eventsToAdd = Array.isArray(installationEvents) ? installationEvents : 
-                                     (installationEvents && installationEvents.content ? installationEvents.content : [])
-                  
-                  events = [...events, ...eventsToAdd]
-                } catch (error: any) {
-                  console.error(`Error fetching events for installation ${inst?.id || 'unknown'}:`, error)
-                  if (error.response && error.response.status === 401) {
-                    // If we encounter a 401 error, break the loop and show auth error
-                    toast({
-                      title: "Authentication Error",
-                      description: "Your session may have expired. Please log in again.",
-                      variant: "destructive",
-                    })
-                    break
-                  }
-                }
-              }
-            }
+          // Apply filters client-side
+          // Note: We don't filter by status here, as we want to keep all events for counting purposes
+          // Status filtering will be done in the applyFilters function
+
+          // If we have a specific installation filter (not "all"), apply it
+          if (installation !== "all" && installation) {
+            events = events.filter(event => event.installationId.toString() === installation.toString())
+          }
+
+          // Apply date range filter if needed
+          if (dateRange.from || dateRange.to) {
+            events = events.filter(event => {
+              const eventDate = new Date(event.timestamp)
+              const isAfterStart = !dateRange.from || eventDate >= dateRange.from
+              const isBeforeEnd = !dateRange.to || eventDate <= dateRange.to
+              return isAfterStart && isBeforeEnd
+            })
           }
         } catch (error: any) {
           console.error("Error fetching tamper events:", error)
@@ -246,8 +221,11 @@ export default function SecurityAlertsPage() {
       // Severity filter
       if (severity !== "all" && event.severity !== severity) return false
 
-      // Status filter is handled in the main API call, but we'll double-check here
+      // Status filter
       if (status !== "all" && event.status !== status) return false
+
+      // Installation filter
+      if (installation !== "all" && event.installationId.toString() !== installation.toString()) return false
 
       // Search term filter (check description, installation name, etc.)
       if (searchTerm && searchTerm.length > 0) {
@@ -267,7 +245,7 @@ export default function SecurityAlertsPage() {
   // Apply filters when filter values change
   useEffect(() => {
     applyFilters()
-  }, [eventType, severity, searchTerm])
+  }, [eventType, severity, status, installation, searchTerm])
 
   // Refresh data
   const refreshData = () => {
@@ -354,10 +332,13 @@ export default function SecurityAlertsPage() {
     if (!selectedEvent) return
 
     try {
+      // Get current user information
+      const currentUser = "admin"; // In a real app, this would come from the auth context
+
       const resolutionDetails = {
-        resolutionNotes,
-        resolvedBy: "admin", // This would be replaced with the actual user ID in a real application
-        resolvedAt: new Date().toISOString(),
+        resolutionNotes: resolutionNotes || "Issue resolved",
+        resolvedBy: currentUser,
+        // We don't need resolvedAt as it will be set by the backend
       }
 
       await securityApi.resolveEvent(selectedEvent.id, resolutionDetails)
@@ -380,7 +361,7 @@ export default function SecurityAlertsPage() {
       console.error(`Error resolving event ${selectedEvent.id}:`, error)
       toast({
         title: "Error",
-        description: "Failed to resolve event",
+        description: "Failed to resolve event. Please make sure you're logged in with admin privileges.",
         variant: "destructive",
       })
     }
@@ -402,13 +383,13 @@ export default function SecurityAlertsPage() {
 
   // Get status badge
   const getStatusBadge = (status) => {
-    switch (status.toUpperCase()) {
-      case 'OPEN':
+    switch (status?.toUpperCase()) {
+      case 'NEW':
         return <Badge className="bg-red-100 text-red-700 border-red-200">Open</Badge>
       case 'ACKNOWLEDGED':
         return <Badge className="bg-amber-100 text-amber-700 border-amber-200">Acknowledged</Badge>
-      case 'IN_PROGRESS':
-        return <Badge className="bg-purple-100 text-purple-700 border-purple-200">In Progress</Badge>
+      case 'INVESTIGATING':
+        return <Badge className="bg-purple-100 text-purple-700 border-purple-200">Investigating</Badge>
       case 'RESOLVED':
         return <Badge className="bg-green-100 text-green-700 border-green-200">Resolved</Badge>
       case 'FALSE_ALARM':
@@ -425,10 +406,16 @@ export default function SecurityAlertsPage() {
         return <ShieldAlert className="h-4 w-4 text-red-500" />
       case 'VOLTAGE_FLUCTUATION':
         return <AlertTriangle className="h-4 w-4 text-amber-500" />
-      case 'CONNECTION_INTERRUPTION':
+      case 'CONNECTION_TAMPERING':
         return <X className="h-4 w-4 text-red-500" />
       case 'LOCATION_CHANGE':
         return <Eye className="h-4 w-4 text-blue-500" />
+      case 'PANEL_ACCESS':
+        return <ShieldAlert className="h-4 w-4 text-red-500" />
+      case 'COMMUNICATION_INTERFERENCE':
+        return <X className="h-4 w-4 text-amber-500" />
+      case 'UNAUTHORIZED_ACCESS':
+        return <ShieldAlert className="h-4 w-4 text-red-500" />
       default:
         return <ShieldAlert className="h-4 w-4 text-gray-500" />
     }
@@ -487,10 +474,10 @@ export default function SecurityAlertsPage() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{tamperEvents.length}</div>
+            <div className="text-2xl font-bold">{filteredEvents.length}</div>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Open Alerts</CardTitle>
@@ -499,33 +486,35 @@ export default function SecurityAlertsPage() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{tamperEvents.filter(event => event.status === 'OPEN').length}</div>
+            <div className="text-2xl font-bold">{filteredEvents.filter(event => event.status === 'NEW').length}</div>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">High Severity</CardTitle>
+            <CardTitle className="text-sm font-medium">Critical Severity</CardTitle>
             <div className="h-8 w-8 flex items-center justify-center rounded-full bg-purple-100">
               <AlertTriangle className="h-4 w-4 text-purple-600" />
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{tamperEvents.filter(event => event.severity === 'HIGH').length}</div>
+            <div className="text-2xl font-bold">{filteredEvents.filter(event => event.severity === 'CRITICAL').length}</div>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Resolved</CardTitle>
-            <div className="h-8 w-8 flex items-center justify-center rounded-full bg-green-100">
-              <CheckCircle2 className="h-4 w-4 text-green-600" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{tamperEvents.filter(event => event.status === 'RESOLVED').length}</div>
-          </CardContent>
-        </Card>
+        {(status === "all" || status === "RESOLVED") && (
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Resolved</CardTitle>
+              <div className="h-8 w-8 flex items-center justify-center rounded-full bg-green-100">
+                <CheckCircle2 className="h-4 w-4 text-green-600" />
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{filteredEvents.filter(event => event.status === 'RESOLVED').length}</div>
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       <div className="grid gap-4">
@@ -556,11 +545,10 @@ export default function SecurityAlertsPage() {
                       <SelectValue placeholder="Status" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="OPEN">Open</SelectItem>
+                      <SelectItem value="NEW">Open</SelectItem>
                       <SelectItem value="ACKNOWLEDGED">Acknowledged</SelectItem>
-                      <SelectItem value="IN_PROGRESS">In Progress</SelectItem>
+                      <SelectItem value="INVESTIGATING">Investigating</SelectItem>
                       <SelectItem value="RESOLVED">Resolved</SelectItem>
-                      <SelectItem value="FALSE_ALARM">False Alarm</SelectItem>
                       <SelectItem value="all">All Statuses</SelectItem>
                     </SelectContent>
                   </Select>
@@ -570,6 +558,7 @@ export default function SecurityAlertsPage() {
                       <SelectValue placeholder="Severity" />
                     </SelectTrigger>
                     <SelectContent>
+                      <SelectItem value="CRITICAL">Critical</SelectItem>
                       <SelectItem value="HIGH">High</SelectItem>
                       <SelectItem value="MEDIUM">Medium</SelectItem>
                       <SelectItem value="LOW">Low</SelectItem>
@@ -584,8 +573,11 @@ export default function SecurityAlertsPage() {
                     <SelectContent>
                       <SelectItem value="PHYSICAL_MOVEMENT">Physical Movement</SelectItem>
                       <SelectItem value="VOLTAGE_FLUCTUATION">Voltage Fluctuation</SelectItem>
-                      <SelectItem value="CONNECTION_INTERRUPTION">Connection Interruption</SelectItem>
+                      <SelectItem value="CONNECTION_TAMPERING">Connection Tampering</SelectItem>
                       <SelectItem value="LOCATION_CHANGE">Location Change</SelectItem>
+                      <SelectItem value="PANEL_ACCESS">Panel Access</SelectItem>
+                      <SelectItem value="COMMUNICATION_INTERFERENCE">Communication Interference</SelectItem>
+                      <SelectItem value="UNAUTHORIZED_ACCESS">Unauthorized Access</SelectItem>
                       <SelectItem value="all">All Types</SelectItem>
                     </SelectContent>
                   </Select>
@@ -686,25 +678,25 @@ export default function SecurityAlertsPage() {
                                   </DropdownMenuItem>
                                   <DropdownMenuSeparator />
                                   <DropdownMenuItem
-                                    disabled={['RESOLVED', 'FALSE_ALARM'].includes(event.status)}
+                                    disabled={['RESOLVED'].includes(event.status)}
                                     onClick={() => acknowledgeEvent(event.id)}
                                   >
                                     Acknowledge
                                   </DropdownMenuItem>
                                   <DropdownMenuItem
-                                    disabled={['RESOLVED', 'FALSE_ALARM'].includes(event.status)}
+                                    disabled={['RESOLVED'].includes(event.status)}
+                                    onClick={() => updateEventStatus(event.id, 'INVESTIGATING')}
+                                  >
+                                    Mark as Investigating
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem
+                                    disabled={['RESOLVED'].includes(event.status)}
                                     onClick={() => {
                                       setSelectedEvent(event)
                                       setResolveDialogOpen(true)
                                     }}
                                   >
                                     Resolve
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem
-                                    disabled={['RESOLVED', 'FALSE_ALARM'].includes(event.status)}
-                                    onClick={() => updateEventStatus(event.id, 'FALSE_ALARM')}
-                                  >
-                                    Mark as False Alarm
                                   </DropdownMenuItem>
                                 </DropdownMenuContent>
                               </DropdownMenu>
@@ -815,24 +807,27 @@ export default function SecurityAlertsPage() {
               >
                 Close
               </Button>
-              <Button
-                variant="destructive"
-                disabled={!selectedEvent || ['RESOLVED', 'FALSE_ALARM'].includes(selectedEvent?.status)}
-                onClick={() => updateEventStatus(selectedEvent?.id, 'FALSE_ALARM')}
-              >
-                Mark as False Alarm
-              </Button>
             </div>
             <div className="flex flex-col sm:flex-row gap-2">
               <Button
                 variant="outline"
-                disabled={!selectedEvent || ['RESOLVED', 'FALSE_ALARM'].includes(selectedEvent?.status)}
+                disabled={!selectedEvent || ['RESOLVED'].includes(selectedEvent?.status)}
                 onClick={() => acknowledgeEvent(selectedEvent?.id)}
               >
                 Acknowledge
               </Button>
               <Button
-                disabled={!selectedEvent || ['RESOLVED', 'FALSE_ALARM'].includes(selectedEvent?.status)}
+                variant="outline"
+                disabled={!selectedEvent || ['RESOLVED'].includes(selectedEvent?.status)}
+                onClick={() => {
+                  updateEventStatus(selectedEvent?.id, 'INVESTIGATING')
+                  setDetailsOpen(false)
+                }}
+              >
+                Mark as Investigating
+              </Button>
+              <Button
+                disabled={!selectedEvent || ['RESOLVED'].includes(selectedEvent?.status)}
                 onClick={() => {
                   setDetailsOpen(false)
                   setResolveDialogOpen(true)

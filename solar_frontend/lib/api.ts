@@ -2831,6 +2831,11 @@ export const securityApi = {
 
       if (response && response.data) {
         console.log("Security alerts response:", response.data);
+        // Check if the response is a pagination object with a content array
+        if (response.data.content && Array.isArray(response.data.content)) {
+          return response.data.content;
+        }
+        // Fallback to the original check if content is not available
         return Array.isArray(response.data) ? response.data : [];
       } else {
         console.log("No security alerts data received");
@@ -2852,18 +2857,23 @@ export const securityApi = {
 
   getUnresolvedEvents: async () => {
     try {
-      console.log("Fetching unresolved security alerts from API");
+      console.log("Fetching security alerts from API");
       const response = await apiClient.get('/api/security/admin/alerts');
 
       if (response && response.data) {
-        console.log("Unresolved security alerts response:", response.data);
+        console.log("Security alerts response:", response.data);
+        // Check if the response is a pagination object with a content array
+        if (response.data.content && Array.isArray(response.data.content)) {
+          return response.data.content;
+        }
+        // Fallback to the original check if content is not available
         return Array.isArray(response.data) ? response.data : [];
       } else {
-        console.log("No unresolved security alerts data received");
+        console.log("No security alerts data received");
         return [];
       }
     } catch (error: any) {
-      console.error("Error fetching unresolved security alerts:", error);
+      console.error("Error fetching security alerts:", error);
       if (error.response) {
         console.error("Server response:", error.response.status, error.response.data);
       } else if (error.request) {
@@ -2872,6 +2882,37 @@ export const securityApi = {
         console.error("Error setting up request:", error.message);
       }
       // Return empty array instead of null to avoid additional null checks
+      return [];
+    }
+  },
+
+  getAllTamperEvents: async () => {
+    try {
+      console.log("Fetching all tamper events from API");
+      // Use the new endpoint that returns all events including resolved ones
+      const response = await apiClient.get('/api/security/admin/all-alerts');
+
+      if (response && response.data) {
+        console.log("All tamper events response:", response.data);
+        // Check if the response is a pagination object with a content array
+        if (response.data.content && Array.isArray(response.data.content)) {
+          return response.data.content;
+        }
+        // Fallback to the original check if content is not available
+        return Array.isArray(response.data) ? response.data : [];
+      } else {
+        console.log("No tamper events data received");
+        return [];
+      }
+    } catch (error: any) {
+      console.error("Error fetching all tamper events:", error);
+      if (error.response) {
+        console.error("Server response:", error.response.status, error.response.data);
+      } else if (error.request) {
+        console.error("No response received from server");
+      } else {
+        console.error("Error setting up request:", error.message);
+      }
       return [];
     }
   },
@@ -2974,7 +3015,10 @@ export const securityApi = {
 
   resolveEvent: async (eventId: string, resolutionDetails: any) => {
     try {
-      const response = await apiClient.post(`/api/security/admin/events/${eventId}/resolve`, resolutionDetails);
+      // Send resolvedBy and resolutionNotes as query parameters instead of in the request body
+      const response = await apiClient.post(
+        `/api/security/admin/events/${eventId}/resolve?resolvedBy=${encodeURIComponent(resolutionDetails.resolvedBy)}&resolutionNotes=${encodeURIComponent(resolutionDetails.resolutionNotes || '')}`
+      );
       return response.data;
     } catch (error: any) {
       console.error(`Error resolving event ${eventId}:`, error);
