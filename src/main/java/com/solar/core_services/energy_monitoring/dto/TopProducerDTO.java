@@ -1,5 +1,6 @@
 package com.solar.core_services.energy_monitoring.dto;
 
+import com.solar.core_services.energy_monitoring.model.SolarInstallation;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -19,7 +20,8 @@ public class TopProducerDTO {
     private String username;
     private String location;
     private double installedCapacityKW;
-    
+    private SolarInstallation.InstallationType type;
+
     // Energy production metrics
     private double currentPowerGenerationWatts;
     private double todayGenerationKWh;

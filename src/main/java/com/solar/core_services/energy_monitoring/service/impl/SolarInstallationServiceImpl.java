@@ -95,14 +95,14 @@ public class SolarInstallationServiceImpl implements SolarInstallationService {
         installation.setInstallationDate(
                 installationDTO.getInstallationDate() != null ? installationDTO.getInstallationDate()
                         : LocalDateTime.now());
-        
+
         // Set installation type - default to RESIDENTIAL if not provided
         if (installationDTO.getType() != null) {
             installation.setType(installationDTO.getType());
         } else {
             installation.setType(SolarInstallation.InstallationType.RESIDENTIAL);
         }
-        
+
         installation.setStatus(SolarInstallation.InstallationStatus.ACTIVE);
         installation.setTamperDetected(false);
         installation.setLastTamperCheck(LocalDateTime.now());
@@ -139,7 +139,7 @@ public class SolarInstallationServiceImpl implements SolarInstallationService {
         if (installationDTO.getStatus() != null) {
             installation.setStatus(installationDTO.getStatus());
         }
-        
+
         // Update the installation type if provided
         if (installationDTO.getType() != null) {
             installation.setType(installationDTO.getType());
@@ -198,26 +198,26 @@ public class SolarInstallationServiceImpl implements SolarInstallationService {
     public SystemOverviewResponse getSystemOverview() {
         // Get all installations
         List<SolarInstallation> allInstallations = installationRepository.findAll();
-        
+
         // Get active and suspended counts
         long activeCount = allInstallations.stream()
                 .filter(i -> i.getStatus() == SolarInstallation.InstallationStatus.ACTIVE)
                 .count();
-        
+
         long suspendedCount = allInstallations.stream()
                 .filter(i -> i.getStatus() == SolarInstallation.InstallationStatus.SUSPENDED)
                 .count();
-        
+
         // Get installations with tamper alerts
         List<SolarInstallation> tamperAlertInstallations = allInstallations.stream()
                 .filter(SolarInstallation::isTamperDetected)
                 .collect(Collectors.toList());
-        
+
         // Calculate total capacity
         double totalCapacity = allInstallations.stream()
                 .mapToDouble(SolarInstallation::getInstalledCapacityKW)
                 .sum();
-        
+
         // Define time periods
         LocalDateTime now = LocalDateTime.now();
         LocalDateTime startOfDay = LocalDateTime.of(LocalDate.now(), LocalTime.MIDNIGHT);
@@ -228,7 +228,7 @@ public class SolarInstallationServiceImpl implements SolarInstallationService {
 
         // Get month-to-date data
         LocalDateTime startOfMonth = LocalDateTime.of(LocalDate.now().withDayOfMonth(1), LocalTime.MIDNIGHT);
-        
+
         // Get year-to-date data
         LocalDateTime startOfYear = LocalDateTime.of(LocalDate.now().withDayOfYear(1), LocalTime.MIDNIGHT);
 
@@ -243,12 +243,12 @@ public class SolarInstallationServiceImpl implements SolarInstallationService {
         double yearToDateGeneration = 0;
         double yearToDateConsumption = 0;
         double averageEfficiency = 0;
-        
+
         // Get all active installations
         List<SolarInstallation> activeInstallations = allInstallations.stream()
                 .filter(i -> i.getStatus() == SolarInstallation.InstallationStatus.ACTIVE)
                 .collect(Collectors.toList());
-        
+
         // Sum up today's generation and consumption for all active installations
         for (SolarInstallation installation : activeInstallations) {
             // Get most recent reading for current generation
@@ -258,11 +258,11 @@ public class SolarInstallationServiceImpl implements SolarInstallationService {
                 // Take up to 10 most recent readings for smoothing
                 int readingsToConsider = Math.min(10, recentReadings.size());
                 List<EnergyData> recentSubset = recentReadings.subList(0, readingsToConsider);
-                
+
                 // Calculate average generation, but filter out extreme outliers
                 double sum = 0;
                 int count = 0;
-                
+
                 // First pass - calculate median value
                 double[] values = recentSubset.stream()
                     .mapToDouble(EnergyData::getPowerGenerationWatts)
@@ -271,7 +271,7 @@ public class SolarInstallationServiceImpl implements SolarInstallationService {
                 double median = values.length % 2 == 0 ? 
                     (values[values.length/2] + values[values.length/2 - 1]) / 2 : 
                     values[values.length/2];
-                
+
                 // Second pass - use values within reasonable range of median
                 for (EnergyData reading : recentSubset) {
                     double value = reading.getPowerGenerationWatts();
@@ -281,35 +281,35 @@ public class SolarInstallationServiceImpl implements SolarInstallationService {
                         count++;
                     }
                 }
-                
+
                 double avgGeneration = count > 0 ? sum / count : 0;
                 currentSystemGeneration += avgGeneration;
             }
-            
+
             // Get today's generation and consumption
             Double installationTodayGeneration = energyDataRepository.sumPowerGenerationForPeriod(
                     installation, startOfDay, endOfDay);
             Double installationTodayConsumption = energyDataRepository.sumPowerConsumptionForPeriod(
                     installation, startOfDay, endOfDay);
-            
+
             // Get week-to-date generation and consumption
             Double installationWeekGeneration = energyDataRepository.sumPowerGenerationForPeriod(
                     installation, startOfWeek, endOfDay);
             Double installationWeekConsumption = energyDataRepository.sumPowerConsumptionForPeriod(
                     installation, startOfWeek, endOfDay);
-            
+
             // Get month-to-date generation and consumption
             Double installationMonthGeneration = energyDataRepository.sumPowerGenerationForPeriod(
                     installation, startOfMonth, endOfDay);
             Double installationMonthConsumption = energyDataRepository.sumPowerConsumptionForPeriod(
                     installation, startOfMonth, endOfDay);
-            
+
             // Get year-to-date generation and consumption
             Double installationYearGeneration = energyDataRepository.sumPowerGenerationForPeriod(
                     installation, startOfYear, endOfDay);
             Double installationYearConsumption = energyDataRepository.sumPowerConsumptionForPeriod(
                     installation, startOfYear, endOfDay);
-            
+
             // Add to totals (convert from Watt-seconds to kWh)
             todayTotalGeneration += (installationTodayGeneration != null ? installationTodayGeneration : 0) / 1000.0 / 3600.0;
             todayTotalConsumption += (installationTodayConsumption != null ? installationTodayConsumption : 0) / 1000.0 / 3600.0;
@@ -320,19 +320,19 @@ public class SolarInstallationServiceImpl implements SolarInstallationService {
             yearToDateGeneration += (installationYearGeneration != null ? installationYearGeneration : 0) / 1000.0 / 3600.0;
             yearToDateConsumption += (installationYearConsumption != null ? installationYearConsumption : 0) / 1000.0 / 3600.0;
         }
-        
+
         // Calculate average efficiency
         if (todayTotalConsumption > 0) {
             averageEfficiency = Math.min(100.0, (todayTotalGeneration / todayTotalConsumption) * 100);
         }
-        
+
         // Fall back to energy summaries if raw data isn't sufficient
         if (todayTotalGeneration == 0) {
             // Try to get daily summaries for today
             LocalDate today = LocalDate.now();
             List<EnergySummary> dailySummaries = energySummaryRepository.findByPeriodAndDate(
                     EnergySummary.SummaryPeriod.DAILY, today);
-            
+
             if (!dailySummaries.isEmpty()) {
                 todayTotalGeneration = dailySummaries.stream()
                         .mapToDouble(EnergySummary::getTotalGenerationKWh)
@@ -342,14 +342,14 @@ public class SolarInstallationServiceImpl implements SolarInstallationService {
                         .sum();
             }
         }
-        
+
         // Fall back to summaries for week-to-date if raw data isn't sufficient
         if (weekToDateGeneration == 0) {
             // Try to get weekly summaries for this week
             LocalDate startOfWeekDate = LocalDate.now().minusDays(LocalDate.now().getDayOfWeek().getValue() - 1);
             List<EnergySummary> weeklySummaries = energySummaryRepository.findByPeriodAndDate(
                     EnergySummary.SummaryPeriod.WEEKLY, startOfWeekDate);
-            
+
             if (!weeklySummaries.isEmpty()) {
                 weekToDateGeneration = weeklySummaries.stream()
                         .mapToDouble(EnergySummary::getTotalGenerationKWh)
@@ -359,14 +359,14 @@ public class SolarInstallationServiceImpl implements SolarInstallationService {
                         .sum();
             }
         }
-        
+
         // Fall back to summaries for month-to-date if raw data isn't sufficient
         if (monthToDateGeneration == 0) {
             // Try to get monthly summaries for this month
             LocalDate firstOfMonth = LocalDate.now().withDayOfMonth(1);
             List<EnergySummary> monthlySummaries = energySummaryRepository.findByPeriodAndDate(
                     EnergySummary.SummaryPeriod.MONTHLY, firstOfMonth);
-            
+
             if (!monthlySummaries.isEmpty()) {
                 monthToDateGeneration = monthlySummaries.stream()
                         .mapToDouble(EnergySummary::getTotalGenerationKWh)
@@ -376,16 +376,16 @@ public class SolarInstallationServiceImpl implements SolarInstallationService {
                         .sum();
             }
         }
-        
+
         // Fall back to summaries for year-to-date if raw data isn't sufficient
         if (yearToDateGeneration == 0) {
             // Try to get yearly summaries for this year or monthly summaries and sum them up
             LocalDate firstOfYear = LocalDate.now().with(TemporalAdjusters.firstDayOfYear());
-            
+
             // First try yearly summaries
             List<EnergySummary> yearlySummaries = energySummaryRepository.findByPeriodAndDate(
                     EnergySummary.SummaryPeriod.YEARLY, firstOfYear);
-            
+
             if (!yearlySummaries.isEmpty()) {
                 yearToDateGeneration = yearlySummaries.stream()
                         .mapToDouble(EnergySummary::getTotalGenerationKWh)
@@ -399,7 +399,7 @@ public class SolarInstallationServiceImpl implements SolarInstallationService {
                         EnergySummary.SummaryPeriod.MONTHLY, 
                         firstOfYear, 
                         LocalDate.now());
-                
+
                 if (!thisYearMonthlySummaries.isEmpty()) {
                     yearToDateGeneration = thisYearMonthlySummaries.stream()
                             .mapToDouble(EnergySummary::getTotalGenerationKWh)
@@ -410,14 +410,14 @@ public class SolarInstallationServiceImpl implements SolarInstallationService {
                 }
             }
         }
-        
+
         // Get installations by status distribution
         Map<String, Long> installationsByStatus = allInstallations.stream()
                 .collect(Collectors.groupingBy(
                         installation -> installation.getStatus().name(),
                         Collectors.counting()
                 ));
-                
+
         // Get recent readings from all installations (last reading from each active installation)
         List<EnergyReadingDTO> recentInstallationReadings = activeInstallations.stream()
                 .map(installation -> {
@@ -435,7 +435,7 @@ public class SolarInstallationServiceImpl implements SolarInstallationService {
                 })
                 .filter(reading -> reading != null)
                 .collect(Collectors.toList());
-                
+
         // Get top producers
         List<TopProducerDTO> topProducers = activeInstallations.stream()
                 .sorted((i1, i2) -> {
@@ -453,22 +453,22 @@ public class SolarInstallationServiceImpl implements SolarInstallationService {
                             installation, startOfDay, endOfDay);
                     Double todayConsumption = energyDataRepository.sumPowerConsumptionForPeriod(
                             installation, startOfDay, endOfDay);
-                    
+
                     // Get most recent reading for current generation
                     List<EnergyData> recentReadings = energyDataRepository.findByInstallationOrderByTimestampDesc(installation);
                     Double currentGenerationWatts = recentReadings.isEmpty() ? 0 : recentReadings.get(0).getPowerGenerationWatts();
-                    
+
                     // Calculate efficiency
                     Double efficiency = 0.0;
                     if (todayConsumption != null && todayConsumption > 0) {
                         efficiency = (todayGeneration / todayConsumption) * 100;
                     }
-                    
+
                     // Convert to TopProducerDTO with production and efficiency metrics
                     return convertToTopProducerDTO(installation, todayGeneration, currentGenerationWatts, efficiency);
                 })
                 .collect(Collectors.toList());
-        
+
         // Build the system overview response
         SystemOverviewResponse response = SystemOverviewResponse.builder()
                 .totalActiveInstallations((int) activeCount)
@@ -495,7 +495,7 @@ public class SolarInstallationServiceImpl implements SolarInstallationService {
                 .recentInstallationReadings(recentInstallationReadings)
                 .installationsByStatus(installationsByStatus)
                 .build();
-        
+
         return response;
     }
 
@@ -543,7 +543,7 @@ public class SolarInstallationServiceImpl implements SolarInstallationService {
         // Calculate sensible default values if metrics are null
         double todayGenerationKWh = (todayGeneration != null ? todayGeneration : 0) / 1000.0 / 3600.0;
         double currentGeneration = (currentGenerationWatts != null ? currentGenerationWatts : 0);
-        
+
         // Get the efficiency from energy summaries if current calculation is zero
         double efficiency = efficiencyValue != null ? efficiencyValue : 0;
         if (efficiency == 0) {
@@ -551,7 +551,7 @@ public class SolarInstallationServiceImpl implements SolarInstallationService {
             LocalDate today = LocalDate.now();
             Optional<EnergySummary> todaySummary = energySummaryRepository.findByInstallationAndPeriodAndDate(
                     installation, EnergySummary.SummaryPeriod.DAILY, today);
-            
+
             if (todaySummary.isPresent() && todaySummary.get().getEfficiencyPercentage() > 0) {
                 efficiency = todaySummary.get().getEfficiencyPercentage();
             } else {
@@ -559,22 +559,24 @@ public class SolarInstallationServiceImpl implements SolarInstallationService {
                 LocalDate startOfWeek = LocalDate.now().minusDays(LocalDate.now().getDayOfWeek().getValue() - 1);
                 Optional<EnergySummary> weeklySummary = energySummaryRepository.findByInstallationAndPeriodAndDate(
                         installation, EnergySummary.SummaryPeriod.WEEKLY, startOfWeek);
-                
+
                 if (weeklySummary.isPresent() && weeklySummary.get().getEfficiencyPercentage() > 0) {
                     efficiency = weeklySummary.get().getEfficiencyPercentage();
                 }
             }
         }
-        
-        // Ensure efficiency is properly formatted as a decimal (frontend expects 0.0-1.0 range)
-        efficiency = efficiency > 1.0 ? efficiency / 100.0 : efficiency;
-        
+
+        // Make sure efficiency is a percentage value (0-100 range)
+        if (efficiency > 0 && efficiency <= 1.0) {
+            efficiency = efficiency * 100.0; // Convert from decimal to percentage
+        }
+
         // Calculate utilization rate (currentGeneration as percentage of installed capacity)
         double utilizationRate = 0;
         if (installation.getInstalledCapacityKW() > 0) {
             utilizationRate = Math.min(1.0, currentGeneration / (installation.getInstalledCapacityKW() * 1000));
         }
-        
+
         return TopProducerDTO.builder()
                 .id(installation.getId())
                 .name(installation.getName())
@@ -582,6 +584,7 @@ public class SolarInstallationServiceImpl implements SolarInstallationService {
                 .username(installation.getUser() != null ? installation.getUser().getEmail() : null)
                 .location(installation.getLocation())
                 .installedCapacityKW(installation.getInstalledCapacityKW())
+                .type(installation.getType() != null ? installation.getType() : SolarInstallation.InstallationType.RESIDENTIAL)
                 .currentPowerGenerationWatts(currentGeneration)
                 .todayGenerationKWh(todayGenerationKWh)
                 .efficiencyPercentage(efficiency)
