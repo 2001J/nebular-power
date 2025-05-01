@@ -17,6 +17,9 @@ import {
   BarChart3,
   Settings,
   RefreshCw,
+  AlertTriangle,
+  Zap,
+  MapPin,
 } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -678,7 +681,22 @@ export default function AdminDashboardPage() {
                             : "bg-amber-500/10 text-amber-500"
                         }`}
                       >
-                        <ShieldAlert className="h-5 w-5" />
+                        {/* Use different icons based on alert type */}
+                        {alertType.toUpperCase().includes("PHYSICAL") || 
+                         alertType.toUpperCase().includes("INTRUSION") ? (
+                          <ShieldAlert className="h-5 w-5" />
+                        ) : alertType.toUpperCase().includes("VOLTAGE") || 
+                           alertType.toUpperCase().includes("POWER") ? (
+                          <AlertTriangle className="h-5 w-5" />
+                        ) : alertType.toUpperCase().includes("CONNECTION") || 
+                           alertType.toUpperCase().includes("NETWORK") ? (
+                          <Zap className="h-5 w-5" />
+                        ) : alertType.toUpperCase().includes("LOCATION") || 
+                           alertType.toUpperCase().includes("GPS") ? (
+                          <MapPin className="h-5 w-5" />
+                        ) : (
+                          <ShieldAlert className="h-5 w-5" />
+                        )}
                       </div>
                       <div className="flex-1 space-y-1">
                         <p className="font-medium">{simplifyAlertMessage(alert.description || alert.message)}</p>
