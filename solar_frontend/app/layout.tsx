@@ -9,9 +9,9 @@ import "./globals.css"
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata = {
-  title: "Solar Energy Financing & Monitoring",
+  title: "NebulaPower - Solar Energy Monitoring & Management",
   description: "Monitor and manage your solar energy system",
-    generator: 'v0.dev'
+  generator: 'v0.dev'
 }
 
 export default function RootLayout({

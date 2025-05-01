@@ -105,7 +105,7 @@ export default function LoginPage() {
       <div className="hidden md:flex md:w-1/2 bg-[#1e2e4a] text-white p-8 flex-col justify-between">
         <div className="flex items-center gap-2">
           <Sun className="h-6 w-6" />
-          <span className="text-lg font-bold">SolarMonitor</span>
+          <span className="text-lg font-bold">NebulaPower</span>
         </div>
 
         <div className="space-y-6 max-w-md">
@@ -125,7 +125,7 @@ export default function LoginPage() {
           </div>
         </div>
 
-        <p className="text-sm text-gray-300">&copy; {new Date().getFullYear()} SolarMonitor. All rights reserved.</p>
+        <p className="text-sm text-gray-300">&copy; {new Date().getFullYear()} NebulaPower. All rights reserved.</p>
       </div>
 
       {/* Right panel - Login form */}
@@ -134,7 +134,7 @@ export default function LoginPage() {
           <div className="flex justify-between items-center">
             <div className="md:hidden flex items-center gap-2">
               <Sun className="h-6 w-6 text-[#1e2e4a]" />
-              <span className="text-lg font-bold text-[#1e2e4a]">SolarMonitor</span>
+              <span className="text-lg font-bold text-[#1e2e4a]">NebulaPower</span>
             </div>
             <div className="text-sm text-gray-500">
               <span className="flex items-center">

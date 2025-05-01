@@ -155,7 +155,7 @@ export default function AdminLayout({
           <SidebarHeader className="h-16 flex items-center px-4 border-b">
             <div className="flex items-center gap-2">
               <Sun className="h-6 w-6 text-primary" />
-              <span className="text-lg font-bold">SolarComply</span>
+              <span className="text-lg font-bold">NebulaPower</span>
               <Badge variant="outline" className="ml-2">
                 Admin
               </Badge>

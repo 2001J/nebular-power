@@ -62,7 +62,7 @@ export default function CustomerLayout({
       <header className="fixed top-0 left-0 right-0 z-50 h-14 bg-white border-b flex items-center px-4">
         <div className="flex items-center gap-2 mr-8">
           <Sun className="h-6 w-6 text-red-500" />
-          <span className="text-lg font-bold">SolarComply</span>
+          <span className="text-lg font-bold">NebulaPower</span>
         </div>
 
         <nav className="hidden md:flex items-center space-x-4">
