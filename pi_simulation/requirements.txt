@@ -1,0 +1,17 @@
+# HTTP requests library
+requests>=2.25.1
+
+# For more robust HTTP requests handling
+urllib3>=1.26.5
+
+# For easier date/time manipulation
+python-dateutil>=2.8.2
+
+# For environment variable management
+python-dotenv>=0.19.1
+
+# For console output formatting
+colorama>=0.4.4
+
+# For more advanced logging
+loguru>=0.5.3
