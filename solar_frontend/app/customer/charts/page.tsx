@@ -3,6 +3,7 @@
 import type React from "react"
 
 import { useState, useEffect } from "react"
+import { useTheme } from "next-themes"
 import { AlertCircle, ArrowRight, Battery, Check, Download, Home, Info, Shield, Sun, Zap, ArrowUp, ArrowDown, RefreshCw, BarChart3 } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -109,6 +110,7 @@ interface SystemAlert {
 export default function DashboardPage() {
   const { user } = useAuth()
   const { toast } = useToast()
+  const { theme } = useTheme()
   const [selectedPeriod, setSelectedPeriod] = useState("day")
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split("T")[0])
   const [selectedInstallation, setSelectedInstallation] = useState<string | null>(null)
@@ -118,6 +120,20 @@ export default function DashboardPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [hasError, setHasError] = useState(false)
   const [systemStatus, setSystemStatus] = useState<SystemStatus | null>(null)
+
+  // Theme-aware chart colors
+  const chartColors = {
+    grid: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)',
+    referenceLine: theme === 'dark' ? '#ffffff' : '#000000',
+    production: {
+      stroke: '#16a34a',
+      fill: theme === 'dark' ? 'rgba(22, 163, 74, 0.5)' : 'rgba(22, 163, 74, 0.3)'
+    },
+    consumption: {
+      stroke: '#ef4444',
+      fill: theme === 'dark' ? 'rgba(239, 68, 68, 0.5)' : 'rgba(239, 68, 68, 0.3)'
+    }
+  }
 
   // State for toggling data series visibility
   const [visibleSeries, setVisibleSeries] = useState({
@@ -894,7 +910,7 @@ export default function DashboardPage() {
                 bottom: 20,
               }}
             >
-              <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.1} />
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={chartColors.grid} />
               <XAxis 
                 dataKey="time" 
                 tick={{ fontSize: 12 }}
@@ -916,9 +932,9 @@ export default function DashboardPage() {
                   dataKey="production"
                   name="Generation"
                   stackId="1"
-                  stroke="#16a34a"
-                  fill="#16a34a"
-                  fillOpacity={0.3}
+                  stroke={chartColors.production.stroke}
+                  fill={chartColors.production.stroke}
+                  fillOpacity={theme === 'dark' ? 0.5 : 0.3}
                 />
               )}
               {visibleSeries.consumption && (
@@ -927,9 +943,9 @@ export default function DashboardPage() {
                   dataKey="consumption"
                   name="Consumption"
                   stackId="2"
-                  stroke="#ef4444"
-                  fill="#ef4444"
-                  fillOpacity={0.3}
+                  stroke={chartColors.consumption.stroke}
+                  fill={chartColors.consumption.stroke}
+                  fillOpacity={theme === 'dark' ? 0.5 : 0.3}
                 />
               )}
             </AreaChart>
@@ -950,7 +966,7 @@ export default function DashboardPage() {
                 bottom: 20,
               }}
             >
-              <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.1} />
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={chartColors.grid} />
               <XAxis 
                 dataKey="time" 
                 tick={{ fontSize: 12 }}
@@ -973,7 +989,7 @@ export default function DashboardPage() {
                 <Bar
                   dataKey="production"
                   name="Generation"
-                  fill="#16a34a"
+                  fill={chartColors.production.stroke}
                   radius={[4, 4, 0, 0]}
                 />
               )}
@@ -981,11 +997,11 @@ export default function DashboardPage() {
                 <Bar
                   dataKey="consumption"
                   name="Consumption"
-                  fill="#ef4444"
+                  fill={chartColors.consumption.stroke}
                   radius={[4, 4, 0, 0]}
                 />
               )}
-              <ReferenceLine y={0} stroke="#000" />
+              <ReferenceLine y={0} stroke={chartColors.referenceLine} />
             </BarChart>
           </ResponsiveContainer>
         </div>
