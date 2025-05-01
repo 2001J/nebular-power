@@ -22,6 +22,8 @@ import {
   Check,
   X,
   Loader2,
+  ShieldAlert,
+  Eye,
 } from "lucide-react"
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
@@ -109,11 +111,12 @@ interface ReadingData {
 interface SecurityEvent {
   id: number;
   installationId: number;
-  eventType: string;
+  type: string;
   status: string;
   timestamp: string;
   details: string;
   severity: string;
+  eventType?: string;
 }
 
 interface SecurityEventResponse {
@@ -219,7 +222,7 @@ export default function InstallationDetailPage() {
           // Calculate performance metrics from dashboard data
           // Use the dashboard data for more accurate performance metrics
           const perfMetrics = {
-            efficiency: averageEfficiency || dashboardData.currentEfficiencyPercentage || 0,
+            efficiency: dashboardData.averageEfficiencyPercentage || 0,
             dailyYield: dashboardData.todayGenerationKWh || 0,
             monthlyYield: dashboardData.monthToDateGenerationKWh || 0,
             yearlyYield: dashboardData.yearToDateGenerationKWh || 0,
@@ -601,6 +604,24 @@ export default function InstallationDetailPage() {
     }
   }
 
+  // Get severity badge
+  const getSeverityBadge = (severity: string) => {
+    if (!severity) return <Badge variant="outline">Unknown</Badge>
+
+    switch (severity.toUpperCase()) {
+      case 'HIGH':
+        return <Badge className="bg-red-100 text-red-700 border-red-200">High</Badge>
+      case 'MEDIUM':
+        return <Badge className="bg-amber-100 text-amber-700 border-amber-200">Medium</Badge>
+      case 'LOW':
+        return <Badge className="bg-blue-100 text-blue-700 border-blue-200">Low</Badge>
+      case 'CRITICAL':
+        return <Badge className="bg-red-700 text-white">Critical</Badge>
+      default:
+        return <Badge variant="outline">{severity}</Badge>
+    }
+  }
+
   // Event status badge
   const getEventStatusBadge = (status: string) => {
     if (!status) return <Badge variant="outline">Unknown</Badge>
@@ -625,31 +646,29 @@ export default function InstallationDetailPage() {
       case 'CRITICAL':
         return <Badge className="bg-red-700">Critical</Badge>
       default:
-        return <Badge variant="outline">{status}</Badge>
-    }
-  }
-
-  // Severity badge
-  const getSeverityBadge = (severity: string) => {
-    if (!severity) return <Badge variant="outline">Unknown</Badge>
-
-    switch (severity.toUpperCase()) {
-      case 'HIGH':
-        return <Badge className="bg-red-100 text-red-700 border-red-200">High</Badge>
-      case 'MEDIUM':
-        return <Badge className="bg-amber-100 text-amber-700 border-amber-200">Medium</Badge>
-      case 'LOW':
-        return <Badge className="bg-blue-100 text-blue-700 border-blue-200">Low</Badge>
-      default:
-        return <Badge variant="outline">{severity}</Badge>
+        return <Badge variant="outline">Unknown</Badge>
     }
   }
 
   // Event type icon
-  const getEventTypeIcon = (eventType: string) => {
-    if (!eventType) return <Info className="h-4 w-4" />
+  const getEventTypeIcon = (type: string) => {
+    if (!type) return <Info className="h-4 w-4" />
 
-    switch (eventType.toUpperCase()) {
+    switch (type.toUpperCase()) {
+      case 'PHYSICAL_MOVEMENT':
+        return <ShieldAlert className="h-4 w-4 text-red-500" />
+      case 'VOLTAGE_FLUCTUATION':
+        return <AlertTriangle className="h-4 w-4 text-amber-500" />
+      case 'CONNECTION_TAMPERING':
+        return <X className="h-4 w-4 text-red-500" />
+      case 'LOCATION_CHANGE':
+        return <Eye className="h-4 w-4 text-blue-500" />
+      case 'PANEL_ACCESS':
+        return <ShieldAlert className="h-4 w-4 text-red-500" />
+      case 'COMMUNICATION_INTERFERENCE':
+        return <X className="h-4 w-4 text-amber-500" />
+      case 'UNAUTHORIZED_ACCESS':
+        return <ShieldAlert className="h-4 w-4 text-red-500" />
       case 'SYSTEM_CHECK':
         return <Check className="h-4 w-4" />
       case 'CONNECTION_CHECK':
@@ -771,7 +790,7 @@ export default function InstallationDetailPage() {
 
                     // Calculate performance metrics from dashboard data
                     const perfMetrics = {
-                      efficiency: averageEfficiency || dashboardData.currentEfficiencyPercentage || 0,
+                      efficiency: dashboardData.averageEfficiencyPercentage || 0,
                       dailyYield: dashboardData.todayGenerationKWh || 0,
                       monthlyYield: dashboardData.monthToDateGenerationKWh || 0,
                       yearlyYield: dashboardData.yearToDateGenerationKWh || 0,
@@ -902,7 +921,7 @@ export default function InstallationDetailPage() {
                   <div>
                     <h3 className="text-sm font-medium text-muted-foreground">Efficiency</h3>
                     <div className="flex items-center gap-2 mt-1">
-                      <p className="text-xl font-bold">{performance.efficiency}%</p>
+                      <p className="text-xl font-bold">{performance.efficiency.toFixed(2)}%</p>
                       <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
                         <div 
                           className={`h-full rounded-full ${
@@ -1183,11 +1202,11 @@ export default function InstallationDetailPage() {
                       <TableCell>{formatDate(event.timestamp)}</TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
-                          {getEventTypeIcon(event.eventType)}
-                          <span>{event.eventType}</span>
+                          {getEventTypeIcon(event.type || event.eventType)}
+                          <span>{(event.type || event.eventType)?.replace("_", " ")}</span>
                         </div>
                       </TableCell>
-                      <TableCell>{getSeverityBadge(event.severity)}</TableCell>
+                      <TableCell>{getSeverityBadge(event.severity || 'MEDIUM')}</TableCell>
                       <TableCell>{getEventStatusBadge(event.status)}</TableCell>
                     </TableRow>
                   ))}
@@ -1208,13 +1227,13 @@ export default function InstallationDetailPage() {
           )}
           <Button
             variant="default"
-            className={`${installation?.tamperDetected ? 'bg-red-500 hover:bg-red-600' : ''}`}
-            onClick={() => router.push("/admin/security")}
+            className={`${installation?.tamperDetected ? 'bg-red-500 hover:bg-red-600 px-6' : ''}`}
+            onClick={() => router.push("/admin/security/alerts")}
           >
             {installation?.tamperDetected ? (
               <>
                 <AlertTriangle className="mr-2 h-4 w-4" />
-                Tamper Detected
+                Tamper Detected -&gt; View All Alerts
               </>
             ) : (
               "Security Dashboard"
