@@ -5,6 +5,7 @@ import { ShieldAlert, AlertTriangle, Zap, User, RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { securityApi } from "@/lib/api"
 import { format, parseISO } from "date-fns"
+import { Badge } from "@/components/ui/badge"
 
 export function AdminSecurityAlerts() {
   const [alerts, setAlerts] = useState([])
@@ -20,6 +21,7 @@ export function AdminSecurityAlerts() {
           const formattedAlerts = data.map(alert => ({
             id: alert.id || alert.alertId,
             type: mapAlertTypeToUIType(alert.severity || alert.eventType),
+            eventType: alert.eventType || alert.tamperType || alert.type || "Unknown Alert Type",
             message: alert.description || "Security alert detected",
             timestamp: formatDate(alert.timestamp),
             location: alert.installationLocation || `Installation #${alert.installationId}`,
@@ -62,7 +64,32 @@ export function AdminSecurityAlerts() {
       return Zap
     if (typeUpper === "LOCATION_CHANGE" || typeUpper === "LOCATION_TAMPER")
       return User
-    return User
+    return ShieldAlert
+  }
+
+  // Format alert type for display
+  const formatAlertType = (eventType) => {
+    if (!eventType) return "Unknown";
+    
+    // Replace underscores with spaces and capitalize each word
+    return eventType
+      .replace(/_/g, ' ')
+      .split(' ')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join(' ');
+  }
+
+  // Get alert badge based on type
+  const getAlertBadge = (type) => {
+    if (type === "critical") {
+      return <Badge variant="destructive">Critical</Badge>;
+    }
+    
+    if (type === "warning") {
+      return <Badge className="bg-amber-500">Warning</Badge>;
+    }
+    
+    return <Badge variant="outline">Info</Badge>;
   }
 
   // Format date for display
@@ -119,7 +146,10 @@ export function AdminSecurityAlerts() {
           <div className="flex-1">
             <p className="font-medium">{alert.message}</p>
             <p className="text-sm text-muted-foreground">{alert.location}</p>
-            <p className="text-sm text-muted-foreground">{alert.timestamp}</p>
+            <div className="flex items-center gap-2 mt-1">
+              {getAlertBadge(alert.type)}
+              <span className="text-sm font-medium">{formatAlertType(alert.eventType)}</span>
+            </div>
           </div>
           <Button variant="outline" size="sm" onClick={() => window.location.href = "/admin/security/alerts"}>
             View

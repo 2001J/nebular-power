@@ -616,26 +616,86 @@ export default function AdminDashboardPage() {
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
                 </div>
               ) : displaySecurityAlerts.length > 0 ? (
-                displaySecurityAlerts.slice(0, 3).map((alert) => (
-                  <div key={alert.id} className="flex items-start gap-4 rounded-lg border p-4">
-                    <div
-                      className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${alert.type === "critical"
-                        ? "bg-destructive/10 text-destructive"
-                        : "bg-amber-500/10 text-amber-500"
+                displaySecurityAlerts.slice(0, 3).map((alert) => {
+                  // Format alert message to be more concise
+                  const simplifyAlertMessage = (message) => {
+                    if (!message) return "Security alert";
+                    
+                    // Extract just the alert type without detailed values
+                    if (message.includes(":")) {
+                      return message.split(":")[0].trim();
+                    }
+                    
+                    // For other types of alerts, extract just the main part before any detailed values
+                    const detailsStart = message.match(/\(|\d|:/);
+                    if (detailsStart) {
+                      return message.substring(0, detailsStart.index).trim();
+                    }
+                    
+                    // If no pattern found, limit to first 40 chars
+                    if (message.length > 40) {
+                      return message.substring(0, 40).trim() + "...";
+                    }
+                    
+                    return message;
+                  };
+                  
+                  // Format alert type for display
+                  const formatAlertType = (eventType) => {
+                    if (!eventType) return "Unknown";
+                    
+                    // Replace underscores with spaces and capitalize each word
+                    return eventType
+                      .replace(/_/g, ' ')
+                      .split(' ')
+                      .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+                      .join(' ');
+                  };
+                  
+                  // Get alert type and severity
+                  const alertType = alert.eventType || alert.tamperType || alert.type || "Unknown Alert Type";
+                  const severity = alert.severity?.toLowerCase() || 
+                    (alertType.includes("PHYSICAL") ? "critical" : 
+                     alertType.includes("VOLTAGE") ? "warning" : "info");
+                  
+                  // Get badge based on severity
+                  const getBadge = () => {
+                    if (severity === "critical" || severity === "high") {
+                      return <Badge variant="destructive">Critical</Badge>;
+                    }
+                    if (severity === "warning" || severity === "medium") {
+                      return <Badge className="bg-amber-500">Warning</Badge>;
+                    }
+                    return <Badge variant="outline">Info</Badge>;
+                  };
+                  
+                  return (
+                    <div key={alert.id} className="flex items-start gap-4 rounded-lg border p-4">
+                      <div
+                        className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${
+                          severity === "critical" || severity === "high"
+                            ? "bg-destructive/10 text-destructive"
+                            : "bg-amber-500/10 text-amber-500"
                         }`}
-                    >
-                      <ShieldAlert className="h-5 w-5" />
+                      >
+                        <ShieldAlert className="h-5 w-5" />
+                      </div>
+                      <div className="flex-1 space-y-1">
+                        <p className="font-medium">{simplifyAlertMessage(alert.description || alert.message)}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {alert.installationLocation || alert.location || `Installation #${alert.installationId}`}
+                        </p>
+                        <div className="flex items-center gap-2 mt-1">
+                          {getBadge()}
+                          <span className="text-sm font-medium">{formatAlertType(alertType)}</span>
+                        </div>
+                      </div>
+                      <Button variant="outline" size="sm" onClick={() => router.push(`/admin/security/alerts/${alert.id}`)}>
+                        View
+                      </Button>
                     </div>
-                    <div className="flex-1 space-y-1">
-                      <p className="font-medium">{alert.message}</p>
-                      <p className="text-sm text-muted-foreground">{alert.location}</p>
-                      <p className="text-sm text-muted-foreground">{alert.timestamp}</p>
-                    </div>
-                    <Button variant="outline" size="sm" onClick={() => router.push(`/admin/security/alerts/${alert.id}`)}>
-                      View
-                    </Button>
-                  </div>
-                ))
+                  );
+                })
               ) : (
                 <div className="text-center py-8 text-muted-foreground">
                   No security alerts found
