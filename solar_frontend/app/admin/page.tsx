@@ -690,9 +690,6 @@ export default function AdminDashboardPage() {
                           <span className="text-sm font-medium">{formatAlertType(alertType)}</span>
                         </div>
                       </div>
-                      <Button variant="outline" size="sm" onClick={() => router.push(`/admin/security/alerts/${alert.id}`)}>
-                        View
-                      </Button>
                     </div>
                   );
                 })
