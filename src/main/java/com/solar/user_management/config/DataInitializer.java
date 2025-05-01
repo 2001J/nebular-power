@@ -10,7 +10,11 @@ import org.springframework.stereotype.Component;
 
 @Component
 @RequiredArgsConstructor
-@Profile("dev")
+@Profile({"dev", "test"})
+/**
+ * DataInitializer is a Spring component that initializes the database with default data.
+ * It creates an admin user if it does not already exist.
+ */
 public class DataInitializer implements CommandLineRunner {
 
     private final UserRepository userRepository;
