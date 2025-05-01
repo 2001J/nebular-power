@@ -29,7 +29,7 @@ import java.util.Optional;
 @Component
 @RequiredArgsConstructor
 @Slf4j
-@Profile({"dev", "prod"})
+@Profile("dev")
 // Note: The profile is set to "prod" to ensure this data loader runs in production for demo purposes.
 // In a real production environment, this should be removed or replaced with a more secure data loading mechanism.
 // The "dev" profile is used for local development and testing.

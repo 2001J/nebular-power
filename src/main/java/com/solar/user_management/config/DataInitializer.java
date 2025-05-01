@@ -9,6 +9,7 @@ import org.springframework.stereotype.Component;
 
 @Component
 @RequiredArgsConstructor
+@Profile("dev")
 public class DataInitializer implements CommandLineRunner {
 
     private final UserRepository userRepository;
