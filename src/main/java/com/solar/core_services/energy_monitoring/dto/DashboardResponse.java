@@ -27,6 +27,7 @@ public class DashboardResponse {
     private double lifetimeGenerationKWh;
     private double lifetimeConsumptionKWh;
     private double currentEfficiencyPercentage;
+    private double averageEfficiencyPercentage;
     private LocalDateTime lastUpdated;
     private List<EnergyDataDTO> recentReadings;
     private SolarInstallationDTO installationDetails;

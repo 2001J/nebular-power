@@ -26,5 +26,6 @@ public class TopProducerDTO {
     private double currentPowerGenerationWatts;
     private double todayGenerationKWh;
     private double efficiencyPercentage;
+    private double averageEfficiencyPercentage;
     private double utilizationRate;
 }

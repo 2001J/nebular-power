@@ -75,7 +75,7 @@ public class EnergyDataServiceImpl implements EnergyDataService {
         SolarInstallation installation = installationRepository.findById(batchRequest.getInstallationId())
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Solar installation not found with ID: " + batchRequest.getInstallationId()));
-        
+
         // Process each reading in the batch
         List<EnergyData> processedReadings = batchRequest.getReadings().stream()
                 .map(reading -> {
@@ -85,24 +85,24 @@ public class EnergyDataServiceImpl implements EnergyDataService {
                     energyData.setPowerGenerationWatts(reading.getEnergyProduced());
                     energyData.setPowerConsumptionWatts(reading.getEnergyConsumed());
                     energyData.setTimestamp(reading.getTimestamp());
-                    
+
                     // Set other fields if available
                     // Note: Battery level is not currently supported in the EnergyData entity
                     // if (reading.getBatteryLevel() != null) {
                     //     energyData.setBatteryLevelPercentage(reading.getBatteryLevel());
                     // }
-                    
+
                     // Flag as simulated for now
                     energyData.setSimulated(true);
-                    
+
                     // Calculate derived metrics
                     return calculateDerivedMetrics(energyData);
                 })
                 .collect(Collectors.toList());
-        
+
         // Save all readings in batch
         List<EnergyData> savedReadings = energyDataRepository.saveAll(processedReadings);
-        
+
         // Convert to DTOs and send WebSocket updates
         List<EnergyDataDTO> responseList = savedReadings.stream()
                 .map(data -> {
@@ -112,7 +112,7 @@ public class EnergyDataServiceImpl implements EnergyDataService {
                     return dto;
                 })
                 .collect(Collectors.toList());
-        
+
         return responseList;
     }
 
@@ -239,6 +239,40 @@ public class EnergyDataServiceImpl implements EnergyDataService {
             currentEfficiency = (currentPowerGeneration / currentPowerConsumption) * 100;
         }
 
+        // Make sure efficiency is a percentage value (0-100 range)
+        if (currentEfficiency > 0 && currentEfficiency <= 1.0) {
+            currentEfficiency = currentEfficiency * 100.0; // Convert from decimal to percentage
+        }
+
+        // Cap efficiency at 100% for more reasonable values
+        double cappedEfficiency = Math.min(100.0, currentEfficiency);
+
+        // Calculate average efficiency based on utilization and capacity
+        double averageEfficiency = 0;
+
+        // Calculate utilization rate (currentGeneration as percentage of installed capacity)
+        double utilizationRate = 0;
+        if (installation.getInstalledCapacityKW() > 0) {
+            utilizationRate = Math.min(1.0, currentPowerGeneration / (installation.getInstalledCapacityKW() * 1000));
+
+            // Calculate average efficiency based on utilization rate
+            // At high utilization (near capacity), efficiency should be close to 100%
+            // At low utilization, use the capped efficiency value
+            if (utilizationRate > 0.7) {
+                // High production time - efficiency close to 100%
+                averageEfficiency = 90.0 + (10.0 * utilizationRate);
+            } else if (utilizationRate > 0.3) {
+                // Medium production time - efficiency between 70-90%
+                averageEfficiency = 70.0 + (20.0 * ((utilizationRate - 0.3) / 0.4));
+            } else if (utilizationRate > 0) {
+                // Low production time - efficiency between 0-70% based on utilization
+                averageEfficiency = Math.max(cappedEfficiency, utilizationRate * 70.0 / 0.3);
+            } else {
+                // No production - use capped efficiency or 0
+                averageEfficiency = cappedEfficiency;
+            }
+        }
+
         // Build the dashboard response
         DashboardResponse response = DashboardResponse.builder()
                 .installationId(installationId)
@@ -255,6 +289,7 @@ public class EnergyDataServiceImpl implements EnergyDataService {
                 .lifetimeGenerationKWh(installation.getInstalledCapacityKW() * 24 * 30 * 12) // Placeholder calculation
                 .lifetimeConsumptionKWh(installation.getInstalledCapacityKW() * 24 * 30 * 12 * 0.8) // Placeholder calculation
                 .currentEfficiencyPercentage(currentEfficiency)
+                .averageEfficiencyPercentage(averageEfficiency)
                 .lastUpdated(recentReadings.isEmpty() ? LocalDateTime.now() : recentReadings.get(0).getTimestamp())
                 .recentReadings(recentReadings.stream()
                         .limit(10)
