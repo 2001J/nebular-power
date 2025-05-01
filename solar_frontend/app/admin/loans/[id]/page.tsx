@@ -553,7 +553,7 @@ export default function LoanDetailsPage({ params }: { params: LoanParams }) {
         return <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">Active</Badge>
       case "COMPLETED":
       case "PAID":
-        return <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 font-bold">Completed</Badge>
+        return <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 font-bold">Completed</Badge>
       case "CANCELLED":
         return <Badge variant="outline" className="bg-gray-50 text-gray-700 border-gray-200">Cancelled</Badge>
       case "DEFAULTED":
