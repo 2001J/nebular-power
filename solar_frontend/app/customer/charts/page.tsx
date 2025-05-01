@@ -73,6 +73,7 @@ interface InstallationDashboard {
   lifetimeGenerationKWh: number;
   lifetimeConsumptionKWh: number;
   currentEfficiencyPercentage: number;
+  averageEfficiencyPercentage?: number;
   lastUpdated: string;
   recentReadings: EnergyReading[];
   installationDetails: InstallationDetails;
@@ -296,15 +297,15 @@ export default function DashboardPage() {
               tamperDetected: securityResponse.tamperDetected || dashboardResponse.installationDetails?.tamperDetected || false,
               lastTamperCheck: securityResponse.lastCheck || dashboardResponse.installationDetails?.lastTamperCheck || new Date().toISOString(),
               systemHealth: determineSystemHealth(
-                dashboardResponse.currentEfficiencyPercentage || 0, 
+                dashboardResponse.averageEfficiencyPercentage !== undefined ? dashboardResponse.averageEfficiencyPercentage : dashboardResponse.currentEfficiencyPercentage || 0, 
                 securityResponse.tamperDetected || false,
                 securityResponse.alerts?.length || 0
               ),
-              efficiency: dashboardResponse.currentEfficiencyPercentage || 0,
+              efficiency: dashboardResponse.averageEfficiencyPercentage !== undefined ? dashboardResponse.averageEfficiencyPercentage : dashboardResponse.currentEfficiencyPercentage || 0,
               lastMaintenance: securityResponse.lastMaintenance || null,
               alerts: securityResponse.alerts || [],
               recommendations: generateRecommendations(
-                dashboardResponse.currentEfficiencyPercentage || 0,
+                dashboardResponse.averageEfficiencyPercentage !== undefined ? dashboardResponse.averageEfficiencyPercentage : dashboardResponse.currentEfficiencyPercentage || 0,
                 securityResponse.tamperDetected || false,
                 securityResponse.alerts || []
               )
@@ -319,14 +320,14 @@ export default function DashboardPage() {
             tamperDetected: dashboardResponse.installationDetails?.tamperDetected || false,
             lastTamperCheck: dashboardResponse.installationDetails?.lastTamperCheck || new Date().toISOString(),
             systemHealth: determineSystemHealth(
-              dashboardResponse.currentEfficiencyPercentage || 0, 
+              dashboardResponse.averageEfficiencyPercentage !== undefined ? dashboardResponse.averageEfficiencyPercentage : dashboardResponse.currentEfficiencyPercentage || 0, 
               dashboardResponse.installationDetails?.tamperDetected || false,
               0
             ),
-            efficiency: dashboardResponse.currentEfficiencyPercentage || 0,
+            efficiency: dashboardResponse.averageEfficiencyPercentage !== undefined ? dashboardResponse.averageEfficiencyPercentage : dashboardResponse.currentEfficiencyPercentage || 0,
             alerts: [],
             recommendations: generateRecommendations(
-              dashboardResponse.currentEfficiencyPercentage || 0,
+              dashboardResponse.averageEfficiencyPercentage !== undefined ? dashboardResponse.averageEfficiencyPercentage : dashboardResponse.currentEfficiencyPercentage || 0,
               dashboardResponse.installationDetails?.tamperDetected || false,
               []
             )
@@ -1170,7 +1171,11 @@ export default function DashboardPage() {
               <CardContent>
                 <div className="flex items-center justify-between">
                   <div className="text-2xl font-bold">
-                    {dashboardData?.currentEfficiencyPercentage?.toFixed(1) || '0.0'}%
+                    {dashboardData?.averageEfficiencyPercentage !== undefined ? 
+                      `${(dashboardData.averageEfficiencyPercentage).toFixed(1)}%` : 
+                      dashboardData?.currentEfficiencyPercentage !== undefined ? 
+                      `${(dashboardData.currentEfficiencyPercentage).toFixed(1)}%` : 
+                      "0.0%"}
                 </div>
                   {systemStatus && (
                     <Badge className={`${getHealthColor(systemStatus.systemHealth)}`}>
@@ -1180,7 +1185,9 @@ export default function DashboardPage() {
                 </div>
                 <Progress 
                   className="h-2 mt-2" 
-                  value={dashboardData?.currentEfficiencyPercentage || 0} 
+                  value={dashboardData?.averageEfficiencyPercentage !== undefined ? 
+                    dashboardData.averageEfficiencyPercentage : 
+                    dashboardData?.currentEfficiencyPercentage || 0} 
                 />
               </CardContent>
             </Card>
@@ -1256,7 +1263,11 @@ export default function DashboardPage() {
                       <span>Efficiency</span>
                     </div>
                     <span className="font-bold text-blue-500">
-                      {dashboardData?.currentEfficiencyPercentage?.toFixed(1) || '0.0'}%
+                      {dashboardData?.averageEfficiencyPercentage !== undefined ? 
+                        `${(dashboardData.averageEfficiencyPercentage).toFixed(1)}%` : 
+                        dashboardData?.currentEfficiencyPercentage !== undefined ? 
+                        `${(dashboardData.currentEfficiencyPercentage).toFixed(1)}%` : 
+                        "0.0%"}
                     </span>
                   </div>
                 </div>

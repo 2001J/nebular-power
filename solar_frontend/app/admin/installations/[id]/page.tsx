@@ -109,10 +109,11 @@ interface ReadingData {
 interface SecurityEvent {
   id: number;
   installationId: number;
-  type: string;
+  eventType: string;
   status: string;
   timestamp: string;
   details: string;
+  severity: string;
 }
 
 interface SecurityEventResponse {
@@ -130,10 +131,10 @@ export default function InstallationDetailPage() {
   const router = useRouter()
   const { id } = useParams() as { id: string }
   const { toast } = useToast()
-  
+
   // Extract referrer from URL query parameters to know where the user came from
   const [referrer, setReferrer] = useState<string | null>(null)
-  
+
   useEffect(() => {
     // Check URL for referrer parameter
     const urlParams = new URLSearchParams(window.location.search)
@@ -142,7 +143,7 @@ export default function InstallationDetailPage() {
       setReferrer(ref)
     }
   }, [])
-  
+
   const [loading, setLoading] = useState(true)
   const [timeRange, setTimeRange] = useState("week")
   const [installation, setInstallation] = useState<Installation | null>(null)
@@ -164,22 +165,22 @@ export default function InstallationDetailPage() {
     const fetchInstallationData = async () => {
       try {
         setLoading(true)
-        
+
         // First fetch installation dashboard data (contains all the most accurate metrics)
         const dashboardData = await energyApi.getInstallationDashboard(id)
-        
+
         console.log('Installation dashboard data:', dashboardData)
-        
+
         // Calculate the average efficiency for this installation
         const averageEfficiency = await energyApi.calculateInstallationAverageEfficiency(id)
         console.log('Average efficiency for installation:', averageEfficiency)
-        
+
         // Then get additional installation details if needed
         const installationData = await installationApi.getInstallationDetails(id)
-        
+
         if (dashboardData && installationData) {
           console.log('Installation details:', installationData)
-          
+
           // Combine dashboard data with installation details
           const combinedData = {
             ...installationData,
@@ -200,10 +201,10 @@ export default function InstallationDetailPage() {
             lifetimeGenerationKWh: dashboardData.lifetimeGenerationKWh,
             lifetimeConsumptionKWh: dashboardData.lifetimeConsumptionKWh
           }
-          
+
           // Set the combined installation data
           setInstallation(combinedData)
-          
+
           // Store customer info separately if available
           if (installationData.username) {
             setCustomerInfo({
@@ -211,10 +212,10 @@ export default function InstallationDetailPage() {
               userId: installationData.userId
             })
           }
-          
+
           // Use readings from the dashboard if available
           setRecentReadings(dashboardData.recentReadings || [])
-          
+
           // Calculate performance metrics from dashboard data
           // Use the dashboard data for more accurate performance metrics
           const perfMetrics = {
@@ -225,9 +226,9 @@ export default function InstallationDetailPage() {
             totalYield: dashboardData.lifetimeGenerationKWh || 0,
             uptimePercent: 98 // Default value
           }
-          
+
           setPerformance(perfMetrics)
-          
+
           // Transform readings to chart data if available
           if (dashboardData.recentReadings && dashboardData.recentReadings.length > 0) {
             const chartData = processEnergyData(dashboardData.recentReadings, timeRange, dashboardData)
@@ -236,12 +237,12 @@ export default function InstallationDetailPage() {
             // Set empty chart data
             setEnergyData([])
           }
-          
+
           // Fetch recent security events
           let recentEvents: SecurityEvent[] = []
           try {
             const eventsResponse = await securityApi.getInstallationEvents(id) as SecurityEventResponse
-            
+
             // Handle both array response and paged response
             if (eventsResponse) {
               if (Array.isArray(eventsResponse)) {
@@ -253,7 +254,7 @@ export default function InstallationDetailPage() {
           } catch (eventsError) {
             console.error('Error fetching security events:', eventsError)
           }
-          
+
           // Use actual security events or empty array
           if (Array.isArray(recentEvents) && recentEvents.length > 0) {
             setSecurityEvents(recentEvents.slice(0, 5))
@@ -284,10 +285,10 @@ export default function InstallationDetailPage() {
       console.log(`🔄 Loading installation ${id} data with timeRange: ${timeRange}`);
       fetchInstallationData()
     }
-    
+
     // Set up WebSocket connection
     let wsConnection = null
-    
+
     try {
       wsConnection = energyWebSocket.createInstallationMonitor(
         id,
@@ -299,7 +300,7 @@ export default function InstallationDetailPage() {
               const updated = [data.payload, ...prev.slice(0, 9)]
               return updated
             })
-            
+
             // Update energy data charts
             setEnergyData(prev => {
               if (timeRange === 'day') {
@@ -307,7 +308,7 @@ export default function InstallationDetailPage() {
                 const newData = [...prev]
                 const existingIndex = newData.findIndex(item => 
                   item.name && item.name.includes(`${hour}:`))
-                
+
                 if (existingIndex >= 0) {
                   newData[existingIndex] = {
                     ...newData[existingIndex],
@@ -332,7 +333,7 @@ export default function InstallationDetailPage() {
     } catch (error) {
       console.error('Error setting up WebSocket:', error)
     }
-    
+
     // Clean up WebSocket connection
     return () => {
       if (wsConnection) {
@@ -340,7 +341,7 @@ export default function InstallationDetailPage() {
       }
     }
   }, [id, timeRange, toast, router])
-  
+
   // Transform readings to chart data
   const processEnergyData = (
     readings: any[],
@@ -363,34 +364,34 @@ export default function InstallationDetailPage() {
       month: dashboardData?.monthToDateGenerationKWh || 0,
       year: dashboardData?.yearToDateGenerationKWh || 0
     }
-    
+
     const expectedConsumption = {
       day: dashboardData?.todayConsumptionKWh || 0,
       week: dashboardData?.weekToDateConsumptionKWh || 0,
       month: dashboardData?.monthToDateConsumptionKWh || 0,
       year: dashboardData?.yearToDateConsumptionKWh || 0
     }
-    
+
     // Calculate the total energy from readings to normalize later
     const totalProductionFromReadings = sortedReadings.reduce(
       (sum, reading) => sum + (reading.powerGenerationWatts / 1000), 0
     )
-    
+
     const totalConsumptionFromReadings = sortedReadings.reduce(
       (sum, reading) => sum + (reading.powerConsumptionWatts / 1000), 0
     )
-    
+
     // Calculate normalization factors
     const productionNormalizationFactor = 
       totalProductionFromReadings > 0 && expectedProduction[timeRangeType] > 0 
         ? expectedProduction[timeRangeType] / totalProductionFromReadings
         : 1
-        
+
     const consumptionNormalizationFactor = 
       totalConsumptionFromReadings > 0 && expectedConsumption[timeRangeType] > 0 
         ? expectedConsumption[timeRangeType] / totalConsumptionFromReadings
         : 1
-    
+
     console.log('Installation normalization factors:', {
       timeRangeType,
       productionFactor: productionNormalizationFactor,
@@ -427,7 +428,7 @@ export default function InstallationDetailPage() {
           // Normalize the values using the calculated factors
           const normalizedGeneration = (reading.powerGenerationWatts / 1000) * productionNormalizationFactor
           const normalizedConsumption = (reading.powerConsumptionWatts / 1000) * consumptionNormalizationFactor
-          
+
           hourlyData[hourKey].generation += normalizedGeneration
           hourlyData[hourKey].consumption += normalizedConsumption
           hourlyData[hourKey].count += 1
@@ -470,7 +471,7 @@ export default function InstallationDetailPage() {
         // Normalize the values using the calculated factors
         const normalizedGeneration = (reading.powerGenerationWatts / 1000) * productionNormalizationFactor
         const normalizedConsumption = (reading.powerConsumptionWatts / 1000) * consumptionNormalizationFactor
-        
+
         dailyData[dayName].generation += normalizedGeneration
         dailyData[dayName].consumption += normalizedConsumption
         dailyData[dayName].count += 1
@@ -507,7 +508,7 @@ export default function InstallationDetailPage() {
         // Normalize the values using the calculated factors
         const normalizedGeneration = (reading.powerGenerationWatts / 1000) * productionNormalizationFactor
         const normalizedConsumption = (reading.powerConsumptionWatts / 1000) * consumptionNormalizationFactor
-        
+
         monthData[dayStr].generation += normalizedGeneration
         monthData[dayStr].consumption += normalizedConsumption
         monthData[dayStr].count += 1
@@ -549,7 +550,7 @@ export default function InstallationDetailPage() {
         // Normalize the values using the calculated factors
         const normalizedGeneration = (reading.powerGenerationWatts / 1000) * productionNormalizationFactor
         const normalizedConsumption = (reading.powerConsumptionWatts / 1000) * consumptionNormalizationFactor
-        
+
         yearData[monthName].generation += normalizedGeneration
         yearData[monthName].consumption += normalizedConsumption
         yearData[monthName].count += 1
@@ -562,11 +563,11 @@ export default function InstallationDetailPage() {
       }))
     }
   }
-  
+
   // Format energy value
   const formatEnergyValue = (value: number) => {
     if (!value) return "0 kWh"
-    
+
     if (value >= 1000000) {
       return `${(value / 1000000).toFixed(2)} GWh`
     } else if (value >= 1000) {
@@ -575,19 +576,19 @@ export default function InstallationDetailPage() {
       return `${value.toFixed(2)} kWh`
     }
   }
-  
+
   // Format date
   const formatDate = (dateString: string) => {
     if (!dateString) return "N/A"
-    
+
     const date = new Date(dateString)
     return date.toLocaleString()
   }
-  
+
   // Installation type badge color
   const getTypeColor = (type: string) => {
     if (!type) return "bg-gray-500"
-    
+
     switch (type.toUpperCase()) {
       case 'RESIDENTIAL':
         return "bg-blue-500"
@@ -599,12 +600,22 @@ export default function InstallationDetailPage() {
         return "bg-gray-500"
     }
   }
-  
+
   // Event status badge
   const getEventStatusBadge = (status: string) => {
     if (!status) return <Badge variant="outline">Unknown</Badge>
-    
+
     switch (status.toUpperCase()) {
+      case 'NEW':
+        return <Badge className="bg-red-100 text-red-700 border-red-200">Open</Badge>
+      case 'ACKNOWLEDGED':
+        return <Badge className="bg-amber-100 text-amber-700 border-amber-200">Acknowledged</Badge>
+      case 'INVESTIGATING':
+        return <Badge className="bg-purple-100 text-purple-700 border-purple-200">Investigating</Badge>
+      case 'RESOLVED':
+        return <Badge className="bg-green-100 text-green-700 border-green-200">Resolved</Badge>
+      case 'FALSE_ALARM':
+        return <Badge className="bg-slate-100 text-slate-700 border-slate-200">False Alarm</Badge>
       case 'SUCCESS':
         return <Badge className="bg-green-500">Success</Badge>
       case 'WARNING':
@@ -614,15 +625,31 @@ export default function InstallationDetailPage() {
       case 'CRITICAL':
         return <Badge className="bg-red-700">Critical</Badge>
       default:
-        return <Badge variant="outline">Unknown</Badge>
+        return <Badge variant="outline">{status}</Badge>
     }
   }
-  
+
+  // Severity badge
+  const getSeverityBadge = (severity: string) => {
+    if (!severity) return <Badge variant="outline">Unknown</Badge>
+
+    switch (severity.toUpperCase()) {
+      case 'HIGH':
+        return <Badge className="bg-red-100 text-red-700 border-red-200">High</Badge>
+      case 'MEDIUM':
+        return <Badge className="bg-amber-100 text-amber-700 border-amber-200">Medium</Badge>
+      case 'LOW':
+        return <Badge className="bg-blue-100 text-blue-700 border-blue-200">Low</Badge>
+      default:
+        return <Badge variant="outline">{severity}</Badge>
+    }
+  }
+
   // Event type icon
-  const getEventTypeIcon = (type: string) => {
-    if (!type) return <Info className="h-4 w-4" />
-    
-    switch (type.toUpperCase()) {
+  const getEventTypeIcon = (eventType: string) => {
+    if (!eventType) return <Info className="h-4 w-4" />
+
+    switch (eventType.toUpperCase()) {
       case 'SYSTEM_CHECK':
         return <Check className="h-4 w-4" />
       case 'CONNECTION_CHECK':
@@ -700,13 +727,13 @@ export default function InstallationDetailPage() {
                 try {
                   // First fetch installation dashboard data
                   const dashboardData = await energyApi.getInstallationDashboard(id)
-                  
+
                   // Calculate the average efficiency for this installation
                   const averageEfficiency = await energyApi.calculateInstallationAverageEfficiency(id)
-                  
+
                   // Then get additional installation details if needed
                   const installationData = await installationApi.getInstallationDetails(id)
-                  
+
                   if (dashboardData && installationData) {
                     // Process data here (same as in useEffect)
                     // Combine dashboard data with installation details
@@ -727,10 +754,10 @@ export default function InstallationDetailPage() {
                       lifetimeGenerationKWh: dashboardData.lifetimeGenerationKWh,
                       lifetimeConsumptionKWh: dashboardData.lifetimeConsumptionKWh
                     }
-                    
+
                     // Update state with the new data
                     setInstallation(combinedData)
-                    
+
                     // Store customer info separately if available
                     if (installationData.username) {
                       setCustomerInfo({
@@ -738,10 +765,10 @@ export default function InstallationDetailPage() {
                         userId: installationData.userId
                       })
                     }
-                    
+
                     // Use readings from the dashboard if available
                     setRecentReadings(dashboardData.recentReadings || [])
-                    
+
                     // Calculate performance metrics from dashboard data
                     const perfMetrics = {
                       efficiency: averageEfficiency || dashboardData.currentEfficiencyPercentage || 0,
@@ -751,9 +778,9 @@ export default function InstallationDetailPage() {
                       totalYield: dashboardData.lifetimeGenerationKWh || 0,
                       uptimePercent: 98 // Default value
                     }
-                    
+
                     setPerformance(perfMetrics)
-                    
+
                     // Transform readings to chart data if available
                     if (dashboardData.recentReadings && dashboardData.recentReadings.length > 0) {
                       const chartData = processEnergyData(dashboardData.recentReadings, timeRange, dashboardData)
@@ -771,7 +798,7 @@ export default function InstallationDetailPage() {
                   setLoading(false)
                 }
               }
-              
+
               fetchInstallationData()
             }
           }}>
@@ -1144,24 +1171,24 @@ export default function InstallationDetailPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Event Type</TableHead>
+                    <TableHead>Time</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Severity</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead>Timestamp</TableHead>
-                    <TableHead>Details</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {securityEvents.map((event) => (
                     <TableRow key={event.id}>
+                      <TableCell>{formatDate(event.timestamp)}</TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
-                          {getEventTypeIcon(event.type)}
-                          <span>{event.type}</span>
+                          {getEventTypeIcon(event.eventType)}
+                          <span>{event.eventType}</span>
                         </div>
                       </TableCell>
+                      <TableCell>{getSeverityBadge(event.severity)}</TableCell>
                       <TableCell>{getEventStatusBadge(event.status)}</TableCell>
-                      <TableCell>{formatDate(event.timestamp)}</TableCell>
-                      <TableCell>{event.details}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
