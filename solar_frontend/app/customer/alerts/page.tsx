@@ -39,11 +39,39 @@ export default function AlertsPage() {
   const { toast } = useToast()
   const [activeTab, setActiveTab] = useState("active")
   const [searchTerm, setSearchTerm] = useState("")
-  const [filterType, setFilterType] = useState("all")
   const [installations, setInstallations] = useState<Installation[]>([])
   const [alerts, setAlerts] = useState<Alert[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
+
+  // Helper function to simplify alert messages for customers
+  const simplifyAlertMessage = (message: string): string => {
+    if (!message) return "System Alert";
+
+    // For voltage fluctuation alerts
+    if (message.includes("Voltage fluctuation")) {
+      return "Voltage fluctuation";
+    }
+
+    // For other types of alerts, extract just the main part before any details
+    const colonIndex = message.indexOf(':');
+    if (colonIndex > 0) {
+      return message.substring(0, colonIndex).trim();
+    }
+
+    // If no colon, return the first sentence or the whole message if it's short
+    const periodIndex = message.indexOf('.');
+    if (periodIndex > 0 && periodIndex < 100) {
+      return message.substring(0, periodIndex + 1).trim();
+    }
+
+    // If the message is too long, truncate it
+    if (message.length > 50) {
+      return message.substring(0, 50).trim() + "...";
+    }
+
+    return message;
+  };
 
   const fetchData = async () => {
     if (!user) return
@@ -66,8 +94,8 @@ export default function AlertsPage() {
               id: alert.id || alert.alertId,
               installationId: installation.id,
               type: mapAlertTypeToUIType(alert.type || alert.tamperType),
-              message: alert.message || alert.title || alert.description,
-              description: alert.description,
+              message: simplifyAlertMessage(alert.message || alert.title || alert.description),
+              description: alert.description, // Keep the full description for reference if needed
               severity: alert.severity?.toLowerCase() || "medium",
               timestamp: alert.timestamp || alert.createdAt,
               location: alert.location?.address || installation.name,
@@ -139,15 +167,13 @@ export default function AlertsPage() {
   const filteredActiveAlerts = activeAlerts.filter(
     (alert) =>
       (alert.message?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        alert.description?.toLowerCase().includes(searchTerm.toLowerCase())) &&
-      (filterType === "all" || alert.type === filterType)
+        alert.description?.toLowerCase().includes(searchTerm.toLowerCase()))
   )
 
   const filteredResolvedAlerts = resolvedAlerts.filter(
     (alert) =>
       (alert.message?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        alert.description?.toLowerCase().includes(searchTerm.toLowerCase())) &&
-      (filterType === "all" || alert.type === filterType)
+        alert.description?.toLowerCase().includes(searchTerm.toLowerCase()))
   )
 
   // Format date for display
@@ -209,17 +235,6 @@ export default function AlertsPage() {
             />
           </div>
 
-          <Select value={filterType} onValueChange={setFilterType}>
-            <SelectTrigger className="w-[150px]">
-              <SelectValue placeholder="Filter by type" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Types</SelectItem>
-              <SelectItem value="critical">Critical</SelectItem>
-              <SelectItem value="warning">Warning</SelectItem>
-              <SelectItem value="info">Info</SelectItem>
-            </SelectContent>
-          </Select>
 
           <Button variant="outline" size="icon" onClick={fetchData} disabled={refreshing}>
             <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
@@ -228,7 +243,7 @@ export default function AlertsPage() {
       </div>
 
       {/* Alert Summary */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card className="border">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
@@ -247,22 +262,8 @@ export default function AlertsPage() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <div className="text-sm text-gray-500">Critical</div>
-                <div className="text-2xl font-bold">{activeAlerts.filter((a) => a.type === "critical").length}</div>
-              </div>
-              <div className="h-10 w-10 rounded-full bg-red-100 flex items-center justify-center">
-                <AlertTriangle className="h-5 w-5 text-red-500" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="text-sm text-gray-500">Warnings</div>
-                <div className="text-2xl font-bold">{activeAlerts.filter((a) => a.type === "warning").length}</div>
+                <div className="text-sm text-gray-500">Unresolved</div>
+                <div className="text-2xl font-bold">{activeAlerts.filter((a) => a.status.toUpperCase() !== "RESOLVED").length}</div>
               </div>
               <div className="h-10 w-10 rounded-full bg-amber-100 flex items-center justify-center">
                 <AlertTriangle className="h-5 w-5 text-amber-500" />
@@ -291,10 +292,6 @@ export default function AlertsPage() {
         <CardHeader className="pb-2">
           <div className="flex justify-between items-center">
             <CardTitle>Alert Management</CardTitle>
-            <Button variant="outline" size="sm">
-              <Settings className="h-4 w-4 mr-2" />
-              Alert Settings
-            </Button>
           </div>
         </CardHeader>
         <CardContent>
@@ -345,7 +342,7 @@ export default function AlertsPage() {
                                   </span>
                                 </div>
                               </div>
-                              <p className="text-sm text-gray-500 mt-1">{alert.description || alert.message}</p>
+                              <p className="text-sm text-gray-500 mt-1">{alert.message}</p>
                               {alert.location && (
                                 <p className="text-xs text-gray-400 mt-1">Location: {alert.location}</p>
                               )}
@@ -401,7 +398,7 @@ export default function AlertsPage() {
                                   </span>
                                 </div>
                               </div>
-                              <p className="text-sm text-gray-500 mt-1">{alert.description || alert.message}</p>
+                              <p className="text-sm text-gray-500 mt-1">{alert.message}</p>
                               <div className="flex justify-between mt-1">
                                 {alert.location && (
                                   <p className="text-xs text-gray-400">Location: {alert.location}</p>
@@ -432,43 +429,7 @@ export default function AlertsPage() {
 
             <TabsContent value="settings">
               <div className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <Card className="border">
-                    <CardHeader>
-                      <CardTitle className="text-lg">Alert Preferences</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <h4 className="font-medium">Critical Alerts</h4>
-                          <p className="text-sm text-gray-500">Receive notifications for critical system issues</p>
-                        </div>
-                        <Switch defaultChecked />
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <h4 className="font-medium">Warning Alerts</h4>
-                          <p className="text-sm text-gray-500">Receive notifications for system warnings</p>
-                        </div>
-                        <Switch defaultChecked />
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <h4 className="font-medium">Info Alerts</h4>
-                          <p className="text-sm text-gray-500">Receive notifications for informational updates</p>
-                        </div>
-                        <Switch defaultChecked />
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <h4 className="font-medium">Maintenance Reminders</h4>
-                          <p className="text-sm text-gray-500">Receive notifications for scheduled maintenance</p>
-                        </div>
-                        <Switch defaultChecked />
-                      </div>
-                    </CardContent>
-                  </Card>
-
+                <div className="grid grid-cols-1 gap-6">
                   <Card className="border">
                     <CardHeader>
                       <CardTitle className="text-lg">Notification Methods</CardTitle>

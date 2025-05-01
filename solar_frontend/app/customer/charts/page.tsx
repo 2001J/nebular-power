@@ -76,7 +76,7 @@ interface InstallationDashboard {
   lastUpdated: string;
   recentReadings: EnergyReading[];
   installationDetails: InstallationDetails;
-  
+
   // Computed properties for metrics that aren't directly in the API
   environmentalImpact?: {
     co2Saved: number;
@@ -136,17 +136,17 @@ export default function DashboardPage() {
   useEffect(() => {
     const fetchInstallations = async () => {
       if (!user?.id) return
-      
+
       try {
         setIsLoading(true)
         setHasError(false)
         console.log("Fetching installations for user ID:", user.id)
         const response = await installationApi.getCustomerInstallations(user.id.toString())
-        
+
         if (Array.isArray(response) && response.length > 0) {
           setInstallations(response)
           console.log(`Found ${response.length} installations for the user`)
-          
+
           // Select the first installation by default if none is selected
           if (!selectedInstallation) {
             setSelectedInstallation(response[0].id.toString())
@@ -178,7 +178,7 @@ export default function DashboardPage() {
   useEffect(() => {
     const fetchDashboardData = async () => {
       if (!selectedInstallation) return
-      
+
       try {
         setIsLoading(true)
         setHasError(false)
@@ -186,7 +186,7 @@ export default function DashboardPage() {
 
         // Fetch installation dashboard data
         const dashboardResponse = await energyApi.getInstallationDashboard(selectedInstallation)
-        
+
         if (!dashboardResponse) {
           setHasError(true)
           toast({
@@ -197,14 +197,14 @@ export default function DashboardPage() {
           setIsLoading(false)
           return
         }
-        
+
         console.log("Installation dashboard data:", dashboardResponse)
         setDashboardData(dashboardResponse)
-        
+
         // Get recent energy readings and recent alerts
         let energyData = []
         let alertsData = []
-        
+
         // Try to get energy readings from the dashboard response first
         if (dashboardResponse.recentReadings && dashboardResponse.recentReadings.length > 0) {
           console.log(`Using ${dashboardResponse.recentReadings.length} readings from dashboard response`)
@@ -213,18 +213,18 @@ export default function DashboardPage() {
           // If not available in dashboard, fetch them separately
           console.log(`Fetching recent readings for installation ${selectedInstallation}`)
           const readingsResponse = await energyApi.getRecentReadings(selectedInstallation, 100) // Get more readings for better charts
-          
+
           if (Array.isArray(readingsResponse) && readingsResponse.length > 0) {
             console.log(`Fetched ${readingsResponse.length} separate energy readings`)
             energyData = readingsResponse
           } else {
             console.warn("No energy readings available or format incorrect")
             // Try to fetch energy summaries by period if no raw readings
-            
+
             // Get appropriate start and end dates
             const today = new Date()
             let startDate, endDate
-            
+
             if (selectedPeriod === 'day') {
               startDate = new Date(today.setHours(0, 0, 0, 0)).toISOString()
               endDate = new Date().toISOString()
@@ -245,7 +245,7 @@ export default function DashboardPage() {
               startDate = yearStart.toISOString()
               endDate = new Date().toISOString()
             }
-            
+
             console.log(`Attempting to fetch ${selectedPeriod} summaries from ${startDate} to ${endDate}`)
             const summariesResponse = await energyApi.getSummariesByPeriodAndDateRange(
               selectedInstallation, 
@@ -253,7 +253,7 @@ export default function DashboardPage() {
               startDate, 
               endDate
             )
-            
+
             if (Array.isArray(summariesResponse) && summariesResponse.length > 0) {
               console.log(`Received ${summariesResponse.length} energy summaries`)
               // Use summaries as readings with appropriate fields
@@ -278,19 +278,19 @@ export default function DashboardPage() {
             }
           }
         }
-        
+
         // Set the energy data for charts
         setEnergyReadings(energyData)
         console.log(`Set ${energyData.length} energy readings for charts`)
-        
+
         // Check for security and system status
         try {
           console.log(`Fetching security status for installation ${selectedInstallation}`)
           const securityResponse = await securityApi.getInstallationSecurityStatus(selectedInstallation)
-          
+
           if (securityResponse) {
             console.log("Security status response:", securityResponse)
-            
+
             // Build system status from security data
             const systemStatusData = {
               tamperDetected: securityResponse.tamperDetected || dashboardResponse.installationDetails?.tamperDetected || false,
@@ -309,7 +309,7 @@ export default function DashboardPage() {
                 securityResponse.alerts || []
               )
             }
-            
+
             setSystemStatus(systemStatusData)
           }
         } catch (error) {
@@ -360,29 +360,29 @@ export default function DashboardPage() {
     if (efficiency < 75) return "POOR"
     return "UNKNOWN"
   }
-  
+
   // Generate recommendations based on system state
   const generateRecommendations = (efficiency: number, tamperDetected: boolean, alerts: SystemAlert[]): string[] => {
     const recommendations: string[] = []
-    
+
     if (tamperDetected) {
       recommendations.push("Contact support immediately: potential tampering detected")
     }
-    
+
     if (alerts.some(a => a.severity === "CRITICAL" || a.severity === "HIGH")) {
       recommendations.push("Address high-priority system alerts")
     }
-    
+
     if (efficiency < 75) {
       recommendations.push("Schedule a maintenance check to improve system efficiency")
     } else if (efficiency < 90) {
       recommendations.push("Consider panel cleaning to optimize performance")
     }
-    
+
     if (recommendations.length === 0) {
       recommendations.push("Your system is performing well. Continue regular monitoring.")
     }
-    
+
     return recommendations
   }
 
@@ -400,16 +400,16 @@ export default function DashboardPage() {
   // Refresh dashboard data
   const refreshDashboard = async () => {
     if (!selectedInstallation) return
-    
+
     try {
       setIsLoading(true)
       // Re-fetch the dashboard data for the selected installation
       const dashboardResponse = await energyApi.getInstallationDashboard(selectedInstallation)
-      
+
       if (!dashboardResponse) {
         throw new Error("Failed to refresh dashboard data")
       }
-      
+
       // Calculate environmental impact values
       const calculatedDashboard = {
         ...dashboardResponse,
@@ -422,16 +422,16 @@ export default function DashboardPage() {
               : Math.min(100, (dashboardResponse.monthToDateGenerationKWh / 2000) * 100)
         }
       }
-      
+
       setDashboardData(calculatedDashboard)
-      
+
       // Refresh energy readings
       const readingsResponse = await energyApi.getRecentReadings(selectedInstallation, 24)
-      
+
       if (Array.isArray(readingsResponse)) {
         setEnergyReadings(readingsResponse)
       }
-      
+
       toast({
         title: "Dashboard Updated",
         description: "The latest solar data has been loaded."
@@ -464,19 +464,19 @@ export default function DashboardPage() {
     console.log('Generating sample data for period:', period);
     const now = new Date();
     const sampleData: any[] = [];
-    
+
     if (period === 'day') {
       // Generate hourly data for today
       for (let hour = 0; hour < 24; hour++) {
         const date = new Date(now);
         date.setHours(hour, 0, 0, 0);
-        
+
         // Production peaks during midday, consumption more consistent
         const isDaylight = hour >= 6 && hour <= 18;
         const middayFactor = 1 - Math.abs((hour - 12) / 6);
         const production = isDaylight ? (3 + middayFactor * 4) * (0.8 + Math.random() * 0.4) : 0;
         const consumption = 1 + Math.random() * 2 + (hour >= 17 && hour <= 21 ? 2 : 0);
-        
+
         sampleData.push({
           timestamp: date.toISOString(),
           powerGenerationWatts: production * 1000,
@@ -487,18 +487,18 @@ export default function DashboardPage() {
       // Generate 7 days of data
       const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
       const dayToGenerate = 7;
-      
+
       for (let i = dayToGenerate - 1; i >= 0; i--) {
         const date = new Date(now);
         date.setDate(date.getDate() - i);
-        
+
         // Weekend vs weekday patterns
         const isWeekend = date.getDay() === 0 || date.getDay() === 6;
         const weatherFactor = 0.7 + Math.random() * 0.6;
-        
+
         const production = (isWeekend ? 18 : 20) * weatherFactor;
         const consumption = (isWeekend ? 25 : 20) * (0.9 + Math.random() * 0.2);
-        
+
         sampleData.push({
           date: date.toISOString().split('T')[0],
           totalGenerationKWh: production,
@@ -509,20 +509,20 @@ export default function DashboardPage() {
     } else if (period === 'month') {
       // Generate daily data for the month
       const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-      
+
       for (let day = 1; day <= daysInMonth; day++) {
         // Only include days up to today
         if (day > now.getDate()) continue;
-        
+
         const date = new Date(now.getFullYear(), now.getMonth(), day);
-        
+
         // Weather variations throughout month
         const weatherCycle = 0.7 + 0.3 * Math.sin(day / 5);
         const isWeekend = date.getDay() === 0 || date.getDay() === 6;
-        
+
         const production = (isWeekend ? 18 : 20) * weatherCycle * (0.8 + Math.random() * 0.4);
         const consumption = (isWeekend ? 25 : 20) * (0.9 + Math.random() * 0.2);
-        
+
         sampleData.push({
           date: date.toISOString().split('T')[0],
           totalGenerationKWh: production,
@@ -535,15 +535,15 @@ export default function DashboardPage() {
       for (let month = 0; month < 12; month++) {
         // Only include months up to current month
         if (month > now.getMonth()) continue;
-        
+
         const date = new Date(now.getFullYear(), month, 15);
-        
+
         // Seasonal variations
         const seasonFactor = 0.6 + 0.8 * Math.sin((month - 2) * Math.PI / 6);
-        
+
         const production = 500 * seasonFactor * (0.9 + Math.random() * 0.2);
         const consumption = 600 * (0.8 + 0.4 * Math.cos((month - 6) * Math.PI / 6)) * (0.9 + Math.random() * 0.2);
-        
+
         sampleData.push({
           date: date.toISOString().split('T')[0],
           totalGenerationKWh: production,
@@ -552,7 +552,7 @@ export default function DashboardPage() {
         });
       }
     }
-    
+
     return sampleData;
   }
 
@@ -563,9 +563,9 @@ export default function DashboardPage() {
     if (!dashboardData || energyReadings.length === 0) {
       return []
     }
-    
+
     const chartData = []
-    
+
     // Get reference values from dashboard for normalization
     const todayGeneration = dashboardData.todayGenerationKWh || 0
     const todayConsumption = dashboardData.todayConsumptionKWh || 0
@@ -575,11 +575,11 @@ export default function DashboardPage() {
     const monthConsumption = dashboardData.monthToDateConsumptionKWh || 0
     const yearGeneration = dashboardData.yearToDateGenerationKWh || 0
     const yearConsumption = dashboardData.yearToDateConsumptionKWh || 0
-    
+
     // Get the appropriate generation and consumption totals based on period
     let expectedGeneration = 0
     let expectedConsumption = 0
-    
+
     switch (selectedPeriod) {
       case 'day':
         expectedGeneration = todayGeneration
@@ -598,27 +598,27 @@ export default function DashboardPage() {
         expectedConsumption = yearConsumption
         break
     }
-    
+
     // Calculate total readings values for normalization
     const totalReadingsGeneration = energyReadings.reduce(
       (sum, reading) => sum + (reading.powerGenerationWatts / 1000), 0
     )
-    
+
     const totalReadingsConsumption = energyReadings.reduce(
       (sum, reading) => sum + (reading.powerConsumptionWatts / 1000), 0
     )
-    
+
     // Calculate normalization factors - if readings have values and expected values exist
     const generationNormalizationFactor = 
       totalReadingsGeneration > 0 && expectedGeneration > 0
         ? expectedGeneration / totalReadingsGeneration
         : 1
-        
+
     const consumptionNormalizationFactor = 
       totalReadingsConsumption > 0 && expectedConsumption > 0
         ? expectedConsumption / totalReadingsConsumption
         : 1
-    
+
     console.log('Chart normalization factors:', {
       selectedPeriod,
       expectedGeneration,
@@ -628,11 +628,11 @@ export default function DashboardPage() {
       generationFactor: generationNormalizationFactor,
       consumptionFactor: consumptionNormalizationFactor
     })
-    
+
     if (selectedPeriod === "day") {
       // Group hourly data
       const hourlyData = {}
-      
+
       // Initialize all hours
       for (let hour = 0; hour < 24; hour++) {
         const hourLabel = `${hour}:00`
@@ -643,24 +643,24 @@ export default function DashboardPage() {
           count: 0
         }
       }
-      
+
       // Process readings
       energyReadings.forEach(reading => {
         if (!reading.timestamp) return
-        
+
         const date = new Date(reading.timestamp)
         const hour = date.getHours()
         const hourLabel = `${hour}:00`
-        
+
         // Apply normalization factors
         const normalizedGeneration = (reading.powerGenerationWatts / 1000) * generationNormalizationFactor
         const normalizedConsumption = (reading.powerConsumptionWatts / 1000) * consumptionNormalizationFactor
-        
+
         hourlyData[hourLabel].production += normalizedGeneration
         hourlyData[hourLabel].consumption += normalizedConsumption
         hourlyData[hourLabel].count += 1
       })
-      
+
       // Convert to array and calculate averages
       for (const hour in hourlyData) {
         if (hourlyData[hour].count > 0) {
@@ -677,7 +677,7 @@ export default function DashboardPage() {
           })
         }
       }
-      
+
       // Sort by hour
       chartData.sort((a, b) => {
         return parseInt(a.time.split(':')[0]) - parseInt(b.time.split(':')[0])
@@ -686,7 +686,7 @@ export default function DashboardPage() {
       // Group by day for week
       const dayData = {}
       const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
-      
+
       // Initialize all days
       dayNames.forEach(day => {
         dayData[day] = {
@@ -696,12 +696,12 @@ export default function DashboardPage() {
           count: 0
         }
       })
-      
+
       // Process readings
       energyReadings.forEach(reading => {
         let readingDate
         let dayName
-        
+
         if (reading.timestamp) {
           readingDate = new Date(reading.timestamp)
           dayName = dayNames[readingDate.getDay()]
@@ -711,7 +711,7 @@ export default function DashboardPage() {
         } else {
           return // Skip if no valid date
         }
-        
+
         // Apply normalization - based on whether we have summary or raw readings
         if (reading.totalGenerationKWh !== undefined) {
           dayData[dayName].production += reading.totalGenerationKWh * generationNormalizationFactor
@@ -721,13 +721,13 @@ export default function DashboardPage() {
           dayData[dayName].production += (reading.powerGenerationWatts / 1000) * generationNormalizationFactor
           dayData[dayName].consumption += (reading.powerConsumptionWatts / 1000) * consumptionNormalizationFactor
         }
-        
+
         dayData[dayName].count += 1
       })
-      
+
       // Use default order: Mon-Sun
       const orderedDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
-      
+
       // Convert to array
       orderedDays.forEach(day => {
         chartData.push({
@@ -739,12 +739,12 @@ export default function DashboardPage() {
     } else if (selectedPeriod === "month") {
       // Group by day for month
       const monthData = {}
-      
+
       // Process readings
       energyReadings.forEach(reading => {
         let readingDate
         let day
-        
+
         if (reading.timestamp) {
           readingDate = new Date(reading.timestamp)
           day = readingDate.getDate()
@@ -754,9 +754,9 @@ export default function DashboardPage() {
         } else {
           return // Skip if no valid date
         }
-        
+
         const dayLabel = day.toString()
-        
+
         if (!monthData[dayLabel]) {
           monthData[dayLabel] = {
             time: dayLabel,
@@ -766,7 +766,7 @@ export default function DashboardPage() {
             actualDate: readingDate
           }
         }
-        
+
         // Apply normalization - based on whether we have summary or raw readings
         if (reading.totalGenerationKWh !== undefined) {
           monthData[dayLabel].production += reading.totalGenerationKWh * generationNormalizationFactor
@@ -776,10 +776,10 @@ export default function DashboardPage() {
           monthData[dayLabel].production += (reading.powerGenerationWatts / 1000) * generationNormalizationFactor
           monthData[dayLabel].consumption += (reading.powerConsumptionWatts / 1000) * consumptionNormalizationFactor
         }
-        
+
         monthData[dayLabel].count += 1
       })
-      
+
       // Convert to array and sort by day
       Object.values(monthData).forEach(day => {
         chartData.push({
@@ -788,14 +788,14 @@ export default function DashboardPage() {
           consumption: day.consumption
         })
       })
-      
+
       // Sort by day number
       chartData.sort((a, b) => parseInt(a.time) - parseInt(b.time))
     } else if (selectedPeriod === "year") {
       // Group by month for year
       const yearData = {}
       const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-      
+
       // Initialize all months
       monthNames.forEach((month, index) => {
         yearData[month] = {
@@ -806,12 +806,12 @@ export default function DashboardPage() {
           monthIndex: index
         }
       })
-      
+
       // Process readings
       energyReadings.forEach(reading => {
         let readingDate
         let month
-        
+
         if (reading.timestamp) {
           readingDate = new Date(reading.timestamp)
           month = readingDate.getMonth()
@@ -821,9 +821,9 @@ export default function DashboardPage() {
         } else {
           return // Skip if no valid date
         }
-        
+
         const monthLabel = monthNames[month]
-        
+
         // Apply normalization - based on whether we have summary or raw readings
         if (reading.totalGenerationKWh !== undefined) {
           yearData[monthLabel].production += reading.totalGenerationKWh * generationNormalizationFactor
@@ -833,10 +833,10 @@ export default function DashboardPage() {
           yearData[monthLabel].production += (reading.powerGenerationWatts / 1000) * generationNormalizationFactor
           yearData[monthLabel].consumption += (reading.powerConsumptionWatts / 1000) * consumptionNormalizationFactor
         }
-        
+
         yearData[monthLabel].count += 1
       })
-      
+
       // Convert to array and sort by month
       Object.values(yearData).forEach(month => {
         chartData.push({
@@ -845,7 +845,7 @@ export default function DashboardPage() {
           consumption: month.consumption
         })
       })
-      
+
       // Sort by month index
       chartData.sort((a, b) => {
         const monthA = monthNames.indexOf(a.time)
@@ -853,13 +853,13 @@ export default function DashboardPage() {
         return monthA - monthB
       })
     }
-    
+
     return chartData
   }
 
   // Get the processed chart data
   const chartData = getProcessedChartData()
-  
+
   // Calculate totals for the charts
   const totalProduction = chartData.reduce((sum, item) => sum + item.production, 0)
   const totalConsumption = chartData.reduce((sum, item) => sum + item.consumption, 0)
@@ -1021,7 +1021,7 @@ export default function DashboardPage() {
       default: return "bg-gray-500"
     }
   }
-  
+
   // Get alert severity color
   const getAlertSeverityColor = (severity: string) => {
     switch (severity) {
@@ -1098,7 +1098,7 @@ export default function DashboardPage() {
               </AlertDescription>
             </Alert>
           )}
-          
+
           {/* Production summary cards */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <Card className="bg-white">
@@ -1122,7 +1122,7 @@ export default function DashboardPage() {
                 </p>
               </CardContent>
             </Card>
-            
+
             <Card className="bg-white">
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium">Today's Production</CardTitle>
@@ -1143,7 +1143,7 @@ export default function DashboardPage() {
                 />
               </CardContent>
             </Card>
-            
+
             <Card className="bg-white">
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium">Monthly Production</CardTitle>
@@ -1162,7 +1162,7 @@ export default function DashboardPage() {
                 </p>
               </CardContent>
             </Card>
-            
+
             <Card className="bg-white">
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium">System Efficiency</CardTitle>
@@ -1237,7 +1237,7 @@ export default function DashboardPage() {
                         : `${totalProduction.toFixed(2)} kWh`}
                     </span>
                   </div>
-                  
+
                   <div className="flex justify-between items-center py-2 border-b">
                     <div className="flex items-center">
                       <Home className="h-4 w-4 text-gray-500 mr-2" />
@@ -1249,7 +1249,7 @@ export default function DashboardPage() {
                         : `${totalConsumption.toFixed(2)} kWh`}
                     </span>
                   </div>
-                  
+
                   <div className="flex justify-between items-center py-2">
                     <div className="flex items-center">
                       <Info className="h-4 w-4 text-blue-500 mr-2" />
@@ -1290,7 +1290,7 @@ export default function DashboardPage() {
                         ></div>
                       </div>
                     </div>
-                    
+
                     <div className="p-3 border rounded-md">
                       <div className="text-sm text-gray-500">Security Status</div>
                       <div className="flex items-center mt-1">
@@ -1303,13 +1303,13 @@ export default function DashboardPage() {
                         Last check: {new Date(systemStatus.lastTamperCheck).toLocaleDateString()}
                       </div>
                     </div>
-                    
+
                     <div className="p-3 border rounded-md">
                       <div className="text-sm text-gray-500">Active Alerts</div>
-                      <div className="text-lg font-semibold">{systemStatus.alerts.length}</div>
+                      <div className="text-lg font-semibold">{systemStatus.alerts.filter(alert => !alert.resolved).length}</div>
                       <div className="flex gap-1 mt-1.5">
-                        {systemStatus.alerts.length > 0 ? (
-                          systemStatus.alerts.slice(0, 4).map((alert, i) => (
+                        {systemStatus.alerts.filter(alert => !alert.resolved).length > 0 ? (
+                          systemStatus.alerts.filter(alert => !alert.resolved).slice(0, 4).map((alert, i) => (
                             <div 
                               key={i}
                               className={`w-6 h-2 rounded-full ${getAlertSeverityColor(alert.severity)}`}
@@ -1321,7 +1321,7 @@ export default function DashboardPage() {
                         )}
                       </div>
                     </div>
-                    
+
                     <div className="p-3 border rounded-md">
                       <div className="text-sm text-gray-500">Last Reading</div>
                       <div className="text-lg font-semibold truncate">
@@ -1331,7 +1331,7 @@ export default function DashboardPage() {
                       </div>
                     </div>
                   </div>
-                  
+
                   {systemStatus.recommendations.length > 0 && (
                     <div className="border rounded-md p-3">
                       <div className="flex items-center text-sm font-medium mb-2">
@@ -1466,4 +1466,3 @@ function Tree(props: React.SVGProps<SVGSVGElement>) {
     </svg>
   )
 }
-
