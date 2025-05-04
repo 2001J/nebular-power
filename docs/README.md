@@ -33,14 +33,4 @@ The developer documentation provides technical information for developers who wa
   - Test coverage
   - How to run tests
 
-## Assessment Criteria
 
-This documentation has been prepared according to the assessment criteria for BSc Theses at the Faculty of Informatics, ELTE:
-
-1. The difficulty of the programming task solved
-2. The structure, the language and style, and the appearance of the thesis
-3. User documentation
-4. Software design document (Developer documentation)
-5. Implementation (Developer documentation)
-6. Testing (Developer documentation)
-7. Program execution
