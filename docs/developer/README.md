@@ -1,6 +1,6 @@
-# Solar Energy Monitoring and Financing System - Developer Documentation
+# Solar Energy Monitoring and Management System - Developer Documentation
 
-Welcome to the developer documentation for the Solar Energy Monitoring and Financing System. This documentation provides technical details about the system's architecture, implementation, and testing to help developers understand, modify, and extend the system.
+Welcome to the developer documentation for the Solar Energy Monitoring and Management System. This documentation provides technical details about the system's architecture, implementation, and testing to help developers understand, modify, and extend the system.
 
 ## Table of Contents
 
