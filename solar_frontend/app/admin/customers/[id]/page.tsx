@@ -37,7 +37,8 @@ import {
 } from "@/components/ui/dialog"
 import { useToast } from "@/components/ui/use-toast"
 import { useAuth } from "@/components/auth-provider"
-import { customerApi, installationApi } from "@/lib/api"
+import { customerApi } from "@/lib/api/customers"
+import { installationApi } from "@/lib/api/installations"
 
 export default function CustomerDetailsPage({ params }: { params: { id: string } }) {
   const { user } = useAuth()

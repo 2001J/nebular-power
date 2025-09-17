@@ -51,7 +51,7 @@ import {
 } from "@/components/ui/breadcrumb"
 import { useToast } from "@/components/ui/use-toast"
 import { useAuth } from "@/components/auth-provider"
-import { customerApi } from "@/lib/api"
+import { customerApi } from "@/lib/api/customers"
 import { debounce } from "lodash"
 import { Pagination, PaginationContent, PaginationEllipsis, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination"
 
@@ -964,4 +964,3 @@ export default function CustomersPage() {
     </div>
   )
 }
-

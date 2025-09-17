@@ -35,7 +35,7 @@ import {
 } from "@/components/ui/breadcrumb"
 import { useRouter } from "next/navigation"
 import { useToast } from "@/components/ui/use-toast"
-import { installationApi } from "@/lib/api"
+import { installationApi } from "@/lib/api/installations"
 
 export default function InstallationsPage() {
   const router = useRouter()

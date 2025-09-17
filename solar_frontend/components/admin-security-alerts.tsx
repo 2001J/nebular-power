@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { ShieldAlert, AlertTriangle, Zap, User, RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { securityApi } from "@/lib/api"
+import { securityApi } from "@/lib/api/security"
 import { format, parseISO } from "date-fns"
 import { Badge } from "@/components/ui/badge"
 

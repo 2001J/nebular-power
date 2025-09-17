@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { toast } from '@/components/ui/use-toast';
 import { AxiosError, AxiosRequestConfig, AxiosResponse } from 'axios';
-import apiClient from '@/lib/api';
+import { apiClient } from '@/lib/api/client';
 
 interface ApiRequestState<T> {
   data: T | null;

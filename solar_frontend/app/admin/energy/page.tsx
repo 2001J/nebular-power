@@ -67,7 +67,8 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
-import { energyApi, installationApi } from "@/lib/api"
+import { energyApi } from "@/lib/api/energy"
+import { installationApi } from "@/lib/api/installations"
 import { energyWebSocket } from "@/lib/energyWebSocket"
 
 export default function EnergyMonitoringPage() {

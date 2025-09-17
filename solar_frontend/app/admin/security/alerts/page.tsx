@@ -86,7 +86,8 @@ import {
 } from "@/components/ui/breadcrumb"
 import { DatePickerWithRange } from "@/components/ui/date-range-picker"
 import { toast } from "@/components/ui/use-toast"
-import { securityApi, installationApi } from "@/lib/api"
+import { securityApi } from "@/lib/api/security"
+import { installationApi } from "@/lib/api/installations"
 
 export default function SecurityAlertsPage() {
   const router = useRouter()

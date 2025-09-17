@@ -35,7 +35,7 @@ import {
 } from "@/components/ui/breadcrumb"
 import { useToast } from "@/components/ui/use-toast"
 import { useAuth } from "@/components/auth-provider"
-import { customerApi } from "@/lib/api"
+import { customerApi } from "@/lib/api/customers"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import * as z from "zod"

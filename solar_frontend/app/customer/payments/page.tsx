@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { useAuth } from "@/components/auth-provider";
-import { paymentApi, installationApi } from "@/lib/api";
+import { paymentApi } from "@/lib/api/payments";
+import { installationApi } from "@/lib/api/installations";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -928,4 +929,3 @@ const createPlanFromDashboard = (paymentDashboardData) => {
     updatedAt: paymentDashboardData.updatedAt || new Date().toISOString(),
   };
 };
-

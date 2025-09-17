@@ -65,7 +65,9 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb"
 import { useRouter } from "next/navigation"
-import { customerApi, installationApi, paymentApi, securityApi, energyApi, serviceApi } from "@/lib/api"
+import { customerApi, installationApi, paymentApi, securityApi } from "@/lib/api"
+import { energyApi } from "@/lib/api/energy"
+import { serviceApi } from "@/lib/api/service"
 
 export default function AdminDashboardPage() {
   const { user } = useAuth()
@@ -953,4 +955,3 @@ export default function AdminDashboardPage() {
     </div>
   )
 }
-
