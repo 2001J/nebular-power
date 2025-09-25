@@ -1092,7 +1092,40 @@ Response:
     "avgGenerationWatts": 3985.4,
     "avgConsumptionWatts": 2430.7,
     "generationKWh": 3.856,
-    "consumptionKWh": 2.352
+    "consumptionKWh": 2.352,
+    "powerUnit": "W",
+    "energyUnit": "kWh"
+  }
+]
+```
+
+## System Aggregated Series (Admin)
+
+Endpoint: `GET /monitoring/readings/system-series`
+
+Query params:
+- `startDate` (ISO date-time)
+- `endDate` (ISO date-time)
+- `bucket` optional: `minute` | `hour` | `day` | `month` (default `hour`)
+
+Sample:
+```
+GET /monitoring/readings/system-series?startDate=2025-04-01T00:00:00&endDate=2025-04-30T23:59:59&bucket=day
+```
+
+Sample Response:
+```json
+[
+  {
+    "bucketStart": "2025-04-15T00:00:00",
+    "generationKWh": 125.42,
+    "consumptionKWh": 98.1,
+    "avgGenerationWatts": 5225.7,
+    "avgConsumptionWatts": 4087.2,
+    "generationByTypeKWh": { "RESIDENTIAL": 80.5, "COMMERCIAL": 44.9 },
+    "consumptionByTypeKWh": { "RESIDENTIAL": 60.3, "COMMERCIAL": 37.8 },
+    "powerUnit": "W",
+    "energyUnit": "kWh"
   }
 ]
 ```

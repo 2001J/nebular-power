@@ -6,17 +6,21 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
+import java.util.Map;
 
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class EnergyChartPointDTO {
+public class SystemSeriesPointDTO {
     private LocalDateTime bucketStart;
     private double avgGenerationWatts;
     private double avgConsumptionWatts;
     private double generationKWh;
     private double consumptionKWh;
+    private Map<String, Double> generationByTypeKWh;
+    private Map<String, Double> consumptionByTypeKWh;
     private String powerUnit;   // e.g., "W"
     private String energyUnit;  // e.g., "kWh"
 }
+

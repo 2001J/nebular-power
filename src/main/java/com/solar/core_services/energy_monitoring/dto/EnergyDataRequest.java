@@ -41,4 +41,8 @@ public class EnergyDataRequest {
     
     @PositiveOrZero(message = "Voltage must be zero or positive")
     private double voltage;
-} 
+
+    // Optional unit hints (non-functional, for clarity and future expansion)
+    private String powerUnit;   // expected: "W"
+    private String energyUnit;  // expected: "kWh"
+}

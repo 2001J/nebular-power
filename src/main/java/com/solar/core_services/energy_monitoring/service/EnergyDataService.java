@@ -70,4 +70,12 @@ public interface EnergyDataService {
                                              LocalDateTime startDate,
                                              LocalDateTime endDate,
                                              String bucket);
+
+    /**
+     * Aggregated system-wide series across installations (admin only)
+     */
+    List<com.solar.core_services.energy_monitoring.dto.SystemSeriesPointDTO> getSystemSeries(
+            LocalDateTime startDate,
+            LocalDateTime endDate,
+            String bucket);
 }

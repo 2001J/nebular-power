@@ -64,4 +64,11 @@ public interface EnergySummaryRepository extends JpaRepository<EnergySummary, Lo
         LocalDate startDate,
         LocalDate endDate
     );
+
+    // Lifetime totals for an installation (across all periods)
+    @Query("SELECT SUM(es.totalGenerationKWh) FROM EnergySummary es WHERE es.installation = ?1")
+    Double sumTotalGenerationForInstallation(SolarInstallation installation);
+
+    @Query("SELECT SUM(es.totalConsumptionKWh) FROM EnergySummary es WHERE es.installation = ?1")
+    Double sumTotalConsumptionForInstallation(SolarInstallation installation);
 }

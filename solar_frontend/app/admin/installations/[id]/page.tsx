@@ -386,7 +386,7 @@ export default function InstallationDetailPage() {
       bucket = 'day'
     } else { // year
       start = new Date(now.getFullYear(), 0, 1)
-      bucket = 'day'
+      bucket = 'month'
     }
     return { start, end, bucket }
   }
