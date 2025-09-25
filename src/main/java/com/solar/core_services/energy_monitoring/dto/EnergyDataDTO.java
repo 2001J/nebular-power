@@ -20,4 +20,6 @@ public class EnergyDataDTO {
     private double dailyYieldKWh;
     private double totalYieldKWh;
     private boolean isSimulated;
-} 
+    private String powerUnit;
+    private String energyUnit;
+}

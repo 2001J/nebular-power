@@ -151,44 +151,43 @@ export default function EnergyMonitoringPage() {
 
         // Prefer aggregated series per-installation for accurate system chart
         const active = systemResponse.recentlyActiveInstallations || []
-        if (active.length > 0) {
-          try {
-            const { start, end, bucket } = getRangeAndBucket(timeRange)
-            const typeMap = Object.fromEntries(active.map((i: any) => [i.id, (i.type || 'RESIDENTIAL')]))
-            // Fetch aggregated series for each active installation in parallel
-            const seriesByInstallation = await Promise.all(
-              active.map((i: any) => energyApi.getAggregatedSeries(String(i.id), start.toISOString(), end.toISOString(), bucket)
-                .then((series: any[]) => ({ id: i.id, series }))
-              )
-            )
-
-            // Convert aggregated series into pseudo-readings and flatten
-            const allReadings = seriesByInstallation.flatMap(({ id, series }) =>
-              (series || []).map((pt: any) => ({
-                timestamp: pt.bucketStart,
-                powerGenerationWatts: (pt.generationKWh || 0) * 1000,
-                powerConsumptionWatts: (pt.consumptionKWh || 0) * 1000,
-                installationType: typeMap[id] || 'RESIDENTIAL'
-              }))
-            )
-
-            if (allReadings.length > 0) {
-              const chartData = transformReadingsToChartData(allReadings, timeRange)
-              setEnergyData(chartData)
-            } else if (systemResponse.recentInstallationReadings && systemResponse.recentInstallationReadings.length > 0) {
-              const chartData = processRecentReadings(systemResponse.recentInstallationReadings, timeRange, {
-                generationTotal: getExpectedGenerationTotal(timeRange, systemResponse),
-                consumptionTotal: getExpectedConsumptionTotal(timeRange, systemResponse)
-              })
-              setEnergyData(chartData)
-            } else {
-              setEnergyData(createBasicChartData(systemResponse, timeRange))
-            }
-          } catch (error) {
-            console.error("Error fetching aggregated series for system chart:", error)
+        try {
+          const { start, end, bucket } = getRangeAndBucket(timeRange)
+          const systemSeries = await energyApi.getSystemSeries(start.toISOString(), end.toISOString(), bucket)
+          if (Array.isArray(systemSeries) && systemSeries.length > 0) {
+            // Convert to chart data structure based on timeRange
+            const chartData = systemSeries.map((pt: any) => {
+              const ts = new Date(pt.bucketStart)
+              let name = ''
+              if (timeRange === 'day') name = `${ts.getHours()}:00`
+              else if (timeRange === 'week') name = ts.toLocaleDateString('en-US', { weekday: 'short' })
+              else if (timeRange === 'month') name = String(ts.getDate())
+              else name = ts.toLocaleDateString('en-US', { month: 'short' })
+              // Split by type if provided, default to put all to residential
+              const res = (pt.generationByTypeKWh?.RESIDENTIAL || 0)
+              const com = (pt.generationByTypeKWh?.COMMERCIAL || 0)
+              const ind = (pt.generationByTypeKWh?.INDUSTRIAL || 0)
+              return {
+                name,
+                residential: res,
+                commercial: com,
+                industrial: ind,
+                consumption: pt.consumptionKWh || 0,
+                total: (pt.generationKWh || 0)
+              }
+            })
+            setEnergyData(chartData)
+          } else if (active.length > 0 && systemResponse.recentInstallationReadings && systemResponse.recentInstallationReadings.length > 0) {
+            const chartData = processRecentReadings(systemResponse.recentInstallationReadings, timeRange, {
+              generationTotal: getExpectedGenerationTotal(timeRange, systemResponse),
+              consumptionTotal: getExpectedConsumptionTotal(timeRange, systemResponse)
+            })
+            setEnergyData(chartData)
+          } else {
             setEnergyData(createBasicChartData(systemResponse, timeRange))
           }
-        } else {
+        } catch (error) {
+          console.error("Error fetching system series for system chart:", error)
           setEnergyData(createBasicChartData(systemResponse, timeRange))
         }
       } else {
@@ -278,7 +277,7 @@ export default function EnergyMonitoringPage() {
       bucket = 'day'
     } else { // year
       start = new Date(now.getFullYear(), 0, 1)
-      bucket = 'day'
+      bucket = 'month'
     }
     return { start, end, bucket }
   }

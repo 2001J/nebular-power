@@ -1,4 +1,5 @@
 import axios, { AxiosError, AxiosRequestConfig, AxiosResponse } from 'axios';
+import type { AggregatedSeriesPoint, SystemSeriesPoint, Bucket } from '@/types/energy'
 
 // Create a simple toast function that can be called directly
 // This is a placeholder for the actual toast implementation
@@ -937,15 +938,32 @@ export const energyApi = {
     installationId: string,
     startDate: string,
     endDate: string,
-    bucket: 'minute' | 'hour' | 'day' = 'hour'
-  ) => {
+    bucket: Bucket = 'hour'
+  ): Promise<AggregatedSeriesPoint[]> => {
     try {
       const response = await apiClient.get(`/monitoring/readings/series/${installationId}`, {
         params: { startDate, endDate, bucket },
       });
-      return response.data || [];
+      return (response.data || []) as AggregatedSeriesPoint[];
     } catch (error: any) {
       console.error(`Error fetching aggregated series for installation ${installationId}:`, error.message);
+      return [];
+    }
+  },
+
+  // System aggregated series (admin)
+  getSystemSeries: async (
+    startDate: string,
+    endDate: string,
+    bucket: Bucket = 'hour'
+  ): Promise<SystemSeriesPoint[]> => {
+    try {
+      const response = await apiClient.get(`/monitoring/readings/system-series`, {
+        params: { startDate, endDate, bucket },
+      });
+      return (response.data || []) as SystemSeriesPoint[];
+    } catch (error: any) {
+      console.error(`Error fetching system series:`, error.message);
       return [];
     }
   },

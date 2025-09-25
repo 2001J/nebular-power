@@ -81,4 +81,14 @@ public class EnergyDataController {
             @RequestParam(name = "bucket", required = false, defaultValue = "hour") String bucket) {
         return ResponseEntity.ok(energyDataService.getChartSeries(installationId, startDate, endDate, bucket));
     }
+
+    @GetMapping("/readings/system-series")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Get system aggregated chart series", description = "Admin-only: bucketed series across all active installations")
+    public ResponseEntity<List<com.solar.core_services.energy_monitoring.dto.SystemSeriesPointDTO>> getSystemSeries(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime startDate,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime endDate,
+            @RequestParam(name = "bucket", required = false, defaultValue = "hour") String bucket) {
+        return ResponseEntity.ok(energyDataService.getSystemSeries(startDate, endDate, bucket));
+    }
 }
