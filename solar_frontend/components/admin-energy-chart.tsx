@@ -55,68 +55,73 @@ export function AdminEnergyChart({ type = "production" }: AdminEnergyChartProps)
   const [connected, setConnected] = useState(false)
   const webSocketRef = useRef<any>(null)
 
-  // Fetch initial system overview data when the component loads
+  // Fetch system series based on timeframe
   useEffect(() => {
-    const fetchSystemOverview = async () => {
-      setLoading(true);
+    const fetchSeries = async () => {
+      setLoading(true)
       try {
-        // Get system overview which contains aggregated metrics
-        const overviewData = await energyApi.getSystemOverview();
-        
-        if (overviewData) {
-          setSystemOverview(overviewData);
-          
-          // Create hourly data points for today's generation/consumption
-          // This simulates a time series from the aggregate data
-          const now = new Date();
-          const hourlyData = [];
-          
-          // Generate 24 hours of data, with a curve that peaks during daylight hours
-          for (let i = 0; i < 24; i++) {
-            const hour = new Date(now);
-            hour.setHours(i, 0, 0, 0);
-            
-            // Production follows sun pattern - peaks at noon-2pm
-            let productionFactor = 0;
-            if (i >= 6 && i <= 18) { // 6am to 6pm
-              productionFactor = 1 - Math.abs((i - 12) / 6) * 0.8; // Peak at noon
+        // Keep overview cards populated
+        const overviewData = await energyApi.getSystemOverview()
+        if (overviewData) setSystemOverview(overviewData)
+
+        // Fetch aggregated series
+        const { start, end, bucket } = getRangeAndBucket(timeframe)
+        const series = await energyApi.getSystemSeries(start.toISOString(), end.toISOString(), bucket)
+        if (Array.isArray(series) && series.length > 0) {
+          const formatted = series.map((pt: any) => {
+            const ts = new Date(pt.bucketStart)
+            let label = ''
+            if (timeframe === 'day') label = `${ts.getHours()}:00`
+            else if (timeframe === 'week') label = ts.toLocaleDateString('en-US', { weekday: 'short' })
+            else if (timeframe === 'month') label = String(ts.getDate())
+            else label = ts.toLocaleDateString('en-US', { month: 'short' })
+            return {
+              time: label,
+              production: pt.avgGenerationWatts / 1000, // to kW
+              consumption: pt.avgConsumptionWatts / 1000, // to kW
+              timestamp: pt.bucketStart,
             }
-            
-            // Consumption has two peaks - morning and evening
-            let consumptionFactor = 0.3; // Base load
-            if (i >= 6 && i <= 9) { // Morning peak 6am-9am
-              consumptionFactor = 0.7 + (i - 6) * 0.1; // Ramps up in morning
-            } else if (i >= 17 && i <= 22) { // Evening peak 5pm-10pm
-              consumptionFactor = 0.8 - (i - 17) * 0.1; // Ramps down in evening
-            }
-            
-            // Calculate values based on system overview data
-            const production = overviewData.currentSystemGenerationWatts * productionFactor / 1000; // Convert to kW
-            const consumption = overviewData.todayTotalConsumptionKWh / 24 * consumptionFactor * 3; // Convert daily kWh to hourly kW
-            
-            hourlyData.push({
-              time: hour.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-              timestamp: hour.toISOString(),
-              production: production,
-              consumption: consumption,
-            });
-          }
-          
-          setEnergyData(hourlyData);
-          setError(null);
+          })
+          setEnergyData(formatted)
+          setError(null)
         } else {
-          setError("Failed to load system overview data");
+          setEnergyData([])
         }
       } catch (err) {
-        console.error("Error fetching system overview:", err);
-        setError("Failed to load system overview data");
+        console.error('Error fetching system series:', err)
+        setError('Failed to load system series data')
       } finally {
-        setLoading(false);
+        setLoading(false)
       }
-    };
+    }
+    fetchSeries()
+  }, [timeframe])
 
-    fetchSystemOverview();
-  }, [timeframe]);
+  // Compute period range and bucket
+  const getRangeAndBucket = (range: string) => {
+    const now = new Date()
+    const end = now
+    let start = new Date(now)
+    let bucket: 'minute' | 'hour' | 'day' | 'month' = 'hour'
+    if (range === 'day') {
+      start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0)
+      bucket = 'hour'
+    } else if (range === 'week') {
+      const day = now.getDay()
+      const diffToMonday = (day + 6) % 7
+      start = new Date(now)
+      start.setDate(now.getDate() - diffToMonday)
+      start.setHours(0,0,0,0)
+      bucket = 'day'
+    } else if (range === 'month') {
+      start = new Date(now.getFullYear(), now.getMonth(), 1)
+      bucket = 'day'
+    } else {
+      start = new Date(now.getFullYear(), 0, 1)
+      bucket = 'month'
+    }
+    return { start, end, bucket }
+  }
 
   // Set up WebSocket connection for real-time updates
   useEffect(() => {
@@ -341,6 +346,16 @@ export function AdminEnergyChart({ type = "production" }: AdminEnergyChartProps)
         </div>
       )}
 
+      {/* Empty state if no data */}
+      {(!energyData || energyData.length === 0) ? (
+        <div className="w-full h-[350px] flex flex-col items-center justify-center text-center p-8">
+          <BarChart3 className="h-10 w-10 text-muted-foreground mb-4" />
+          <h3 className="text-lg font-medium">No Energy Data</h3>
+          <p className="text-sm text-muted-foreground max-w-sm mt-2">
+            There is no energy data available for the selected {timeframe} period.
+          </p>
+        </div>
+      ) : (
       <Chart>
         <ChartContainer>
           <ResponsiveContainer width="100%" height={350}>
@@ -443,7 +458,7 @@ export function AdminEnergyChart({ type = "production" }: AdminEnergyChartProps)
           </ResponsiveContainer>
         </ChartContainer>
       </Chart>
+      )}
     </div>
   )
 }
-

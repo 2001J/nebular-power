@@ -87,7 +87,7 @@ interface InstallationDashboard {
   }
 }
 
-interface SystemStatus {
+  interface SystemStatus {
   tamperDetected: boolean;
   lastTamperCheck: string;
   systemHealth: "GOOD" | "FAIR" | "POOR" | "UNKNOWN";
@@ -117,6 +117,8 @@ export default function DashboardPage() {
   const [installations, setInstallations] = useState<InstallationDetails[]>([])
   const [dashboardData, setDashboardData] = useState<InstallationDashboard | null>(null)
   const [energyReadings, setEnergyReadings] = useState<EnergyReading[]>([])
+  const [aggregatedSeries, setAggregatedSeries] = useState<any[]>([])
+  const [noDataMessage, setNoDataMessage] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [hasError, setHasError] = useState(false)
   const [systemStatus, setSystemStatus] = useState<SystemStatus | null>(null)
@@ -224,23 +226,31 @@ export default function DashboardPage() {
           const { start, end, bucket } = getRangeAndBucket(selectedPeriod)
           const series = await energyApi.getAggregatedSeries(selectedInstallation, start.toISOString(), end.toISOString(), bucket)
           if (Array.isArray(series) && series.length > 0) {
+            setAggregatedSeries(series)
+            setNoDataMessage(null)
             energyData = series.map((pt: any) => ({
               timestamp: pt.bucketStart,
               powerGenerationWatts: (pt.generationKWh || 0) * 1000,
               powerConsumptionWatts: (pt.consumptionKWh || 0) * 1000,
             }))
           } else if (dashboardResponse.recentReadings && dashboardResponse.recentReadings.length > 0) {
+            setAggregatedSeries([])
+            setNoDataMessage(null)
             energyData = dashboardResponse.recentReadings
           } else {
-            // Fallback to sample data
-            energyData = generateSampleData(selectedPeriod, dashboardResponse)
+            setAggregatedSeries([])
+            setNoDataMessage(`No energy data available for the selected ${selectedPeriod} period.`)
+            energyData = []
           }
         } catch (e) {
           console.warn('Aggregated series fetch failed, falling back to recent readings or sample')
+          setAggregatedSeries([])
           if (dashboardResponse.recentReadings && dashboardResponse.recentReadings.length > 0) {
+            setNoDataMessage(null)
             energyData = dashboardResponse.recentReadings
           } else {
-            energyData = generateSampleData(selectedPeriod, dashboardResponse)
+            setNoDataMessage(`No energy data available for the selected ${selectedPeriod} period.`)
+            energyData = []
           }
         }
 
@@ -256,21 +266,25 @@ export default function DashboardPage() {
             console.log("Security status response:", securityResponse)
 
             // Build system status from security data
+            const alerts = securityResponse.alerts || []
+            const highCriticalCount = alerts.filter((a: any) => ['CRITICAL','HIGH'].includes((a.severity || '').toUpperCase())).length
+            const efficiencyVal = (dashboardResponse.averageEfficiencyPercentage !== undefined ? dashboardResponse.averageEfficiencyPercentage : dashboardResponse.currentEfficiencyPercentage || 0)
             const systemStatusData = {
               tamperDetected: securityResponse.tamperDetected || dashboardResponse.installationDetails?.tamperDetected || false,
               lastTamperCheck: securityResponse.lastCheck || dashboardResponse.installationDetails?.lastTamperCheck || new Date().toISOString(),
               systemHealth: determineSystemHealth(
-                dashboardResponse.averageEfficiencyPercentage !== undefined ? dashboardResponse.averageEfficiencyPercentage : dashboardResponse.currentEfficiencyPercentage || 0, 
+                efficiencyVal,
                 securityResponse.tamperDetected || false,
-                securityResponse.alerts?.length || 0
+                alerts.length || 0,
+                highCriticalCount
               ),
-              efficiency: dashboardResponse.averageEfficiencyPercentage !== undefined ? dashboardResponse.averageEfficiencyPercentage : dashboardResponse.currentEfficiencyPercentage || 0,
+              efficiency: efficiencyVal,
               lastMaintenance: securityResponse.lastMaintenance || null,
-              alerts: securityResponse.alerts || [],
+              alerts,
               recommendations: generateRecommendations(
-                dashboardResponse.averageEfficiencyPercentage !== undefined ? dashboardResponse.averageEfficiencyPercentage : dashboardResponse.currentEfficiencyPercentage || 0,
+                efficiencyVal,
                 securityResponse.tamperDetected || false,
-                securityResponse.alerts || []
+                alerts
               )
             }
 
@@ -279,21 +293,15 @@ export default function DashboardPage() {
         } catch (error) {
           console.error("Error fetching security status:", error)
           // Create minimal system status from dashboard data
+          const eff = (dashboardResponse.averageEfficiencyPercentage !== undefined ? dashboardResponse.averageEfficiencyPercentage : dashboardResponse.currentEfficiencyPercentage || 0)
+          const tamp = dashboardResponse.installationDetails?.tamperDetected || false
           setSystemStatus({
-            tamperDetected: dashboardResponse.installationDetails?.tamperDetected || false,
+            tamperDetected: tamp,
             lastTamperCheck: dashboardResponse.installationDetails?.lastTamperCheck || new Date().toISOString(),
-            systemHealth: determineSystemHealth(
-              dashboardResponse.averageEfficiencyPercentage !== undefined ? dashboardResponse.averageEfficiencyPercentage : dashboardResponse.currentEfficiencyPercentage || 0, 
-              dashboardResponse.installationDetails?.tamperDetected || false,
-              0
-            ),
-            efficiency: dashboardResponse.averageEfficiencyPercentage !== undefined ? dashboardResponse.averageEfficiencyPercentage : dashboardResponse.currentEfficiencyPercentage || 0,
+            systemHealth: determineSystemHealth(eff, tamp, 0, 0),
+            efficiency: eff,
             alerts: [],
-            recommendations: generateRecommendations(
-              dashboardResponse.averageEfficiencyPercentage !== undefined ? dashboardResponse.averageEfficiencyPercentage : dashboardResponse.currentEfficiencyPercentage || 0,
-              dashboardResponse.installationDetails?.tamperDetected || false,
-              []
-            )
+            recommendations: generateRecommendations(eff, tamp, [])
           })
         }
       } catch (error) {
@@ -315,39 +323,59 @@ export default function DashboardPage() {
   }, [selectedInstallation, selectedPeriod, toast])
 
   // Determine system health based on efficiency and other factors
-  const determineSystemHealth = (efficiency: number, tamperDetected: boolean, alertCount: number): "GOOD" | "FAIR" | "POOR" | "UNKNOWN" => {
+  const determineSystemHealth = (
+    efficiency: number,
+    tamperDetected: boolean,
+    alertCount: number,
+    severeAlertCount: number
+  ): "GOOD" | "FAIR" | "POOR" | "UNKNOWN" => {
     if (tamperDetected) return "POOR"
-    if (alertCount > 3) return "POOR"
+    if (severeAlertCount > 0) return "POOR"
     if (alertCount > 0) return "FAIR"
-    if (efficiency >= 90) return "GOOD"
-    if (efficiency >= 75) return "FAIR"
-    if (efficiency < 75) return "POOR"
+    if (efficiency >= 85) return "GOOD"
+    if (efficiency >= 70) return "FAIR"
+    if (efficiency > 0) return "POOR"
     return "UNKNOWN"
+  }
+
+  // Friendly labels for health status
+  const getHealthLabel = (status: "GOOD" | "FAIR" | "POOR" | "UNKNOWN") => {
+    switch (status) {
+      case "GOOD": return "Optimal"
+      case "FAIR": return "Degraded"
+      case "POOR": return "Critical"
+      default: return "No Data"
+    }
   }
 
   // Generate recommendations based on system state
   const generateRecommendations = (efficiency: number, tamperDetected: boolean, alerts: SystemAlert[]): string[] => {
-    const recommendations: string[] = []
+    const rec: string[] = []
+
+    const severe = alerts.filter(a => (a.severity || '').toUpperCase() === 'CRITICAL' || (a.severity || '').toUpperCase() === 'HIGH')
+    const hasWarnings = alerts.length > 0 && severe.length === 0
 
     if (tamperDetected) {
-      recommendations.push("Contact support immediately: potential tampering detected")
+      rec.push("Tamper detected — secure hardware and contact support immediately.")
+    }
+    if (severe.length > 0) {
+      rec.push(`Critical alerts active (${severe.length}). Investigate inverter, wiring, and connectivity.`)
+    } else if (hasWarnings) {
+      rec.push("Resolve active warnings to restore optimal performance.")
     }
 
-    if (alerts.some(a => a.severity === "CRITICAL" || a.severity === "HIGH")) {
-      recommendations.push("Address high-priority system alerts")
+    if (efficiency > 0 && efficiency < 50) {
+      rec.push("Performance far below expected — check for shading, soiling, or equipment faults.")
+    } else if (efficiency >= 50 && efficiency < 70) {
+      rec.push("Underperforming — consider inspection and cleaning to improve output.")
+    } else if (efficiency >= 70 && efficiency < 85) {
+      rec.push("Slightly degraded — cleaning or minor maintenance may help.")
     }
 
-    if (efficiency < 75) {
-      recommendations.push("Schedule a maintenance check to improve system efficiency")
-    } else if (efficiency < 90) {
-      recommendations.push("Consider panel cleaning to optimize performance")
+    if (rec.length === 0) {
+      rec.push("All systems normal — no action required.")
     }
-
-    if (recommendations.length === 0) {
-      recommendations.push("Your system is performing well. Continue regular monitoring.")
-    }
-
-    return recommendations
+    return rec
   }
 
   // Handle installation change
@@ -848,7 +876,47 @@ export default function DashboardPage() {
   }
 
   // Get the processed chart data
-  const chartData = getProcessedChartData()
+  const getProcessedChartDataAgg = () => {
+    const out: any[] = []
+    if (!aggregatedSeries || aggregatedSeries.length === 0) return out
+    if (selectedPeriod === 'day') {
+      aggregatedSeries.forEach((pt: any) => {
+        const ts = new Date(pt.bucketStart)
+        out.push({ time: `${ts.getHours()}:00`, production: (pt.avgGenerationWatts || 0) / 1000, consumption: (pt.avgConsumptionWatts || 0) / 1000 })
+      })
+      out.sort((a, b) => parseInt(a.time) - parseInt(b.time))
+      return out
+    }
+    if (selectedPeriod === 'week') {
+      const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']
+      aggregatedSeries.forEach((pt: any) => {
+        const ts = new Date(pt.bucketStart)
+        out.push({ time: dayNames[ts.getDay()], production: pt.generationKWh || 0, consumption: pt.consumptionKWh || 0 })
+      })
+      const order: any = { Mon:1, Tue:2, Wed:3, Thu:4, Fri:5, Sat:6, Sun:7 }
+      out.sort((a, b) => (order[a.time]||0) - (order[b.time]||0))
+      return out
+    }
+    if (selectedPeriod === 'month') {
+      aggregatedSeries.forEach((pt: any) => {
+        const ts = new Date(pt.bucketStart)
+        out.push({ time: String(ts.getDate()), production: pt.generationKWh || 0, consumption: pt.consumptionKWh || 0 })
+      })
+      out.sort((a, b) => parseInt(a.time) - parseInt(b.time))
+      return out
+    }
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+    aggregatedSeries.forEach((pt: any) => {
+      const ts = new Date(pt.bucketStart)
+      out.push({ time: months[ts.getMonth()], production: pt.generationKWh || 0, consumption: pt.consumptionKWh || 0 })
+    })
+    out.sort((a, b) => months.indexOf(a.time) - months.indexOf(b.time))
+    return out
+  }
+
+  const chartData = (aggregatedSeries && aggregatedSeries.length > 0)
+    ? getProcessedChartDataAgg()
+    : getProcessedChartData()
 
   // Calculate totals for the charts
   const totalProduction = chartData.reduce((sum, item) => sum + item.production, 0)
@@ -864,7 +932,7 @@ export default function DashboardPage() {
           </div>
           <h3 className="text-lg font-medium">No Energy Data Available</h3>
           <p className="text-sm text-muted-foreground max-w-md mt-2 text-center">
-            There is no energy data available for the selected time period or installation.
+            {noDataMessage ? noDataMessage : 'There is no energy data available for the selected time period or installation.'}
           </p>
         </div>
       )
@@ -1168,7 +1236,7 @@ export default function DashboardPage() {
                 </div>
                   {systemStatus && (
                     <Badge className={`${getHealthColor(systemStatus.systemHealth)}`}>
-                      {systemStatus.systemHealth}
+                      {getHealthLabel(systemStatus.systemHealth)}
                     </Badge>
                   )}
                 </div>
@@ -1203,6 +1271,43 @@ export default function DashboardPage() {
                 </Select>
               </CardHeader>
               <CardContent className="pt-4">
+                {/* Period summary for cross-check */}
+                {(() => {
+                  if (!dashboardData) return null
+                  const isDay = selectedPeriod === 'day'
+                  if (chartData.length === 0) return null
+                  let gen = 0, con = 0
+                  if (isDay) {
+                    gen = chartData.reduce((s: number, d: any) => s + (d.production || 0), 0) / chartData.length
+                    con = chartData.reduce((s: number, d: any) => s + (d.consumption || 0), 0) / chartData.length
+                  } else {
+                    gen = chartData.reduce((s: number, d: any) => s + (d.production || 0), 0)
+                    con = chartData.reduce((s: number, d: any) => s + (d.consumption || 0), 0)
+                  }
+                  const fmt = (v: number, unit: string) => v >= 1000 && unit === 'kWh' ? `${(v/1000).toFixed(2)} MWh` : `${v.toFixed(2)} ${unit}`
+                  const dash = {
+                    day: { gen: dashboardData.todayGenerationKWh || 0, con: dashboardData.todayConsumptionKWh || 0 },
+                    week: { gen: dashboardData.weekToDateGenerationKWh || 0, con: dashboardData.weekToDateConsumptionKWh || 0 },
+                    month: { gen: dashboardData.monthToDateGenerationKWh || 0, con: dashboardData.monthToDateConsumptionKWh || 0 },
+                    year: { gen: dashboardData.yearToDateGenerationKWh || 0, con: dashboardData.yearToDateConsumptionKWh || 0 },
+                  } as any
+                  const dashTotals = dash[selectedPeriod]
+                  return (
+                    <div className="mb-3 p-2 rounded-md bg-muted text-sm flex flex-wrap gap-4 items-center justify-between">
+                      {isDay ? (
+                        <>
+                          <div>Average Power — Generation: <span className="font-medium">{fmt(gen, 'kW')}</span>, Consumption: <span className="font-medium">{fmt(con, 'kW')}</span></div>
+                          <div>Today totals (dashboard) — Gen: <span className="font-medium">{fmt(dashTotals.gen, 'kWh')}</span>, Con: <span className="font-medium">{fmt(dashTotals.con, 'kWh')}</span></div>
+                        </>
+                      ) : (
+                        <>
+                          <div>Period Totals — Generation: <span className="font-medium">{fmt(gen, 'kWh')}</span>, Consumption: <span className="font-medium">{fmt(con, 'kWh')}</span></div>
+                          <div>Dashboard — Gen: <span className="font-medium">{fmt(dashTotals.gen, 'kWh')}</span>, Con: <span className="font-medium">{fmt(dashTotals.con, 'kWh')}</span></div>
+                        </>
+                      )}
+                    </div>
+                  )
+                })()}
                 <div className="h-80">
                   {isLoading ? (
                     <div className="flex justify-center items-center h-full">
@@ -1271,7 +1376,7 @@ export default function DashboardPage() {
                 <span>System Status</span>
                 {systemStatus && (
                   <Badge className={`${getHealthColor(systemStatus.systemHealth)} text-white`}>
-                    {systemStatus.systemHealth}
+                    {getHealthLabel(systemStatus.systemHealth)}
                   </Badge>
                 )}
               </CardTitle>

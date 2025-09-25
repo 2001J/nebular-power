@@ -1021,6 +1021,19 @@ export default function EnergyMonitoringPage() {
             </TabsList>
 
             <TabsContent value="both">
+              {/* Summary above chart for cross-check */}
+              {energyData && energyData.length > 0 && (
+                (() => {
+                  const gen = energyData.reduce((s: number, d: any) => s + (d.total || 0), 0)
+                  const con = energyData.reduce((s: number, d: any) => s + (d.consumption || 0), 0)
+                  const fmt = (v: number) => v >= 1000 ? `${(v/1000).toFixed(2)} MWh` : `${v.toFixed(2)} kWh`
+                  return (
+                    <div className="mb-3 p-2 rounded-md bg-muted text-sm flex flex-wrap gap-4 items-center justify-between">
+                      <div>Period Totals — Generation: <span className="font-medium">{fmt(gen)}</span>, Consumption: <span className="font-medium">{fmt(con)}</span></div>
+                    </div>
+                  )
+                })()
+              )}
               <div className="h-[400px]">
                 {loading ? (
                   <div className="w-full h-full flex items-center justify-center">
@@ -1031,7 +1044,7 @@ export default function EnergyMonitoringPage() {
                     <BarChart3 className="h-10 w-10 text-muted-foreground mb-4" />
                     <h3 className="text-lg font-medium">No Energy Data</h3>
                     <p className="text-sm text-muted-foreground max-w-sm mt-2">
-                      There is no energy data available for the selected time period.
+                      There is no energy data available for the selected {timeRange} period.
                     </p>
                   </div>
                 ) : (
@@ -1043,12 +1056,12 @@ export default function EnergyMonitoringPage() {
                           <YAxis 
                             yAxisId="left"
                             orientation="left"
-                            label={{ value: 'kW/h', angle: -90, position: 'insideLeft' }}
+                            label={{ value: 'kWh', angle: -90, position: 'insideLeft' }}
                           />
                           <YAxis 
                             yAxisId="right"
                             orientation="right"
-                            label={{ value: 'kW/h', angle: 90, position: 'insideRight' }}
+                            label={{ value: 'kWh', angle: 90, position: 'insideRight' }}
                           />
                           <CartesianGrid strokeDasharray="3 3" vertical={false} />
                           <Tooltip 
