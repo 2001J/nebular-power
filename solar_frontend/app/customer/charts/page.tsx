@@ -218,85 +218,32 @@ export default function DashboardPage() {
         console.log("Installation dashboard data:", dashboardResponse)
         setDashboardData(dashboardResponse)
 
-        // Get recent energy readings and recent alerts
-        let energyData = []
-        let alertsData = []
-
-        // Try to get energy readings from the dashboard response first
-        if (dashboardResponse.recentReadings && dashboardResponse.recentReadings.length > 0) {
-          console.log(`Using ${dashboardResponse.recentReadings.length} readings from dashboard response`)
-          energyData = dashboardResponse.recentReadings
-        } else {
-          // If not available in dashboard, fetch them separately
-          console.log(`Fetching recent readings for installation ${selectedInstallation}`)
-          const readingsResponse = await energyApi.getRecentReadings(selectedInstallation, 100) // Get more readings for better charts
-
-          if (Array.isArray(readingsResponse) && readingsResponse.length > 0) {
-            console.log(`Fetched ${readingsResponse.length} separate energy readings`)
-            energyData = readingsResponse
+        // Prefer aggregated series for accurate charts
+        let energyData: any[] = []
+        try {
+          const { start, end, bucket } = getRangeAndBucket(selectedPeriod)
+          const series = await energyApi.getAggregatedSeries(selectedInstallation, start.toISOString(), end.toISOString(), bucket)
+          if (Array.isArray(series) && series.length > 0) {
+            energyData = series.map((pt: any) => ({
+              timestamp: pt.bucketStart,
+              powerGenerationWatts: (pt.generationKWh || 0) * 1000,
+              powerConsumptionWatts: (pt.consumptionKWh || 0) * 1000,
+            }))
+          } else if (dashboardResponse.recentReadings && dashboardResponse.recentReadings.length > 0) {
+            energyData = dashboardResponse.recentReadings
           } else {
-            console.warn("No energy readings available or format incorrect")
-            // Try to fetch energy summaries by period if no raw readings
-
-            // Get appropriate start and end dates
-            const today = new Date()
-            let startDate, endDate
-
-            if (selectedPeriod === 'day') {
-              startDate = new Date(today.setHours(0, 0, 0, 0)).toISOString()
-              endDate = new Date().toISOString()
-            } else if (selectedPeriod === 'week') {
-              // Get previous 7 days
-              const weekStart = new Date(today)
-              weekStart.setDate(today.getDate() - 7)
-              startDate = weekStart.toISOString()
-              endDate = new Date().toISOString()
-            } else if (selectedPeriod === 'month') {
-              // Get current month
-              const monthStart = new Date(today.getFullYear(), today.getMonth(), 1)
-              startDate = monthStart.toISOString()
-              endDate = new Date().toISOString()
-            } else {
-              // Year view - get this year
-              const yearStart = new Date(today.getFullYear(), 0, 1)
-              startDate = yearStart.toISOString()
-              endDate = new Date().toISOString()
-            }
-
-            console.log(`Attempting to fetch ${selectedPeriod} summaries from ${startDate} to ${endDate}`)
-            const summariesResponse = await energyApi.getSummariesByPeriodAndDateRange(
-              selectedInstallation, 
-              selectedPeriod, 
-              startDate, 
-              endDate
-            )
-
-            if (Array.isArray(summariesResponse) && summariesResponse.length > 0) {
-              console.log(`Received ${summariesResponse.length} energy summaries`)
-              // Use summaries as readings with appropriate fields
-              energyData = summariesResponse.map(summary => ({
-                id: summary.id,
-                installationId: summary.installationId,
-                timestamp: summary.date || summary.endDate || summary.timestamp,
-                powerGenerationWatts: summary.averageGenerationWatts || 0,
-                powerConsumptionWatts: summary.averageConsumptionWatts || 0,
-                dailyYieldKWh: summary.totalGenerationKWh || 0,
-                totalGenerationKWh: summary.totalGenerationKWh || 0,
-                totalConsumptionKWh: summary.totalConsumptionKWh || 0,
-                isSimulated: true
-              }))
-            } else {
-              console.warn(`No energy summaries available for ${selectedPeriod} period`)
-              // Generate sample data if no actual data is available
-              if (dashboardData) {
-                console.log('Generating sample data based on dashboard metrics')
-                energyData = generateSampleData(selectedPeriod, dashboardResponse)
-              }
-            }
+            // Fallback to sample data
+            energyData = generateSampleData(selectedPeriod, dashboardResponse)
+          }
+        } catch (e) {
+          console.warn('Aggregated series fetch failed, falling back to recent readings or sample')
+          if (dashboardResponse.recentReadings && dashboardResponse.recentReadings.length > 0) {
+            energyData = dashboardResponse.recentReadings
+          } else {
+            energyData = generateSampleData(selectedPeriod, dashboardResponse)
           }
         }
 
-        // Set the energy data for charts
         setEnergyReadings(energyData)
         console.log(`Set ${energyData.length} energy readings for charts`)
 
@@ -463,6 +410,32 @@ export default function DashboardPage() {
     } finally {
       setIsLoading(false)
     }
+  }
+
+  // Compute start/end and bucket based on selectedPeriod
+  const getRangeAndBucket = (period: string) => {
+    const now = new Date()
+    const end = now
+    let start = new Date(now)
+    let bucket: 'minute' | 'hour' | 'day' = 'hour'
+    if (period === 'day') {
+      start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0)
+      bucket = 'hour'
+    } else if (period === 'week') {
+      const day = now.getDay()
+      const diffToMonday = (day + 6) % 7
+      start = new Date(now)
+      start.setDate(now.getDate() - diffToMonday)
+      start.setHours(0,0,0,0)
+      bucket = 'day'
+    } else if (period === 'month') {
+      start = new Date(now.getFullYear(), now.getMonth(), 1)
+      bucket = 'day'
+    } else { // year
+      start = new Date(now.getFullYear(), 0, 1)
+      bucket = 'day'
+    }
+    return { start, end, bucket }
   }
 
   // Format energy value with appropriate units

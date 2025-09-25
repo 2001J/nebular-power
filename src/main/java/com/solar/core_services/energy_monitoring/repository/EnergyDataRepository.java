@@ -17,6 +17,13 @@ public interface EnergyDataRepository extends JpaRepository<EnergyData, Long> {
         LocalDateTime end
     );
 
+    // Ascending order variant to support time-ordered analytics/integration
+    List<EnergyData> findByInstallationAndTimestampBetweenOrderByTimestampAsc(
+        SolarInstallation installation,
+        LocalDateTime start,
+        LocalDateTime end
+    );
+
     @Query("SELECT SUM(e.powerGenerationWatts) FROM EnergyData e WHERE e.installation = ?1 AND e.timestamp BETWEEN ?2 AND ?3")
     Double sumPowerGenerationForPeriod(SolarInstallation installation, LocalDateTime start, LocalDateTime end);
 

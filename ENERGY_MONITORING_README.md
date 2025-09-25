@@ -1062,8 +1062,37 @@ GET /monitoring/admin/customer-distribution
    - 401: Unauthorized (not logged in)
    - 403: Forbidden (insufficient permissions)
    - 404: Not Found (resource doesn't exist)
-   - 500: Server Error
+ - 500: Server Error
 
 6. **Date Formats**:
    - All date fields use ISO-8601 format: "YYYY-MM-DDThh:mm:ss"
    - Date-only fields can use "YYYY-MM-DD"
+
+## Aggregated Chart Series
+
+For efficient, accurate charting you can use the aggregated series endpoint which integrates energy over time and returns bucketed points.
+
+Endpoint: `GET /monitoring/readings/series/{installationId}`
+
+Query params:
+- `startDate` (ISO date-time)
+- `endDate` (ISO date-time)
+- `bucket` optional: `minute` | `hour` | `day` (default `hour`)
+
+Sample:
+```
+GET /monitoring/readings/series/1?startDate=2025-04-15T00:00:00&endDate=2025-04-15T23:59:59&bucket=hour
+```
+
+Response:
+```json
+[
+  {
+    "bucketStart": "2025-04-15T10:00:00",
+    "avgGenerationWatts": 3985.4,
+    "avgConsumptionWatts": 2430.7,
+    "generationKWh": 3.856,
+    "consumptionKWh": 2.352
+  }
+]
+```

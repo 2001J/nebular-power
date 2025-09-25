@@ -232,13 +232,33 @@ export default function InstallationDetailPage() {
 
           setPerformance(perfMetrics)
 
-          // Transform readings to chart data if available
-          if (dashboardData.recentReadings && dashboardData.recentReadings.length > 0) {
-            const chartData = processEnergyData(dashboardData.recentReadings, timeRange, dashboardData)
-            setEnergyData(chartData)
-          } else {
-            // Set empty chart data
-            setEnergyData([])
+          // Prefer aggregated series for accurate charts
+          try {
+            const { start, end, bucket } = getRangeAndBucket(timeRange)
+            const series = await energyApi.getAggregatedSeries(id, start.toISOString(), end.toISOString(), bucket)
+            if (Array.isArray(series) && series.length > 0) {
+              // Map aggregated buckets to pseudo-readings (kWh -> W by *1000 so later /1000 returns kWh)
+              const pseudoReadings = series.map((pt: any) => ({
+                timestamp: pt.bucketStart,
+                powerGenerationWatts: (pt.generationKWh || 0) * 1000,
+                powerConsumptionWatts: (pt.consumptionKWh || 0) * 1000,
+              }))
+              const chartData = processEnergyData(pseudoReadings, timeRange, dashboardData)
+              setEnergyData(chartData)
+            } else if (dashboardData.recentReadings && dashboardData.recentReadings.length > 0) {
+              const chartData = processEnergyData(dashboardData.recentReadings, timeRange, dashboardData)
+              setEnergyData(chartData)
+            } else {
+              setEnergyData([])
+            }
+          } catch (e) {
+            console.warn('Aggregated series fetch failed, falling back to dashboard readings')
+            if (dashboardData.recentReadings && dashboardData.recentReadings.length > 0) {
+              const chartData = processEnergyData(dashboardData.recentReadings, timeRange, dashboardData)
+              setEnergyData(chartData)
+            } else {
+              setEnergyData([])
+            }
           }
 
           // Fetch recent security events
@@ -344,6 +364,32 @@ export default function InstallationDetailPage() {
       }
     }
   }, [id, timeRange, toast, router])
+
+  // Compute period range and bucket
+  const getRangeAndBucket = (range: string) => {
+    const now = new Date()
+    const end = now
+    let start = new Date(now)
+    let bucket: 'minute' | 'hour' | 'day' = 'hour'
+    if (range === 'day') {
+      start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0)
+      bucket = 'hour'
+    } else if (range === 'week') {
+      const day = now.getDay()
+      const diffToMonday = (day + 6) % 7
+      start = new Date(now)
+      start.setDate(now.getDate() - diffToMonday)
+      start.setHours(0,0,0,0)
+      bucket = 'day'
+    } else if (range === 'month') {
+      start = new Date(now.getFullYear(), now.getMonth(), 1)
+      bucket = 'day'
+    } else { // year
+      start = new Date(now.getFullYear(), 0, 1)
+      bucket = 'day'
+    }
+    return { start, end, bucket }
+  }
 
   // Transform readings to chart data
   const processEnergyData = (

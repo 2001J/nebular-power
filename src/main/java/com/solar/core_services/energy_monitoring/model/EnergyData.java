@@ -8,7 +8,9 @@ import java.time.LocalDateTime;
 @Data
 @NoArgsConstructor
 @Entity
-@Table(name = "energy_data")
+@Table(name = "energy_data", indexes = {
+        @Index(name = "idx_energy_data_install_ts", columnList = "installation_id,timestamp")
+})
 public class EnergyData {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
