@@ -1,6 +1,7 @@
 package com.solar.core_services.energy_monitoring.service.impl;
 
 import com.solar.core_services.energy_monitoring.dto.DashboardResponse;
+import com.solar.core_services.energy_monitoring.dto.EnergyChartPointDTO;
 import com.solar.core_services.energy_monitoring.dto.EnergyDataDTO;
 import com.solar.core_services.energy_monitoring.dto.EnergyDataRequest;
 import com.solar.core_services.energy_monitoring.dto.EnergyReadingBatchDTO;
@@ -9,6 +10,7 @@ import com.solar.core_services.energy_monitoring.model.EnergyData;
 import com.solar.core_services.energy_monitoring.model.SolarInstallation;
 import com.solar.core_services.energy_monitoring.repository.EnergyDataRepository;
 import com.solar.core_services.energy_monitoring.repository.SolarInstallationRepository;
+import com.solar.core_services.energy_monitoring.repository.EnergySummaryRepository;
 import com.solar.core_services.energy_monitoring.service.EnergyDataService;
 import com.solar.core_services.energy_monitoring.service.SolarInstallationService;
 import com.solar.core_services.energy_monitoring.service.WebSocketService;
@@ -22,7 +24,12 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -34,6 +41,7 @@ public class EnergyDataServiceImpl implements EnergyDataService {
     private final UserRepository userRepository;
     private final SolarInstallationService installationService;
     private final WebSocketService webSocketService;
+    private final EnergySummaryRepository energySummaryRepository;
 
     @Override
     @Transactional
@@ -204,34 +212,48 @@ public class EnergyDataServiceImpl implements EnergyDataService {
         double currentPowerConsumption = recentReadings.isEmpty() ? 0
                 : recentReadings.get(0).getPowerConsumptionWatts();
 
-        // Calculate today's generation and consumption
-        Double todayGeneration = energyDataRepository.sumPowerGenerationForPeriod(installation, startOfDay, endOfDay);
-        Double todayConsumption = energyDataRepository.sumPowerConsumptionForPeriod(installation, startOfDay, endOfDay);
+        // Calculate today's generation and consumption via proper time integration
+        List<EnergyData> todayAsc = energyDataRepository
+                .findByInstallationAndTimestampBetweenOrderByTimestampAsc(installation, startOfDay, endOfDay);
+        double[] todayIntegrated = integrateEnergy(todayAsc);
+        double todayGenerationKWh = todayIntegrated[0];
+        double todayConsumptionKWh = todayIntegrated[1];
 
-        // Calculate week-to-date generation and consumption
-        Double weekToDateGeneration = energyDataRepository.sumPowerGenerationForPeriod(installation, startOfWeek, endOfDay);
-        Double weekToDateConsumption = energyDataRepository.sumPowerConsumptionForPeriod(installation, startOfWeek, endOfDay);
+        // Calculate week-to-date using DAILY summaries plus today's integration
+        LocalDate startOfWeekDate = LocalDate.now().minusDays(LocalDate.now().getDayOfWeek().getValue() - 1);
+        LocalDate todayDate = LocalDate.now();
+        Double weekToDateGenFromSummaries = energySummaryRepository.sumTotalGenerationForPeriod(
+                installation, com.solar.core_services.energy_monitoring.model.EnergySummary.SummaryPeriod.DAILY,
+                startOfWeekDate, todayDate.minusDays(1));
+        Double weekToDateConFromSummaries = energySummaryRepository.sumTotalConsumptionForPeriod(
+                installation, com.solar.core_services.energy_monitoring.model.EnergySummary.SummaryPeriod.DAILY,
+                startOfWeekDate, todayDate.minusDays(1));
+        double weekToDateGenerationKWh = (weekToDateGenFromSummaries != null ? weekToDateGenFromSummaries : 0) + todayGenerationKWh;
+        double weekToDateConsumptionKWh = (weekToDateConFromSummaries != null ? weekToDateConFromSummaries : 0) + todayConsumptionKWh;
 
-        // Calculate month-to-date generation and consumption
-        Double monthToDateGeneration = energyDataRepository.sumPowerGenerationForPeriod(installation, startOfMonth,
-                endOfDay);
-        Double monthToDateConsumption = energyDataRepository.sumPowerConsumptionForPeriod(installation, startOfMonth,
-                endOfDay);
+        // Calculate month-to-date using DAILY summaries plus today
+        LocalDate firstOfMonth = LocalDate.now().withDayOfMonth(1);
+        Double monthToDateGenFromSummaries = energySummaryRepository.sumTotalGenerationForPeriod(
+                installation, com.solar.core_services.energy_monitoring.model.EnergySummary.SummaryPeriod.DAILY,
+                firstOfMonth, todayDate.minusDays(1));
+        Double monthToDateConFromSummaries = energySummaryRepository.sumTotalConsumptionForPeriod(
+                installation, com.solar.core_services.energy_monitoring.model.EnergySummary.SummaryPeriod.DAILY,
+                firstOfMonth, todayDate.minusDays(1));
+        double monthToDateGenerationKWh = (monthToDateGenFromSummaries != null ? monthToDateGenFromSummaries : 0) + todayGenerationKWh;
+        double monthToDateConsumptionKWh = (monthToDateConFromSummaries != null ? monthToDateConFromSummaries : 0) + todayConsumptionKWh;
 
-        // Calculate year-to-date generation and consumption
-        Double yearToDateGeneration = energyDataRepository.sumPowerGenerationForPeriod(installation, startOfYear, endOfDay);
-        Double yearToDateConsumption = energyDataRepository.sumPowerConsumptionForPeriod(installation, startOfYear, endOfDay);
+        // Calculate year-to-date using DAILY summaries plus today
+        LocalDate firstOfYear = LocalDate.now().withDayOfYear(1);
+        Double yearToDateGenFromSummaries = energySummaryRepository.sumTotalGenerationForPeriod(
+                installation, com.solar.core_services.energy_monitoring.model.EnergySummary.SummaryPeriod.DAILY,
+                firstOfYear, todayDate.minusDays(1));
+        Double yearToDateConFromSummaries = energySummaryRepository.sumTotalConsumptionForPeriod(
+                installation, com.solar.core_services.energy_monitoring.model.EnergySummary.SummaryPeriod.DAILY,
+                firstOfYear, todayDate.minusDays(1));
+        double yearToDateGenerationKWh = (yearToDateGenFromSummaries != null ? yearToDateGenFromSummaries : 0) + todayGenerationKWh;
+        double yearToDateConsumptionKWh = (yearToDateConFromSummaries != null ? yearToDateConFromSummaries : 0) + todayConsumptionKWh;
 
-        // Convert kWh values (assuming readings are in watts and timestamps are in seconds)
-        double todayGenerationKWh = (todayGeneration != null ? todayGeneration : 0) / 1000.0 / 3600.0;
-        double todayConsumptionKWh = (todayConsumption != null ? todayConsumption : 0) / 1000.0 / 3600.0;
-        double weekToDateGenerationKWh = (weekToDateGeneration != null ? weekToDateGeneration : 0) / 1000.0 / 3600.0;
-        double weekToDateConsumptionKWh = (weekToDateConsumption != null ? weekToDateConsumption : 0) / 1000.0 / 3600.0;
-        double monthToDateGenerationKWh = (monthToDateGeneration != null ? monthToDateGeneration : 0) / 1000.0 / 3600.0;
-        double monthToDateConsumptionKWh = (monthToDateConsumption != null ? monthToDateConsumption : 0) / 1000.0
-                / 3600.0;
-        double yearToDateGenerationKWh = (yearToDateGeneration != null ? yearToDateGeneration : 0) / 1000.0 / 3600.0;
-        double yearToDateConsumptionKWh = (yearToDateConsumption != null ? yearToDateConsumption : 0) / 1000.0 / 3600.0;
+        // Values already calculated in kWh via integration and summaries
 
         // Calculate efficiency
         double currentEfficiency = 0;
@@ -337,4 +359,127 @@ public class EnergyDataServiceImpl implements EnergyDataService {
                 .type(installation.getType()) // Added the installation type here
                 .build();
     }
+
+    // --- Aggregated chart series ---
+    @Override
+    public List<EnergyChartPointDTO> getChartSeries(Long installationId, LocalDateTime startDate, LocalDateTime endDate, String bucketStr) {
+        // Verify installation
+        SolarInstallation installation = installationRepository.findById(installationId)
+                .orElseThrow(() -> new ResourceNotFoundException("Solar installation not found with ID: " + installationId));
+
+        Bucket bucket = Bucket.from(bucketStr);
+        List<EnergyData> readings = energyDataRepository
+                .findByInstallationAndTimestampBetweenOrderByTimestampAsc(installation, startDate, endDate);
+
+        if (readings.isEmpty()) return List.of();
+
+        // Ensure sorted by timestamp ascending
+        readings.sort(Comparator.comparing(EnergyData::getTimestamp));
+
+        // Aggregate energy (kWh) per bucket by splitting intervals across bucket boundaries
+        Map<LocalDateTime, BucketAccumulator> bucketMap = new LinkedHashMap<>();
+
+        for (int i = 1; i < readings.size(); i++) {
+            EnergyData prev = readings.get(i - 1);
+            EnergyData curr = readings.get(i);
+            LocalDateTime t0 = prev.getTimestamp();
+            LocalDateTime t1 = curr.getTimestamp();
+            if (!t1.isAfter(t0)) continue; // skip zero/negative intervals
+
+            double gen0 = Math.max(0, prev.getPowerGenerationWatts());
+            double gen1 = Math.max(0, curr.getPowerGenerationWatts());
+            double con0 = Math.max(0, prev.getPowerConsumptionWatts());
+            double con1 = Math.max(0, curr.getPowerConsumptionWatts());
+
+            // Average power over the interval (trapezoidal)
+            double avgGenW = (gen0 + gen1) / 2.0;
+            double avgConW = (con0 + con1) / 2.0;
+
+            LocalDateTime segStart = t0;
+            while (segStart.isBefore(t1)) {
+                LocalDateTime bucketStart = floorToBucket(segStart, bucket);
+                LocalDateTime bucketEnd = bucketStart.plus(bucket.duration);
+                LocalDateTime segEnd = t1.isBefore(bucketEnd) ? t1 : bucketEnd;
+
+                long seconds = ChronoUnit.SECONDS.between(segStart, segEnd);
+                if (seconds > 0) {
+                    double genKWh = avgGenW * seconds / 3600_000.0; // W * s -> Wh -> kWh
+                    double conKWh = avgConW * seconds / 3600_000.0;
+                    BucketAccumulator acc = bucketMap.computeIfAbsent(bucketStart, k -> new BucketAccumulator());
+                    acc.generationKWh += genKWh;
+                    acc.consumptionKWh += conKWh;
+                }
+
+                segStart = segEnd;
+            }
+        }
+
+        double hoursPerBucket = bucket.duration.getSeconds() / 3600.0;
+        List<EnergyChartPointDTO> result = new ArrayList<>(bucketMap.size());
+        for (Map.Entry<LocalDateTime, BucketAccumulator> e : bucketMap.entrySet()) {
+            BucketAccumulator acc = e.getValue();
+            double avgGenW = (acc.generationKWh / hoursPerBucket) * 1000.0;
+            double avgConW = (acc.consumptionKWh / hoursPerBucket) * 1000.0;
+            result.add(EnergyChartPointDTO.builder()
+                    .bucketStart(e.getKey())
+                    .generationKWh(round3(acc.generationKWh))
+                    .consumptionKWh(round3(acc.consumptionKWh))
+                    .avgGenerationWatts(round1(avgGenW))
+                    .avgConsumptionWatts(round1(avgConW))
+                    .build());
+        }
+        return result;
+    }
+
+    private static class BucketAccumulator { double generationKWh = 0; double consumptionKWh = 0; }
+
+    private enum Bucket {
+        MINUTE(ChronoUnit.MINUTES),
+        HOUR(ChronoUnit.HOURS),
+        DAY(ChronoUnit.DAYS);
+
+        final ChronoUnit unit;
+        final java.time.Duration duration;
+        Bucket(ChronoUnit u) { this.unit = u; this.duration = java.time.Duration.of(1, u); }
+        static Bucket from(String s) {
+            if (s == null) return HOUR;
+            switch (s.toLowerCase()) {
+                case "minute": case "min": case "m": return MINUTE;
+                case "day": case "d": return DAY;
+                default: return HOUR;
+            }
+        }
+    }
+
+    private LocalDateTime floorToBucket(LocalDateTime ts, Bucket b) {
+        switch (b) {
+            case MINUTE:
+                return ts.truncatedTo(ChronoUnit.MINUTES);
+            case DAY:
+                return LocalDateTime.of(ts.toLocalDate(), LocalTime.MIDNIGHT);
+            case HOUR:
+            default:
+                return ts.truncatedTo(ChronoUnit.HOURS);
+        }
+    }
+
+    private static double[] integrateEnergy(List<EnergyData> ascReadings) {
+        if (ascReadings == null || ascReadings.size() < 2) return new double[]{0, 0};
+        double genKWh = 0;
+        double conKWh = 0;
+        for (int i = 1; i < ascReadings.size(); i++) {
+            EnergyData a = ascReadings.get(i - 1);
+            EnergyData b = ascReadings.get(i);
+            if (!b.getTimestamp().isAfter(a.getTimestamp())) continue;
+            long seconds = ChronoUnit.SECONDS.between(a.getTimestamp(), b.getTimestamp());
+            double avgGenW = (Math.max(0, a.getPowerGenerationWatts()) + Math.max(0, b.getPowerGenerationWatts())) / 2.0;
+            double avgConW = (Math.max(0, a.getPowerConsumptionWatts()) + Math.max(0, b.getPowerConsumptionWatts())) / 2.0;
+            genKWh += avgGenW * seconds / 3600_000.0;
+            conKWh += avgConW * seconds / 3600_000.0;
+        }
+        return new double[]{round3(genKWh), round3(conKWh)};
+    }
+
+    private static double round3(double v) { return Math.round(v * 1000.0) / 1000.0; }
+    private static double round1(double v) { return Math.round(v * 10.0) / 10.0; }
 }
