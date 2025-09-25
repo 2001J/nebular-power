@@ -946,7 +946,8 @@ export const energyApi = {
       });
       return (response.data || []) as AggregatedSeriesPoint[];
     } catch (error: any) {
-      console.error(`Error fetching aggregated series for installation ${installationId}:`, error.message);
+      // Downgrade to warn to avoid noisy error overlays when data is simply absent or restricted
+      console.warn(`Aggregated series unavailable for installation ${installationId}:`, error?.response?.status || error?.message);
       return [];
     }
   },
@@ -963,7 +964,7 @@ export const energyApi = {
       });
       return (response.data || []) as SystemSeriesPoint[];
     } catch (error: any) {
-      console.error(`Error fetching system series:`, error.message);
+      console.warn(`System series unavailable:`, error?.response?.status || error?.message);
       return [];
     }
   },
