@@ -882,7 +882,7 @@ export default function DashboardPage() {
     if (selectedPeriod === 'day') {
       aggregatedSeries.forEach((pt: any) => {
         const ts = new Date(pt.bucketStart)
-        out.push({ time: `${ts.getHours()}:00`, production: (pt.avgGenerationWatts || 0) / 1000, consumption: (pt.avgConsumptionWatts || 0) / 1000 })
+        out.push({ time: `${ts.getHours()}:00`, production: (pt.generationKWh || 0), consumption: (pt.consumptionKWh || 0) })
       })
       out.sort((a, b) => parseInt(a.time) - parseInt(b.time))
       return out
@@ -960,10 +960,10 @@ export default function DashboardPage() {
               />
               <YAxis 
                 tick={{ fontSize: 12 }}
-                label={{ value: "Power (kW)", angle: -90, position: "insideLeft" }}
+                label={{ value: 'Energy (kWh)', angle: -90, position: 'insideLeft' }}
               />
               <Tooltip 
-                formatter={(value: number) => [`${value.toFixed(2)} kW`, ""]} 
+                formatter={(value: number) => [`${value.toFixed(2)} kWh`, ""]} 
                 labelFormatter={(label) => `${label} (Hour)`}
               />
               <Legend content={<CustomLegend />} />
@@ -1255,20 +1255,23 @@ export default function DashboardPage() {
             <Card className="bg-white col-span-2">
               <CardHeader className="pb-2 flex flex-row items-center justify-between">
                 <CardTitle>Energy Production</CardTitle>
-                <Select 
-                  value={selectedPeriod} 
-                  onValueChange={handlePeriodChange}
-                >
-                  <SelectTrigger className="w-[150px]">
-                    <SelectValue placeholder="Select period" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="day">Today (Hourly)</SelectItem>
-                    <SelectItem value="week">This Week (Daily)</SelectItem>
-                    <SelectItem value="month">This Month (Daily)</SelectItem>
-                    <SelectItem value="year">This Year (Monthly)</SelectItem>
-                  </SelectContent>
-                </Select>
+                <div className="flex items-center gap-2">
+                  <Select 
+                    value={selectedPeriod} 
+                    onValueChange={handlePeriodChange}
+                  >
+                    <SelectTrigger className="w-[150px]">
+                      <SelectValue placeholder="Select period" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="day">Today (Hourly)</SelectItem>
+                      <SelectItem value="week">This Week (Daily)</SelectItem>
+                      <SelectItem value="month">This Month (Daily)</SelectItem>
+                      <SelectItem value="year">This Year (Monthly)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {/* Day view toggle removed for simplicity */}
+                </div>
               </CardHeader>
               <CardContent className="pt-4">
                 {/* Period summary for cross-check */}
@@ -1296,7 +1299,7 @@ export default function DashboardPage() {
                     <div className="mb-3 p-2 rounded-md bg-muted text-sm flex flex-wrap gap-4 items-center justify-between">
                       {isDay ? (
                         <>
-                          <div>Average Power — Generation: <span className="font-medium">{fmt(gen, 'kW')}</span>, Consumption: <span className="font-medium">{fmt(con, 'kW')}</span></div>
+                          <div>Period Totals — Generation: <span className="font-medium">{fmt(gen, 'kWh')}</span>, Consumption: <span className="font-medium">{fmt(con, 'kWh')}</span></div>
                           <div>Today totals (dashboard) — Gen: <span className="font-medium">{fmt(dashTotals.gen, 'kWh')}</span>, Con: <span className="font-medium">{fmt(dashTotals.con, 'kWh')}</span></div>
                         </>
                       ) : (
