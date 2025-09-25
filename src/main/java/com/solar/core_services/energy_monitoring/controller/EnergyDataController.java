@@ -2,6 +2,7 @@ package com.solar.core_services.energy_monitoring.controller;
 
 import com.solar.core_services.energy_monitoring.dto.DashboardResponse;
 import com.solar.core_services.energy_monitoring.dto.EnergyDataDTO;
+import com.solar.core_services.energy_monitoring.dto.EnergyChartPointDTO;
 import com.solar.core_services.energy_monitoring.dto.EnergyDataRequest;
 import com.solar.core_services.energy_monitoring.dto.EnergyReadingBatchDTO;
 import com.solar.core_services.energy_monitoring.service.EnergyDataService;
@@ -68,5 +69,16 @@ public class EnergyDataController {
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime startDate,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime endDate) {
         return ResponseEntity.ok(energyDataService.getReadingsInDateRange(installationId, startDate, endDate));
+    }
+
+    @GetMapping("/readings/series/{installationId}")
+    @PreAuthorize("hasRole('ADMIN') or @securityService.hasAccessToInstallation(#installationId)")
+    @Operation(summary = "Get aggregated chart series", description = "Bucketed time-series with integrated energy for charts (bucket: minute|hour|day)")
+    public ResponseEntity<List<EnergyChartPointDTO>> getAggregatedSeries(
+            @PathVariable Long installationId,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime startDate,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime endDate,
+            @RequestParam(name = "bucket", required = false, defaultValue = "hour") String bucket) {
+        return ResponseEntity.ok(energyDataService.getChartSeries(installationId, startDate, endDate, bucket));
     }
 }

@@ -73,6 +73,30 @@ export default function AdminDashboardPage() {
   const router = useRouter()
   const [selectedPeriod, setSelectedPeriod] = useState("week")
   const [loading, setLoading] = useState(true)
+  const getRangeAndBucket = (range: string) => {
+    const now = new Date()
+    const end = now
+    let start = new Date(now)
+    let bucket: 'minute' | 'hour' | 'day' = 'hour'
+    if (range === 'day') {
+      start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0)
+      bucket = 'hour'
+    } else if (range === 'week') {
+      const day = now.getDay()
+      const diffToMonday = (day + 6) % 7
+      start = new Date(now)
+      start.setDate(now.getDate() - diffToMonday)
+      start.setHours(0,0,0,0)
+      bucket = 'day'
+    } else if (range === 'month') {
+      start = new Date(now.getFullYear(), now.getMonth(), 1)
+      bucket = 'day'
+    } else { // year
+      start = new Date(now.getFullYear(), 0, 1)
+      bucket = 'day'
+    }
+    return { start, end, bucket }
+  }
 
   // State to store API data
   const [installations, setInstallations] = useState([])
@@ -171,63 +195,67 @@ export default function AdminDashboardPage() {
           });
         }
 
-        // Fetch energy data
+        // Fetch energy data (aggregated series across active installations)
         try {
-          console.log("Fetching energy data");
-          // Use existing API methods instead of the non-existent getSystemEnergyData
-          // Find the first active installation to get data from
-          const activeInstallation = installations.find(i => i.status === 'ACTIVE' || i.status === 'Active')?.id;
-          
-          if (activeInstallation) {
-            const readings = await energyApi.getRecentReadings(activeInstallation, 30);
-            
-            // Transform readings data to match expected chart format
-            const transformedData = [];
-            
-            if (Array.isArray(readings) && readings.length > 0) {
-              // Group by day for weekly view
-              const groupedByDay = {};
-              readings.forEach(reading => {
-                const date = new Date(reading.timestamp);
-                const day = date.toLocaleDateString('en-US', { weekday: 'short' });
-                
-                if (!groupedByDay[day]) {
-                  groupedByDay[day] = {
-                    readings: [],
-                    total: 0,
-                    count: 0
-                  };
-                }
-                
-                groupedByDay[day].readings.push(reading);
-                if (reading.powerGenerationWatts) {
-                  groupedByDay[day].total += reading.powerGenerationWatts;
-                  groupedByDay[day].count++;
-                }
-              });
-              
-              // Convert to chart data format
-              Object.keys(groupedByDay).forEach(day => {
-                const avgReading = groupedByDay[day].count > 0 ? 
-                  groupedByDay[day].total / groupedByDay[day].count / 1000 : 0; // Convert to kWh
-                
-                transformedData.push({
-                  name: day,
-                  residential: Math.round(avgReading * 0.6), // Estimate residential portion
-                  commercial: Math.round(avgReading * 0.3), // Estimate commercial portion
-                  industrial: Math.round(avgReading * 0.1), // Estimate industrial portion
-                  revenue: Math.round(avgReading * 0.15) // Estimate revenue
-                });
-              });
+          console.log("Fetching aggregated energy data for dashboard");
+          const active = installations.filter((i: any) => (i.status === 'ACTIVE' || i.status === 'Active'))
+          if (active.length > 0) {
+            const { start, end, bucket } = getRangeAndBucket(selectedPeriod)
+            const typeMap: Record<string, string> = Object.fromEntries(active.map((i: any) => [String(i.id), i.type || 'RESIDENTIAL']))
+            const seriesByInstallation = await Promise.all(
+              active.slice(0, 8).map((i: any) => energyApi.getAggregatedSeries(String(i.id), start.toISOString(), end.toISOString(), bucket)
+                .then((series: any[]) => ({ id: String(i.id), series }))
+              )
+            )
+
+            // Bucket map label -> totals
+            const bucketMap: Record<string, { name: string, residential: number, commercial: number, industrial: number, revenue: number }> = {}
+            const addToBucket = (label: string, type: string, genKWh: number) => {
+              if (!bucketMap[label]) bucketMap[label] = { name: label, residential: 0, commercial: 0, industrial: 0, revenue: 0 }
+              const t = (type || 'RESIDENTIAL').toUpperCase()
+              if (t === 'COMMERCIAL') bucketMap[label].commercial += genKWh
+              else if (t === 'INDUSTRIAL') bucketMap[label].industrial += genKWh
+              else bucketMap[label].residential += genKWh
+              bucketMap[label].revenue += genKWh * 0.15
             }
-            
-            setEnergyData(transformedData.length > 0 ? transformedData : []);
+
+            seriesByInstallation.forEach(({ id, series }) => {
+              const type = typeMap[id] || 'RESIDENTIAL'
+              ;(series || []).forEach((pt: any) => {
+                const ts = new Date(pt.bucketStart)
+                let label = ''
+                if (selectedPeriod === 'day') {
+                  label = `${ts.getHours()}:00`
+                } else if (selectedPeriod === 'week') {
+                  label = ts.toLocaleDateString('en-US', { weekday: 'short' })
+                } else if (selectedPeriod === 'month') {
+                  label = String(ts.getDate())
+                } else {
+                  label = ts.toLocaleDateString('en-US', { month: 'short' })
+                }
+                addToBucket(label, type, pt.generationKWh || 0)
+              })
+            })
+
+            const ordered = Object.values(bucketMap)
+              .sort((a, b) => {
+                // Try to order by interpreted date index
+                const orderMap: Record<string, number> = {
+                  Mon:1, Tue:2, Wed:3, Thu:4, Fri:5, Sat:6, Sun:7,
+                  Jan:1, Feb:2, Mar:3, Apr:4, May:5, Jun:6, Jul:7, Aug:8, Sep:9, Oct:10, Nov:11, Dec:12,
+                }
+                const ai = orderMap[a.name] ?? parseInt(a.name) ?? 0
+                const bi = orderMap[b.name] ?? parseInt(b.name) ?? 0
+                return ai - bi
+              })
+
+            setEnergyData(ordered)
           } else {
-            setEnergyData([]);
+            setEnergyData([])
           }
         } catch (error) {
-          console.error("Error fetching energy data:", error);
-          setEnergyData([]);
+          console.error("Error fetching aggregated energy data:", error)
+          setEnergyData([])
         }
 
         // Fetch weather impact data
@@ -953,4 +981,3 @@ export default function AdminDashboardPage() {
     </div>
   )
 }
-

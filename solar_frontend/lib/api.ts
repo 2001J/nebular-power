@@ -932,6 +932,24 @@ export const energyApi = {
     }
   },
 
+  // Aggregated chart series (bucketed, integrated energy)
+  getAggregatedSeries: async (
+    installationId: string,
+    startDate: string,
+    endDate: string,
+    bucket: 'minute' | 'hour' | 'day' = 'hour'
+  ) => {
+    try {
+      const response = await apiClient.get(`/monitoring/readings/series/${installationId}`, {
+        params: { startDate, endDate, bucket },
+      });
+      return response.data || [];
+    } catch (error: any) {
+      console.error(`Error fetching aggregated series for installation ${installationId}:`, error.message);
+      return [];
+    }
+  },
+
   getSystemOverview: async () => {
     try {
       const response = await apiClient.get('/monitoring/installations/overview');

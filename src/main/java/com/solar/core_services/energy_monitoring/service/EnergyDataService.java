@@ -4,6 +4,7 @@ import com.solar.core_services.energy_monitoring.dto.DashboardResponse;
 import com.solar.core_services.energy_monitoring.dto.EnergyDataDTO;
 import com.solar.core_services.energy_monitoring.dto.EnergyDataRequest;
 import com.solar.core_services.energy_monitoring.dto.EnergyReadingBatchDTO;
+import com.solar.core_services.energy_monitoring.dto.EnergyChartPointDTO;
 import com.solar.core_services.energy_monitoring.model.EnergyData;
 
 import java.time.LocalDateTime;
@@ -61,4 +62,12 @@ public interface EnergyDataService {
      * @return The energy data with calculated metrics
      */
     EnergyData calculateDerivedMetrics(EnergyData energyData);
+
+    /**
+     * Aggregated time-series for charts, bucketed by minute/hour/day with energy integration.
+     */
+    List<EnergyChartPointDTO> getChartSeries(Long installationId,
+                                             LocalDateTime startDate,
+                                             LocalDateTime endDate,
+                                             String bucket);
 }

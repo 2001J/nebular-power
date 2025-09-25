@@ -49,7 +49,7 @@ public class EnergySummaryServiceImpl implements EnergySummaryService {
         LocalDateTime startOfDay = LocalDateTime.of(date, LocalTime.MIDNIGHT);
         LocalDateTime endOfDay = LocalDateTime.of(date, LocalTime.MAX);
         
-        List<EnergyData> dayData = energyDataRepository.findByInstallationAndTimestampBetweenOrderByTimestampDesc(
+        List<EnergyData> dayData = energyDataRepository.findByInstallationAndTimestampBetweenOrderByTimestampAsc(
                 installation, startOfDay, endOfDay);
         
         if (dayData.isEmpty()) {
@@ -62,28 +62,25 @@ public class EnergySummaryServiceImpl implements EnergySummaryService {
             return convertToDTO(savedSummary);
         }
         
-        // Calculate summary metrics
-        double totalGeneration = 0;
-        double totalConsumption = 0;
+        // Calculate summary metrics using trapezoidal integration for accuracy
+        double totalGenerationKWh = 0;
+        double totalConsumptionKWh = 0;
         double peakGeneration = 0;
         double peakConsumption = 0;
-        
-        for (EnergyData data : dayData) {
-            totalGeneration += data.getPowerGenerationWatts();
-            totalConsumption += data.getPowerConsumptionWatts();
-            
-            if (data.getPowerGenerationWatts() > peakGeneration) {
-                peakGeneration = data.getPowerGenerationWatts();
-            }
-            
-            if (data.getPowerConsumptionWatts() > peakConsumption) {
-                peakConsumption = data.getPowerConsumptionWatts();
-            }
+
+        for (int i = 0; i < dayData.size(); i++) {
+            EnergyData d = dayData.get(i);
+            peakGeneration = Math.max(peakGeneration, Math.max(0, d.getPowerGenerationWatts()));
+            peakConsumption = Math.max(peakConsumption, Math.max(0, d.getPowerConsumptionWatts()));
+            if (i == 0) continue;
+            EnergyData prev = dayData.get(i - 1);
+            if (!d.getTimestamp().isAfter(prev.getTimestamp())) continue;
+            long seconds = java.time.temporal.ChronoUnit.SECONDS.between(prev.getTimestamp(), d.getTimestamp());
+            double avgGenW = (Math.max(0, prev.getPowerGenerationWatts()) + Math.max(0, d.getPowerGenerationWatts())) / 2.0;
+            double avgConW = (Math.max(0, prev.getPowerConsumptionWatts()) + Math.max(0, d.getPowerConsumptionWatts())) / 2.0;
+            totalGenerationKWh += avgGenW * seconds / 3600_000.0;
+            totalConsumptionKWh += avgConW * seconds / 3600_000.0;
         }
-        
-        // Convert to kWh (assuming readings are in watts and we're averaging over the day)
-        double totalGenerationKWh = totalGeneration / 1000.0 / dayData.size() * 24;
-        double totalConsumptionKWh = totalConsumption / 1000.0 / dayData.size() * 24;
         
         // Calculate efficiency
         double efficiency = 0;
