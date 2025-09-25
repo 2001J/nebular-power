@@ -69,6 +69,8 @@ public class EnergyDataServiceImpl implements EnergyDataService {
 
         // Convert to DTO
         EnergyDataDTO energyDataDTO = convertToDTO(savedData);
+        energyDataDTO.setPowerUnit("W");
+        energyDataDTO.setEnergyUnit("kWh");
 
         // Send real-time update via WebSocket
         webSocketService.sendEnergyDataUpdate(installation.getId(), energyDataDTO);
@@ -308,8 +310,8 @@ public class EnergyDataServiceImpl implements EnergyDataService {
                 .monthToDateConsumptionKWh(monthToDateConsumptionKWh)
                 .yearToDateGenerationKWh(yearToDateGenerationKWh)
                 .yearToDateConsumptionKWh(yearToDateConsumptionKWh)
-                .lifetimeGenerationKWh(installation.getInstalledCapacityKW() * 24 * 30 * 12) // Placeholder calculation
-                .lifetimeConsumptionKWh(installation.getInstalledCapacityKW() * 24 * 30 * 12 * 0.8) // Placeholder calculation
+                .lifetimeGenerationKWh(computeLifetimeGenerationKWh(installation))
+                .lifetimeConsumptionKWh(computeLifetimeConsumptionKWh(installation))
                 .currentEfficiencyPercentage(currentEfficiency)
                 .averageEfficiencyPercentage(averageEfficiency)
                 .lastUpdated(recentReadings.isEmpty() ? LocalDateTime.now() : recentReadings.get(0).getTimestamp())
@@ -341,6 +343,8 @@ public class EnergyDataServiceImpl implements EnergyDataService {
                 .dailyYieldKWh(energyData.getDailyYieldKWh())
                 .totalYieldKWh(energyData.getTotalYieldKWh())
                 .isSimulated(energyData.isSimulated())
+                .powerUnit("W")
+                .energyUnit("kWh")
                 .build();
     }
 
@@ -358,6 +362,27 @@ public class EnergyDataServiceImpl implements EnergyDataService {
                 .lastTamperCheck(installation.getLastTamperCheck())
                 .type(installation.getType()) // Added the installation type here
                 .build();
+    }
+
+    private double computeLifetimeGenerationKWh(SolarInstallation installation) {
+        Double fromSummaries = energySummaryRepository.sumTotalGenerationForInstallation(installation);
+        if (fromSummaries != null && fromSummaries > 0) return round3(fromSummaries);
+        // Fallback: integrate across all readings
+        List<EnergyData> allDesc = energyDataRepository.findByInstallationOrderByTimestampDesc(installation);
+        if (allDesc == null || allDesc.size() < 2) return 0.0;
+        List<EnergyData> allAsc = new ArrayList<>(allDesc);
+        allAsc.sort(Comparator.comparing(EnergyData::getTimestamp));
+        return integrateEnergy(allAsc)[0];
+    }
+
+    private double computeLifetimeConsumptionKWh(SolarInstallation installation) {
+        Double fromSummaries = energySummaryRepository.sumTotalConsumptionForInstallation(installation);
+        if (fromSummaries != null && fromSummaries > 0) return round3(fromSummaries);
+        List<EnergyData> allDesc = energyDataRepository.findByInstallationOrderByTimestampDesc(installation);
+        if (allDesc == null || allDesc.size() < 2) return 0.0;
+        List<EnergyData> allAsc = new ArrayList<>(allDesc);
+        allAsc.sort(Comparator.comparing(EnergyData::getTimestamp));
+        return integrateEnergy(allAsc)[1];
     }
 
     // --- Aggregated chart series ---
@@ -398,7 +423,7 @@ public class EnergyDataServiceImpl implements EnergyDataService {
             LocalDateTime segStart = t0;
             while (segStart.isBefore(t1)) {
                 LocalDateTime bucketStart = floorToBucket(segStart, bucket);
-                LocalDateTime bucketEnd = bucketStart.plus(bucket.duration);
+                LocalDateTime bucketEnd = nextBoundary(bucketStart, bucket);
                 LocalDateTime segEnd = t1.isBefore(bucketEnd) ? t1 : bucketEnd;
 
                 long seconds = ChronoUnit.SECONDS.between(segStart, segEnd);
@@ -414,18 +439,20 @@ public class EnergyDataServiceImpl implements EnergyDataService {
             }
         }
 
-        double hoursPerBucket = bucket.duration.getSeconds() / 3600.0;
         List<EnergyChartPointDTO> result = new ArrayList<>(bucketMap.size());
         for (Map.Entry<LocalDateTime, BucketAccumulator> e : bucketMap.entrySet()) {
             BucketAccumulator acc = e.getValue();
-            double avgGenW = (acc.generationKWh / hoursPerBucket) * 1000.0;
-            double avgConW = (acc.consumptionKWh / hoursPerBucket) * 1000.0;
+            double hours = ChronoUnit.SECONDS.between(e.getKey(), nextBoundary(e.getKey(), bucket)) / 3600.0;
+            double avgGenW = hours > 0 ? (acc.generationKWh / hours) * 1000.0 : 0;
+            double avgConW = hours > 0 ? (acc.consumptionKWh / hours) * 1000.0 : 0;
             result.add(EnergyChartPointDTO.builder()
                     .bucketStart(e.getKey())
                     .generationKWh(round3(acc.generationKWh))
                     .consumptionKWh(round3(acc.consumptionKWh))
                     .avgGenerationWatts(round1(avgGenW))
                     .avgConsumptionWatts(round1(avgConW))
+                    .powerUnit("W")
+                    .energyUnit("kWh")
                     .build());
         }
         return result;
@@ -433,19 +460,13 @@ public class EnergyDataServiceImpl implements EnergyDataService {
 
     private static class BucketAccumulator { double generationKWh = 0; double consumptionKWh = 0; }
 
-    private enum Bucket {
-        MINUTE(ChronoUnit.MINUTES),
-        HOUR(ChronoUnit.HOURS),
-        DAY(ChronoUnit.DAYS);
-
-        final ChronoUnit unit;
-        final java.time.Duration duration;
-        Bucket(ChronoUnit u) { this.unit = u; this.duration = java.time.Duration.of(1, u); }
+    private enum Bucket { MINUTE, HOUR, DAY, MONTH;
         static Bucket from(String s) {
             if (s == null) return HOUR;
             switch (s.toLowerCase()) {
                 case "minute": case "min": case "m": return MINUTE;
                 case "day": case "d": return DAY;
+                case "month": case "mon": return MONTH;
                 default: return HOUR;
             }
         }
@@ -453,13 +474,21 @@ public class EnergyDataServiceImpl implements EnergyDataService {
 
     private LocalDateTime floorToBucket(LocalDateTime ts, Bucket b) {
         switch (b) {
-            case MINUTE:
-                return ts.truncatedTo(ChronoUnit.MINUTES);
-            case DAY:
-                return LocalDateTime.of(ts.toLocalDate(), LocalTime.MIDNIGHT);
-            case HOUR:
-            default:
-                return ts.truncatedTo(ChronoUnit.HOURS);
+            case MINUTE: return ts.truncatedTo(ChronoUnit.MINUTES);
+            case HOUR: return ts.truncatedTo(ChronoUnit.HOURS);
+            case DAY: return LocalDateTime.of(ts.toLocalDate(), LocalTime.MIDNIGHT);
+            case MONTH: return LocalDateTime.of(ts.getYear(), ts.getMonth(), 1, 0, 0);
+            default: return ts.truncatedTo(ChronoUnit.HOURS);
+        }
+    }
+
+    private LocalDateTime nextBoundary(LocalDateTime bucketStart, Bucket b) {
+        switch (b) {
+            case MINUTE: return bucketStart.plusMinutes(1);
+            case HOUR: return bucketStart.plusHours(1);
+            case DAY: return bucketStart.plusDays(1);
+            case MONTH: return bucketStart.plusMonths(1);
+            default: return bucketStart.plusHours(1);
         }
     }
 
@@ -482,4 +511,91 @@ public class EnergyDataServiceImpl implements EnergyDataService {
 
     private static double round3(double v) { return Math.round(v * 1000.0) / 1000.0; }
     private static double round1(double v) { return Math.round(v * 10.0) / 10.0; }
+
+    // --- System-wide aggregated series ---
+    @Override
+    public List<com.solar.core_services.energy_monitoring.dto.SystemSeriesPointDTO> getSystemSeries(
+            LocalDateTime startDate, LocalDateTime endDate, String bucketStr) {
+        Bucket bucket = Bucket.from(bucketStr);
+
+        // Collect active installations
+        List<SolarInstallation> installations = installationRepository.findAll().stream()
+                .filter(i -> i.getStatus() == SolarInstallation.InstallationStatus.ACTIVE)
+                .collect(Collectors.toList());
+
+        Map<LocalDateTime, SysAcc> sysMap = new LinkedHashMap<>();
+
+        for (SolarInstallation inst : installations) {
+            List<EnergyData> readings = energyDataRepository
+                    .findByInstallationAndTimestampBetweenOrderByTimestampAsc(inst, startDate, endDate);
+            if (readings.size() < 2) continue;
+            // Ensure sorted
+            readings.sort(Comparator.comparing(EnergyData::getTimestamp));
+
+            SolarInstallation.InstallationType type = inst.getType() != null ? inst.getType() : SolarInstallation.InstallationType.RESIDENTIAL;
+            String typeKey = type.name();
+
+            for (int i = 1; i < readings.size(); i++) {
+                EnergyData prev = readings.get(i - 1);
+                EnergyData curr = readings.get(i);
+                LocalDateTime t0 = prev.getTimestamp();
+                LocalDateTime t1 = curr.getTimestamp();
+                if (!t1.isAfter(t0)) continue;
+
+                double gen0 = Math.max(0, prev.getPowerGenerationWatts());
+                double gen1 = Math.max(0, curr.getPowerGenerationWatts());
+                double con0 = Math.max(0, prev.getPowerConsumptionWatts());
+                double con1 = Math.max(0, curr.getPowerConsumptionWatts());
+                double avgGenW = (gen0 + gen1) / 2.0;
+                double avgConW = (con0 + con1) / 2.0;
+
+                LocalDateTime segStart = t0;
+                while (segStart.isBefore(t1)) {
+                    LocalDateTime bStart = floorToBucket(segStart, bucket);
+                    LocalDateTime bEnd = nextBoundary(bStart, bucket);
+                    LocalDateTime segEnd = t1.isBefore(bEnd) ? t1 : bEnd;
+                    long seconds = ChronoUnit.SECONDS.between(segStart, segEnd);
+                    if (seconds > 0) {
+                        double gKWh = avgGenW * seconds / 3600_000.0;
+                        double cKWh = avgConW * seconds / 3600_000.0;
+                        SysAcc acc = sysMap.computeIfAbsent(bStart, k -> new SysAcc());
+                        acc.generationKWh += gKWh;
+                        acc.consumptionKWh += cKWh;
+                        acc.generationByTypeKWh.merge(typeKey, gKWh, Double::sum);
+                        acc.consumptionByTypeKWh.merge(typeKey, cKWh, Double::sum);
+                    }
+                    segStart = segEnd;
+                }
+            }
+        }
+
+        List<com.solar.core_services.energy_monitoring.dto.SystemSeriesPointDTO> result = new ArrayList<>(sysMap.size());
+        for (Map.Entry<LocalDateTime, SysAcc> e : sysMap.entrySet()) {
+            LocalDateTime bStart = e.getKey();
+            double hours = ChronoUnit.SECONDS.between(bStart, nextBoundary(bStart, bucket)) / 3600.0;
+            SysAcc acc = e.getValue();
+            double avgGenW = hours > 0 ? (acc.generationKWh / hours) * 1000.0 : 0;
+            double avgConW = hours > 0 ? (acc.consumptionKWh / hours) * 1000.0 : 0;
+            result.add(com.solar.core_services.energy_monitoring.dto.SystemSeriesPointDTO.builder()
+                    .bucketStart(bStart)
+                    .generationKWh(round3(acc.generationKWh))
+                    .consumptionKWh(round3(acc.consumptionKWh))
+                    .avgGenerationWatts(round1(avgGenW))
+                    .avgConsumptionWatts(round1(avgConW))
+                    .generationByTypeKWh(acc.generationByTypeKWh)
+                    .consumptionByTypeKWh(acc.consumptionByTypeKWh)
+                    .powerUnit("W")
+                    .energyUnit("kWh")
+                    .build());
+        }
+
+        return result;
+    }
+
+    private static class SysAcc {
+        double generationKWh = 0;
+        double consumptionKWh = 0;
+        Map<String, Double> generationByTypeKWh = new LinkedHashMap<>();
+        Map<String, Double> consumptionByTypeKWh = new LinkedHashMap<>();
+    }
 }

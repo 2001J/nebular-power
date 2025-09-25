@@ -192,6 +192,8 @@ class EnergySimulator:
             "powerConsumptionWatts": round(power_consumption, 2),
             "dailyYieldKWh": round(self.daily_yield_kwh, 3),
             "totalYieldKWh": round(self.total_yield_kwh, 3),
+            "powerUnit": "W",
+            "energyUnit": "kWh",
             "batteryLevel": round(battery_level, 1),
             "voltage": round(voltage, 1),
             "currentAmps": round(current_amps, 2),
