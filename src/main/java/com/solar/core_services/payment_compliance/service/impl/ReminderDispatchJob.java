@@ -4,6 +4,7 @@ import com.solar.core_services.payment_compliance.model.Payment;
 import com.solar.core_services.payment_compliance.model.PaymentReminder;
 import com.solar.core_services.payment_compliance.repository.PaymentRepository;
 import com.solar.core_services.payment_compliance.service.PaymentReminderService;
+import com.solar.core_services.payment_compliance.service.ReminderConfigService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -21,11 +22,21 @@ public class ReminderDispatchJob {
 
     private final PaymentRepository paymentRepository;
     private final PaymentReminderService reminderService;
+    private final ReminderConfigService reminderConfigService;
 
     @Scheduled(cron = "0 0 8 * * ?") // Run at 8 AM every day
     @Transactional
     public void dispatchReminders() {
         log.info("Starting reminder dispatch job");
+        // Honor auto-reminder configuration
+        try {
+            if (!reminderConfigService.isAutoSendRemindersEnabled()) {
+                log.info("Auto-send reminders is disabled. Skipping reminder dispatch job.");
+                return;
+            }
+        } catch (Exception e) {
+            log.warn("Could not determine auto-reminder configuration. Proceeding with defaults.");
+        }
         
         try {
             // Process reminders in priority order

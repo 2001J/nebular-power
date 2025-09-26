@@ -8,6 +8,7 @@ import com.solar.core_services.payment_compliance.dto.PaymentDTO;
 import com.solar.core_services.payment_compliance.dto.PaymentPlanDTO;
 import com.solar.core_services.payment_compliance.dto.PaymentPlanRequest;
 import com.solar.core_services.payment_compliance.dto.ReminderConfigDTO;
+import com.solar.core_services.payment_compliance.model.Payment;
 import com.solar.core_services.payment_compliance.model.PaymentReminder;
 import com.solar.core_services.payment_compliance.service.GracePeriodConfigService;
 import com.solar.core_services.payment_compliance.service.PaymentPlanService;
@@ -264,24 +265,140 @@ public class AdminPaymentController {
                 return ResponseEntity.ok(payments);
         }
 
+        // Alias endpoint to match frontend client usage (without trailing /payments)
+        @GetMapping("/installations/{installationId}")
+        @Operation(summary = "Get installation payments (alias)", description = "Alias of /installations/{installationId}/payments for compatibility with frontend.")
+        public ResponseEntity<Page<PaymentDTO>> getInstallationPaymentsAlias(
+                        @PathVariable Long installationId,
+                        @RequestParam(defaultValue = "0") int page,
+                        @RequestParam(defaultValue = "10") int size,
+                        @RequestParam(defaultValue = "dueDate") String sortBy,
+                        @RequestParam(defaultValue = "desc") String direction) {
+                Sort.Direction sortDirection = direction.equalsIgnoreCase("asc") ? Sort.Direction.ASC : Sort.Direction.DESC;
+                Page<PaymentDTO> payments = paymentService.getPaymentsByInstallation(
+                                installationId,
+                                PageRequest.of(page, size, Sort.by(sortDirection, sortBy))
+                );
+                return ResponseEntity.ok(payments);
+        }
+
         @PostMapping("/reminders/send")
-        @Operation(summary = "Send manual reminder", description = "Manually sends a payment reminder to a customer for a specific payment.")
+        @Operation(summary = "Send manual or bulk reminders", description = "Sends a manual reminder (via query params) or sends bulk reminders via JSON body { paymentIds: [], reminderType: '' }.")
         @ApiResponses(value = {
-                        @ApiResponse(responseCode = "200", description = "Reminder sent successfully"),
-                        @ApiResponse(responseCode = "400", description = "Invalid reminder type", content = @Content),
+                        @ApiResponse(responseCode = "200", description = "Reminder(s) sent successfully"),
+                        @ApiResponse(responseCode = "400", description = "Invalid payload", content = @Content),
                         @ApiResponse(responseCode = "401", description = "Unauthorized", content = @Content),
                         @ApiResponse(responseCode = "403", description = "Forbidden - requires ADMIN role", content = @Content),
                         @ApiResponse(responseCode = "404", description = "Payment not found", content = @Content)
         })
-        public ResponseEntity<Void> sendManualReminder(
-                        @Parameter(description = "ID of the payment to send reminder for", required = true) @RequestParam Long paymentId,
+        public ResponseEntity<?> sendManualOrBulkReminders(
+                        @Parameter(description = "ID of the payment to send reminder for") @RequestParam(required = false) Long paymentId,
+                        @Parameter(description = "Type of reminder to send (e.g., OVERDUE, GRACE_PERIOD, FINAL_WARNING)") @RequestParam(required = false) String reminderType,
+                        @RequestBody(required = false) Map<String, Object> body) {
 
-                        @Parameter(description = "Type of reminder to send (e.g., EMAIL, SMS, FIRST_REMINDER)", required = true) @RequestParam String reminderType) {
+                // Bulk mode via JSON body
+                if (body != null && body.containsKey("paymentIds")) {
+                        Object idsObj = body.get("paymentIds");
+                        Object typeObj = body.get("reminderType");
+                        if (!(idsObj instanceof List) || !(typeObj instanceof String)) {
+                                return ResponseEntity.badRequest().body(Map.of("error", "Invalid bulk reminder payload"));
+                        }
+                        @SuppressWarnings("unchecked")
+                        List<Object> ids = (List<Object>) idsObj;
+                        String typeStr = (String) typeObj;
+                        PaymentReminder.ReminderType type;
+                        try {
+                                type = PaymentReminder.ReminderType.valueOf(typeStr);
+                        } catch (Exception e) {
+                                return ResponseEntity.badRequest().body(Map.of("error", "Invalid reminderType"));
+                        }
 
-                PaymentReminder.ReminderType type = PaymentReminder.ReminderType.valueOf(reminderType);
-                reminderService.sendManualReminder(paymentId, type);
+                        int success = 0;
+                        for (Object idVal : ids) {
+                                try {
+                                        Long id = Long.valueOf(String.valueOf(idVal));
+                                        reminderService.sendManualReminder(id, type);
+                                        success++;
+                                } catch (Exception e) {
+                                        // continue processing others
+                                }
+                        }
+                        return ResponseEntity.ok(Map.of("sent", success, "requested", ids.size()));
+                }
 
-                return ResponseEntity.ok().build();
+                // Single mode via query params
+                if (paymentId != null && reminderType != null) {
+                        PaymentReminder.ReminderType type = PaymentReminder.ReminderType.valueOf(reminderType);
+                        reminderService.sendManualReminder(paymentId, type);
+                        return ResponseEntity.ok().build();
+                }
+
+                return ResponseEntity.badRequest().body(Map.of("error", "Provide paymentId+reminderType as query params or paymentIds+reminderType in JSON body"));
+        }
+
+        @PostMapping("/{paymentId}/send-reminder")
+        @Operation(summary = "Send reminder for a payment", description = "Sends a reminder for the given payment. Body accepts { reminderType: 'OVERDUE|GRACE_PERIOD|DUE_TODAY|UPCOMING_PAYMENT|FINAL_WARNING' }.")
+        @ApiResponses(value = {
+                        @ApiResponse(responseCode = "200", description = "Reminder sent successfully"),
+                        @ApiResponse(responseCode = "400", description = "Invalid payload", content = @Content),
+                        @ApiResponse(responseCode = "401", description = "Unauthorized", content = @Content),
+                        @ApiResponse(responseCode = "403", description = "Forbidden - requires ADMIN role", content = @Content),
+                        @ApiResponse(responseCode = "404", description = "Payment not found", content = @Content)
+        })
+        public ResponseEntity<?> sendReminderForPayment(
+                        @PathVariable Long paymentId,
+                        @RequestBody Map<String, String> payload) {
+                String typeStr = payload != null ? payload.get("reminderType") : null;
+                if (typeStr == null) {
+                        return ResponseEntity.badRequest().body(Map.of("error", "reminderType is required"));
+                }
+                try {
+                        // Map UI-friendly values to internal reminder types
+                        PaymentReminder.ReminderType type;
+                        switch (typeStr.toUpperCase()) {
+                                case "FIRST_REMINDER":
+                                        type = PaymentReminder.ReminderType.OVERDUE;
+                                        break;
+                                case "FINAL_NOTICE":
+                                        type = PaymentReminder.ReminderType.FINAL_WARNING;
+                                        break;
+                                case "EMAIL":
+                                case "SMS":
+                                        // Infer reminder type from payment status when only channel is specified
+                                        Payment payment = paymentService.getPaymentById(paymentId);
+                                        if (payment.getStatus() == Payment.PaymentStatus.DUE_TODAY) {
+                                                type = PaymentReminder.ReminderType.DUE_TODAY;
+                                        } else if (payment.getStatus() == Payment.PaymentStatus.UPCOMING || payment.getStatus() == Payment.PaymentStatus.SCHEDULED) {
+                                                type = PaymentReminder.ReminderType.UPCOMING_PAYMENT;
+                                        } else if (payment.getStatus() == Payment.PaymentStatus.GRACE_PERIOD) {
+                                                type = PaymentReminder.ReminderType.GRACE_PERIOD;
+                                        } else {
+                                                type = PaymentReminder.ReminderType.OVERDUE;
+                                        }
+                                        break;
+                                default:
+                                        type = PaymentReminder.ReminderType.valueOf(typeStr);
+                        }
+
+                        reminderService.sendManualReminder(paymentId, type);
+                        return ResponseEntity.ok().build();
+                } catch (IllegalArgumentException e) {
+                        return ResponseEntity.badRequest().body(Map.of("error", "Invalid reminderType"));
+                }
+        }
+
+        @GetMapping("/{paymentId}/reminders")
+        @Operation(summary = "Get reminders for a payment", description = "Retrieves reminder history for a specific payment.")
+        @ApiResponses(value = {
+                        @ApiResponse(responseCode = "200", description = "Reminders retrieved successfully"),
+                        @ApiResponse(responseCode = "401", description = "Unauthorized", content = @Content),
+                        @ApiResponse(responseCode = "403", description = "Forbidden - requires ADMIN role", content = @Content),
+                        @ApiResponse(responseCode = "404", description = "Payment not found", content = @Content)
+        })
+        public ResponseEntity<List<com.solar.core_services.payment_compliance.dto.PaymentReminderDTO>> getPaymentReminders(
+                        @PathVariable Long paymentId) {
+                List<com.solar.core_services.payment_compliance.dto.PaymentReminderDTO> reminders = reminderService.getRemindersByPayment(paymentId);
+                return ResponseEntity.ok(reminders);
         }
 
         @GetMapping("/grace-period-config")
@@ -304,15 +421,20 @@ public class AdminPaymentController {
                         @ApiResponse(responseCode = "401", description = "Unauthorized", content = @Content),
                         @ApiResponse(responseCode = "403", description = "Forbidden - requires ADMIN role", content = @Content)
         })
-        public ResponseEntity<GracePeriodConfigDTO> updateGracePeriodConfig(
+        public ResponseEntity<?> updateGracePeriodConfig(
                         @Parameter(description = "Authentication object containing admin credentials", hidden = true) Authentication authentication,
 
                         @Parameter(description = "Updated grace period configuration", required = true) @Valid @RequestBody GracePeriodConfigDTO configDTO) {
 
-                String username = authentication.getName();
-                GracePeriodConfigDTO updatedConfig = gracePeriodConfigService.updateConfig(configDTO, username);
-
-                return ResponseEntity.ok(updatedConfig);
+                try {
+                        String username = authentication.getName();
+                        GracePeriodConfigDTO updatedConfig = gracePeriodConfigService.updateConfig(configDTO, username);
+                        return ResponseEntity.ok(updatedConfig);
+                } catch (IllegalArgumentException ex) {
+                        return ResponseEntity.badRequest().body(Map.of(
+                                        "message", ex.getMessage()
+                        ));
+                }
         }
 
         @GetMapping("/reminder-config")
