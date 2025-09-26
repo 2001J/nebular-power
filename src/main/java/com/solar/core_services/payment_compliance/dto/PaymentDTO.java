@@ -16,6 +16,7 @@ import java.time.LocalDateTime;
 public class PaymentDTO {
     private Long id;
     private Long installationId;
+    private Long customerId;
     private String customerName;
     private String customerEmail;
     private Long paymentPlanId;
@@ -38,6 +39,7 @@ public class PaymentDTO {
         return PaymentDTO.builder()
                 .id(payment.getId())
                 .installationId(payment.getInstallation().getId())
+                .customerId(payment.getInstallation().getUser().getId())
                 .customerName(payment.getInstallation().getUser().getFullName())
                 .customerEmail(payment.getInstallation().getUser().getEmail())
                 .paymentPlanId(payment.getPaymentPlan() != null ? payment.getPaymentPlan().getId() : null)

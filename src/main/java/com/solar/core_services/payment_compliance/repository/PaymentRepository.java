@@ -72,6 +72,9 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
     
     // Find payments by multiple statuses
     List<Payment> findByStatusIn(List<Payment.PaymentStatus> statuses);
+
+    // Find payments by multiple statuses with pagination/sorting
+    Page<Payment> findByStatusIn(List<Payment.PaymentStatus> statuses, Pageable pageable);
     
     // Find payments by due date range
     List<Payment> findByDueDateBetween(LocalDateTime startDate, LocalDateTime endDate);

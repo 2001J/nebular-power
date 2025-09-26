@@ -276,17 +276,7 @@ public class PaymentServiceImpl implements PaymentService {
                 Payment.PaymentStatus.GRACE_PERIOD,
                 Payment.PaymentStatus.SUSPENSION_PENDING);
 
-        LocalDateTime now = LocalDateTime.now();
-        // Use a direct query instead of filtering after fetching
-        List<Payment> overduePaymentsList = paymentRepository.findByStatusIn(overdueStatuses);
-
-        // Convert list to page manually
-        int start = (int) pageable.getOffset();
-        int end = Math.min((start + pageable.getPageSize()), overduePaymentsList.size());
-
-        List<Payment> pageContent = overduePaymentsList.subList(start, end);
-        Page<Payment> overduePayments = new PageImpl<>(pageContent, pageable, overduePaymentsList.size());
-
+        Page<Payment> overduePayments = paymentRepository.findByStatusIn(overdueStatuses, pageable);
         return overduePayments.map(this::mapToDTO);
     }
 
@@ -546,7 +536,7 @@ public class PaymentServiceImpl implements PaymentService {
     @Transactional
     public void updatePaymentStatus(Payment payment, Payment.PaymentStatus newStatus, String reason) {
         log.info("Updating payment ID: {} status from {} to {}", payment.getId(), payment.getStatus(), newStatus);
-
+        Payment.PaymentStatus oldStatus = payment.getStatus();
         payment.setStatus(newStatus);
         payment.setStatusReason(reason);
         payment.setStatusUpdatedAt(LocalDateTime.now());
@@ -554,6 +544,14 @@ public class PaymentServiceImpl implements PaymentService {
         paymentRepository.save(payment);
 
         log.info("Successfully updated payment status");
+
+        // Publish status change event for service control integration
+        try {
+            paymentEventPublisher.publishPaymentStatusChanged(payment, oldStatus, newStatus);
+        } catch (Exception e) {
+            log.warn("Failed to publish payment status changed event for payment {}: {}",
+                    payment.getId(), e.getMessage());
+        }
     }
 
     private PaymentDTO processPayment(Payment payment, MakePaymentRequest request) {
@@ -666,6 +664,7 @@ public class PaymentServiceImpl implements PaymentService {
         return PaymentDTO.builder()
                 .id(payment.getId())
                 .installationId(payment.getInstallation().getId())
+                .customerId(payment.getInstallation().getUser().getId())
                 .paymentPlanId(payment.getPaymentPlan().getId())
                 .amount(payment.getAmount())
                 .dueDate(payment.getDueDate())
@@ -688,17 +687,7 @@ public class PaymentServiceImpl implements PaymentService {
                 Payment.PaymentStatus.GRACE_PERIOD,
                 Payment.PaymentStatus.SUSPENSION_PENDING);
 
-        LocalDateTime now = LocalDateTime.now();
-        // Use a direct query instead of filtering after fetching
-        List<Payment> overduePaymentsList = paymentRepository.findByStatusIn(overdueStatuses);
-
-        // Convert list to page manually
-        int start = (int) pageable.getOffset();
-        int end = Math.min((start + pageable.getPageSize()), overduePaymentsList.size());
-
-        List<Payment> pageContent = overduePaymentsList.subList(start, end);
-        Page<Payment> overduePayments = new PageImpl<>(pageContent, pageable, overduePaymentsList.size());
-
+        Page<Payment> overduePayments = paymentRepository.findByStatusIn(overdueStatuses, pageable);
         return overduePayments.map(this::mapToDTO);
     }
 
