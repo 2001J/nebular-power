@@ -29,14 +29,37 @@ public class GracePeriodConfigServiceImpl implements GracePeriodConfigService {
         GracePeriodConfig config = getActiveGracePeriodConfig();
 
         // Update the existing config
+        if (configDTO.getNumberOfDays() == null || configDTO.getNumberOfDays() < 1) {
+            throw new IllegalArgumentException("Grace period must be at least 1 day");
+        }
+        if (configDTO.getReminderFrequency() == null || configDTO.getReminderFrequency() < 1) {
+            throw new IllegalArgumentException("Reminder frequency must be at least 1 day");
+        }
+
         config.setNumberOfDays(configDTO.getNumberOfDays());
         config.setReminderFrequency(configDTO.getReminderFrequency());
-        config.setAutoSuspendEnabled(configDTO.getAutoSuspendEnabled());
+        config.setAutoSuspendEnabled(Boolean.TRUE.equals(configDTO.getAutoSuspendEnabled()));
 
-        // Update late fee settings
-        config.setLateFeesEnabled(configDTO.getLateFeesEnabled());
-        config.setLateFeePercentage(configDTO.getLateFeePercentage());
-        config.setLateFeeFixedAmount(configDTO.getLateFeeFixedAmount());
+        // Update late fee settings with validation
+        if (Boolean.TRUE.equals(configDTO.getLateFeesEnabled())) {
+            BigDecimal percentage = configDTO.getLateFeePercentage();
+            BigDecimal fixedAmount = configDTO.getLateFeeFixedAmount();
+
+            boolean hasPercentage = percentage != null && percentage.compareTo(BigDecimal.ZERO) > 0;
+            boolean hasFixedAmount = fixedAmount != null && fixedAmount.compareTo(BigDecimal.ZERO) > 0;
+
+            if (!hasPercentage && !hasFixedAmount) {
+                throw new IllegalArgumentException("Provide at least a percentage or fixed amount when late fees are enabled");
+            }
+
+            config.setLateFeesEnabled(true);
+            config.setLateFeePercentage(hasPercentage ? percentage : BigDecimal.ZERO);
+            config.setLateFeeFixedAmount(hasFixedAmount ? fixedAmount : BigDecimal.ZERO);
+        } else {
+            config.setLateFeesEnabled(false);
+            config.setLateFeePercentage(BigDecimal.ZERO);
+            config.setLateFeeFixedAmount(BigDecimal.ZERO);
+        }
 
         config.setUpdatedBy(username);
 

@@ -11,5 +11,10 @@ public interface PaymentEventPublisher {
     
     void publishPaymentPlanUpdated(PaymentPlan paymentPlan);
     
+    /**
+     * Publish a generic payment status change event to decouple Payment Compliance and Service Control.
+     */
+    void publishPaymentStatusChanged(Payment payment, Payment.PaymentStatus oldStatus, Payment.PaymentStatus newStatus);
+    
     boolean confirmServiceControlAction(Long installationId, String actionType);
 } 

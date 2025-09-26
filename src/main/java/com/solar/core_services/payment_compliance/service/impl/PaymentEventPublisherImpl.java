@@ -58,6 +58,21 @@ public class PaymentEventPublisherImpl implements PaymentEventPublisher {
     }
 
     @Override
+    public void publishPaymentStatusChanged(Payment payment, Payment.PaymentStatus oldStatus, Payment.PaymentStatus newStatus) {
+        log.info("Publishing payment status changed event for payment {}, installation {}: {} -> {}",
+                payment.getId(), payment.getInstallation().getId(), oldStatus, newStatus);
+        try {
+            PaymentStatusChangedEvent event = new PaymentStatusChangedEvent(this,
+                    payment.getInstallation().getId(), payment.getId(), oldStatus, newStatus);
+            applicationEventPublisher.publishEvent(event);
+            log.info("Successfully published payment status changed event");
+        } catch (Exception e) {
+            log.error("Failed to publish payment status changed event", e);
+            handleEventPublishingFailure("PAYMENT_STATUS_CHANGED", payment.getInstallation().getId());
+        }
+    }
+
+    @Override
     public boolean confirmServiceControlAction(Long installationId, String actionType) {
         // In a real implementation, this would wait for a confirmation from the Service Control module
         // For now, we'll just log and return true
@@ -144,5 +159,28 @@ public class PaymentEventPublisherImpl implements PaymentEventPublisher {
         public Long getPaymentPlanId() {
             return paymentPlanId;
         }
+    }
+
+    public static class PaymentStatusChangedEvent {
+        private final Object source;
+        private final Long installationId;
+        private final Long paymentId;
+        private final Payment.PaymentStatus oldStatus;
+        private final Payment.PaymentStatus newStatus;
+
+        public PaymentStatusChangedEvent(Object source, Long installationId, Long paymentId,
+                                         Payment.PaymentStatus oldStatus, Payment.PaymentStatus newStatus) {
+            this.source = source;
+            this.installationId = installationId;
+            this.paymentId = paymentId;
+            this.oldStatus = oldStatus;
+            this.newStatus = newStatus;
+        }
+
+        public Object getSource() { return source; }
+        public Long getInstallationId() { return installationId; }
+        public Long getPaymentId() { return paymentId; }
+        public Payment.PaymentStatus getOldStatus() { return oldStatus; }
+        public Payment.PaymentStatus getNewStatus() { return newStatus; }
     }
 } 

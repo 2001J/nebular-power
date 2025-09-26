@@ -68,4 +68,20 @@ public class PaymentEventListenerService {
                 Payment.PaymentStatus.SUSPENSION_PENDING
         );
     }
+
+    /**
+     * Listen for generic payment status change events and delegate to integration service
+     */
+    @EventListener
+    @Transactional
+    public void handlePaymentStatusChangedEvent(PaymentEventPublisherImpl.PaymentStatusChangedEvent event) {
+        log.info("Received payment status changed event for payment {}: {} -> {}",
+                event.getPaymentId(), event.getOldStatus(), event.getNewStatus());
+
+        paymentIntegrationService.handlePaymentStatusChange(
+                event.getPaymentId(),
+                event.getOldStatus(),
+                event.getNewStatus()
+        );
+    }
 } 

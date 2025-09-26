@@ -69,7 +69,7 @@ import { useToast } from "@/components/ui/use-toast"
 // Define Payment type for improved type checking
 interface Payment {
   id: string;
-  customerId: string;
+  customerId: string | number;
   customerName: string;
   amount: number;
   dueDate: string;
@@ -85,6 +85,7 @@ export default function AdminPaymentsPage() {
   const [page, setPage] = useState(0)
   const [pageSize, setPageSize] = useState(10)
   const [totalPages, setTotalPages] = useState(0)
+  const [totalElements, setTotalElements] = useState(0)
   const [sortBy, setSortBy] = useState("dueDate")
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc")
   const [overduePayments, setOverduePayments] = useState<Payment[]>([])
@@ -137,12 +138,31 @@ export default function AdminPaymentsPage() {
   const [showGracePeriodDialog, setShowGracePeriodDialog] = useState(false);
   const [showReminderDialog, setShowReminderDialog] = useState(false);
 
+  const normalizeGraceConfig = (configData: any) => {
+    const numberOfDays = parseInt(configData?.numberOfDays?.toString() || configData?.gracePeriodDays?.toString() || '7');
+    const reminderFrequency = parseInt(configData?.reminderFrequency?.toString() || '2');
+
+    const lateFeePercentage = parseFloat(configData?.lateFeePercentage?.toString() || '0');
+    const lateFeeFixedAmount = parseFloat(configData?.lateFeeFixedAmount?.toString() || '0');
+
+    return {
+      numberOfDays: Number.isNaN(numberOfDays) ? 7 : numberOfDays,
+      gracePeriodDays: Number.isNaN(numberOfDays) ? 7 : numberOfDays,
+      reminderFrequency: Number.isNaN(reminderFrequency) ? 2 : reminderFrequency,
+      autoSuspendEnabled: configData?.autoSuspendEnabled === true,
+      lateFeesEnabled: configData?.lateFeesEnabled === true,
+      lateFeePercentage: Number.isNaN(lateFeePercentage) ? 0 : lateFeePercentage,
+      lateFeeFixedAmount: Number.isNaN(lateFeeFixedAmount) ? 0 : lateFeeFixedAmount
+    };
+  };
+
   const fetchOverduePayments = async () => {
     try {
       setLoading(true);
       const data = await paymentComplianceApi.getOverduePayments(page, pageSize, sortBy, sortDirection);
       setOverduePayments(data.content || []);
       setTotalPages(data.totalPages || 1);
+      setTotalElements(data.totalElements || (data.content?.length || 0));
 
       // Fetch grace period configuration
       try {
@@ -150,17 +170,7 @@ export default function AdminPaymentsPage() {
         console.log("Loaded grace period config from API:", configData);
 
         // Ensure all fields exist with correct types
-        const enhancedConfigData = {
-          gracePeriodDays: parseInt(configData.numberOfDays?.toString() || configData.gracePeriodDays?.toString()) || 7,
-          numberOfDays: parseInt(configData.numberOfDays?.toString() || configData.gracePeriodDays?.toString()) || 7,
-          reminderFrequency: parseInt(configData.reminderFrequency?.toString()) || 2,
-          // Ensure boolean values
-          autoSuspendEnabled: configData.autoSuspendEnabled === false ? false : true,
-          lateFeesEnabled: configData.lateFeesEnabled === true,
-          // Ensure numeric values
-          lateFeePercentage: parseFloat(configData.lateFeePercentage?.toString()) || 0,
-          lateFeeFixedAmount: parseFloat(configData.lateFeeFixedAmount?.toString()) || 0
-        };
+        const enhancedConfigData = normalizeGraceConfig(configData);
 
         console.log("Enhanced grace period config:", enhancedConfigData);
         setGracePeriodConfig(enhancedConfigData)
@@ -168,15 +178,15 @@ export default function AdminPaymentsPage() {
       } catch (gracePeriodError) {
         console.error("Error fetching grace period config:", gracePeriodError);
         // Use defaults for grace period config
-        const defaultGracePeriodConfig = {
-          gracePeriodDays: 7,
+        const defaultGracePeriodConfig = normalizeGraceConfig({
           numberOfDays: 7,
+          gracePeriodDays: 7,
           reminderFrequency: 2,
           autoSuspendEnabled: true,
           lateFeesEnabled: false,
           lateFeePercentage: 0,
           lateFeeFixedAmount: 0
-        };
+        });
         setGracePeriodConfig(defaultGracePeriodConfig);
         setUpdatedGracePeriodConfig(defaultGracePeriodConfig);
       }
@@ -329,9 +339,20 @@ export default function AdminPaymentsPage() {
       // Close dialog first for better UX
       setRecordPaymentDialogOpen(false)
 
+      const amountValue = parseFloat(paymentAmount)
+      if (isNaN(amountValue) || amountValue <= 0) {
+        toast({
+          title: "Invalid amount",
+          description: "Enter a valid payment amount greater than zero.",
+          variant: "destructive",
+        })
+        setConfigSaving(false)
+        return
+      }
+
       const paymentData = {
         paymentId: selectedPayment.id,
-        amount: parseFloat(paymentAmount),
+        amount: amountValue,
         paymentMethod: paymentMethod,
         transactionId: transactionId || undefined
       }
@@ -347,7 +368,7 @@ export default function AdminPaymentsPage() {
       })
 
       // Refresh data
-      fetchOverduePayments()
+      await fetchOverduePayments()
 
       // Reset form
       setPaymentAmount('')
@@ -369,14 +390,10 @@ export default function AdminPaymentsPage() {
     try {
       setConfigSaving(true)
 
-      // Force dialog to close first for better UX
-      setShowGracePeriodDialog(false)
-
       // Validate grace period config before saving
       const isValid = validateGracePeriodConfig()
 
       if (!isValid) {
-        setConfigSaving(false)
         return
       }
 
@@ -385,8 +402,8 @@ export default function AdminPaymentsPage() {
         // Use numberOfDays for consistency
         numberOfDays: parseInt(updatedGracePeriodConfig.numberOfDays.toString()) || 7,
         gracePeriodDays: parseInt(updatedGracePeriodConfig.numberOfDays.toString()) || 7,
-        // Always set autoSuspendEnabled to true as it's a core system feature
-        autoSuspendEnabled: true,
+        // Respect admin toggle for auto-suspension
+        autoSuspendEnabled: Boolean(updatedGracePeriodConfig.autoSuspendEnabled),
         // Set reminder frequency
         reminderFrequency: parseInt(updatedGracePeriodConfig.reminderFrequency.toString()) || 2,
         // Make sure boolean values are properly set - explicitly cast to boolean
@@ -401,16 +418,19 @@ export default function AdminPaymentsPage() {
       // Call API to update configuration
       await paymentComplianceApi.updateGracePeriodConfig(configToUpdate)
 
-      // Update local state with new configuration - ensure we use the properly typed data
-      setGracePeriodConfig({
-        ...configToUpdate,
-        // Ensure boolean fields are correctly set
-        autoSuspendEnabled: true,
-        lateFeesEnabled: Boolean(configToUpdate.lateFeesEnabled)
-      })
+      // Re-fetch to ensure we reflect persisted state exactly
+      const latestConfig = await paymentComplianceApi.getGracePeriodConfig()
+      console.log("Latest grace period config from server:", latestConfig);
 
-      // Force a refresh of the config data from the server
+      const normalizedConfig = normalizeGraceConfig(latestConfig)
+      setGracePeriodConfig(normalizedConfig)
+      setUpdatedGracePeriodConfig(normalizedConfig)
+
+      // Refresh any dependent data
       setConfigRefreshKey(prevKey => prevKey + 1)
+
+      // Close dialog after successful save
+      setShowGracePeriodDialog(false)
 
       // Show success message to user
       toast({
@@ -424,7 +444,7 @@ export default function AdminPaymentsPage() {
       // Show error message
       toast({
         title: "Error",
-        description: "Failed to update grace period configuration. Please try again.",
+        description: (error as any)?.response?.data?.message || "Failed to update grace period configuration. Please try again.",
         variant: "destructive",
       })
     } finally {
@@ -449,8 +469,8 @@ export default function AdminPaymentsPage() {
 
       // Ensure values are properly formatted
       const configToUpdate = {
-        // Ensure automated reminders are always enabled
-        autoSendReminders: true,
+        // Respect admin toggle for automated reminders
+        autoSendReminders: Boolean(updatedReminderConfig.autoSendReminders),
         // Ensure days are properly numeric and have defaults
         firstReminderDays: parseInt(updatedReminderConfig.firstReminderDays.toString()) || 1,
         secondReminderDays: parseInt(updatedReminderConfig.secondReminderDays.toString()) || 3,
@@ -538,20 +558,22 @@ export default function AdminPaymentsPage() {
       const lateFeePercentage = parseFloat(updatedGracePeriodConfig.lateFeePercentage?.toString() || '0');
       const lateFeeFixedAmount = parseFloat(updatedGracePeriodConfig.lateFeeFixedAmount?.toString() || '0');
 
-      if (isNaN(lateFeePercentage) || lateFeePercentage < 0 || lateFeePercentage > 100) {
+      const hasPercentage = !isNaN(lateFeePercentage) && lateFeePercentage > 0 && lateFeePercentage <= 100;
+      const hasFixedAmount = !isNaN(lateFeeFixedAmount) && lateFeeFixedAmount > 0 && lateFeeFixedAmount <= 1000;
+
+      if (!hasPercentage && !hasFixedAmount) {
+        isValid = false;
+        errors.push("Provide at least a percentage or fixed amount when late fees are enabled");
+      }
+
+      if (!isNaN(lateFeePercentage) && (lateFeePercentage < 0 || lateFeePercentage > 100)) {
         isValid = false;
         errors.push("Late fee percentage must be between 0 and 100");
       }
 
-      if (isNaN(lateFeeFixedAmount) || lateFeeFixedAmount < 0 || lateFeeFixedAmount > 1000) {
+      if (!isNaN(lateFeeFixedAmount) && (lateFeeFixedAmount < 0 || lateFeeFixedAmount > 1000)) {
         isValid = false;
         errors.push("Late fee fixed amount must be between $0 and $1000");
-      }
-
-      // Must have at least one fee type defined if enabled
-      if (lateFeePercentage === 0 && lateFeeFixedAmount === 0) {
-        isValid = false;
-        errors.push("At least one late fee type must be specified when late fees are enabled");
       }
     }
 
@@ -641,6 +663,16 @@ export default function AdminPaymentsPage() {
           </dd>
         </div>
         <div className="flex justify-between items-center">
+          <dt className="text-sm font-medium">Auto-Suspension</dt>
+          <dd className="text-sm">
+            {gracePeriodConfig.autoSuspendEnabled ? (
+              <Badge variant="destructive" className="bg-red-100 text-red-800 border-red-300">Enabled</Badge>
+            ) : (
+              <Badge variant="outline">Disabled</Badge>
+            )}
+          </dd>
+        </div>
+        <div className="flex justify-between items-center">
           <dt className="text-sm font-medium">Reminder Frequency</dt>
           <dd className="text-sm">Every {gracePeriodConfig.reminderFrequency} day(s)</dd>
         </div>
@@ -727,12 +759,7 @@ export default function AdminPaymentsPage() {
                             </Button>
                           </TableHead>
                           <TableHead>
-                            <Button variant="ghost" className="p-0 font-medium" onClick={() => handleSort("customerName")}>
-                              Customer
-                              {sortBy === "customerName" && (
-                                <ArrowUpDown className="ml-2 h-4 w-4" />
-                              )}
-                            </Button>
+                            <span className="p-0 font-medium">Customer</span>
                           </TableHead>
                           <TableHead>
                             <Button variant="ghost" className="p-0 font-medium" onClick={() => handleSort("amount")}>
@@ -751,9 +778,9 @@ export default function AdminPaymentsPage() {
                             </Button>
                           </TableHead>
                           <TableHead>
-                            <Button variant="ghost" className="p-0 font-medium" onClick={() => handleSort("daysPastDue")}>
+                            <Button variant="ghost" className="p-0 font-medium" onClick={() => handleSort("daysOverdue")}>
                               Days Overdue
-                              {sortBy === "daysPastDue" && (
+                              {sortBy === "daysOverdue" && (
                                 <ArrowUpDown className="ml-2 h-4 w-4" />
                               )}
                             </Button>
@@ -791,7 +818,7 @@ export default function AdminPaymentsPage() {
                                 </div>
                               </TableCell>
                               <TableCell>
-                                <Badge variant="outline">{payment.daysPastDue} days</Badge>
+                                <Badge variant="outline">{payment.daysOverdue ?? payment.daysPastDue ?? 0} days</Badge>
                               </TableCell>
                               <TableCell>
                                 {getStatusBadge(payment.status)}
@@ -833,7 +860,7 @@ export default function AdminPaymentsPage() {
                   <div className="mt-4 flex items-center justify-end space-x-2">
                     <div className="flex-1 text-sm text-muted-foreground">
                       Showing <span className="font-medium">{overduePayments.length}</span> of{" "}
-                      <span className="font-medium">{pageSize * totalPages}</span> results
+                      <span className="font-medium">{totalElements}</span> results
                     </div>
 
                     <div className="space-x-2">
@@ -931,17 +958,27 @@ export default function AdminPaymentsPage() {
                       </CardDescription>
                     </CardHeader>
                     <CardContent className="pt-4">
-                      <div className="mb-3">
-                        <div className="h-1 w-full bg-muted rounded-full mb-2">
-                          {/* Timeline visualization */}
-                          <div className="relative h-1 w-full">
-                            <div className="absolute top-0 w-2 h-2 bg-primary rounded-full -mt-0.5" style={{ left: "0%" }} />
-                            <div className="absolute top-0 w-2 h-2 bg-primary rounded-full -mt-0.5" style={{ left: `${Math.min((reminderConfig.firstReminderDays / 30) * 100, 100)}%` }} />
-                            <div className="absolute top-0 w-2 h-2 bg-primary rounded-full -mt-0.5" style={{ left: `${Math.min((reminderConfig.secondReminderDays / 30) * 100, 100)}%` }} />
-                            <div className="absolute top-0 w-2 h-2 bg-primary rounded-full -mt-0.5" style={{ left: `${Math.min((reminderConfig.finalReminderDays / 30) * 100, 100)}%` }} />
-                          </div>
+                      {/* Robust timeline visualization */}
+                      <div className="mb-4">
+                        <div className="relative w-full h-6 rounded-full overflow-hidden">
+                          {/* Base rail */}
+                          <div className="absolute inset-y-2 left-0 right-0 bg-muted rounded-full" />
+                          {/* Markers centered vertically to avoid overlap */}
+                          <div className="absolute top-1/2 -translate-y-1/2 left-0 w-2 h-2 bg-primary rounded-full" />
+                          <div
+                            className="absolute top-1/2 -translate-y-1/2 w-2 h-2 bg-primary rounded-full"
+                            style={{ left: `${Math.min((Number(reminderConfig.firstReminderDays || 1) / 30) * 100, 100)}%` }}
+                          />
+                          <div
+                            className="absolute top-1/2 -translate-y-1/2 w-2 h-2 bg-primary rounded-full"
+                            style={{ left: `${Math.min((Number(reminderConfig.secondReminderDays || 3) / 30) * 100, 100)}%` }}
+                          />
+                          <div
+                            className="absolute top-1/2 -translate-y-1/2 w-2 h-2 bg-primary rounded-full"
+                            style={{ left: `${Math.min((Number(reminderConfig.finalReminderDays || 7) / 30) * 100, 100)}%` }}
+                          />
                         </div>
-                        <div className="flex justify-between text-xs text-muted-foreground">
+                        <div className="flex justify-between text-xs text-muted-foreground mt-2">
                           <span>Due Date</span>
                           <span>30 Days</span>
                         </div>
@@ -1141,7 +1178,7 @@ export default function AdminPaymentsPage() {
         }
         setShowGracePeriodDialog(open);
       }}>
-        <DialogContent className="max-w-md mx-auto">
+        <DialogContent className="w-[95vw] max-w-lg sm:max-w-xl md:max-w-2xl mx-auto max-h-[90vh] overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle>Grace Period Settings</DialogTitle>
             <DialogDescription>
@@ -1149,7 +1186,8 @@ export default function AdminPaymentsPage() {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-6 py-4">
+          {/* Scrollable content area */}
+          <div className="dialog-scroll space-y-6 py-4 overflow-y-auto flex-1 px-3 pr-6">
             <div className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="gracePeriodDays">Grace Period Duration</Label>
@@ -1197,9 +1235,23 @@ export default function AdminPaymentsPage() {
 
             <div className="pt-4 border-t">
               <p className="text-sm font-medium mb-3">System Behavior After Grace Period</p>
-              <div className="flex items-center space-x-2 mb-3 bg-muted/30 p-3 rounded-md">
-                <Badge variant="outline" className="bg-red-100 text-red-800 border-red-300">Auto-Suspension</Badge>
-                <span className="text-xs text-muted-foreground">Service is automatically suspended after grace period ends</span>
+              <div className="flex items-center justify-between mb-3 bg-muted/30 p-3 rounded-md">
+                <div className="flex items-center space-x-2">
+                  <Badge variant="outline" className={updatedGracePeriodConfig.autoSuspendEnabled ? "bg-red-100 text-red-800 border-red-300" : ""}>
+                    Auto-Suspension
+                  </Badge>
+                  <span className="text-xs text-muted-foreground">
+                    {updatedGracePeriodConfig.autoSuspendEnabled ? "Service is automatically suspended after grace period ends" : "Service is not automatically suspended after grace period"}
+                  </span>
+                </div>
+                <Switch
+                  id="autoSuspendEnabled"
+                  checked={updatedGracePeriodConfig.autoSuspendEnabled === true}
+                  onCheckedChange={(checked) => setUpdatedGracePeriodConfig({
+                    ...updatedGracePeriodConfig,
+                    autoSuspendEnabled: checked
+                  })}
+                />
               </div>
             </div>
 
@@ -1209,10 +1261,16 @@ export default function AdminPaymentsPage() {
                 <Switch
                   id="lateFeesEnabled"
                   checked={updatedGracePeriodConfig.lateFeesEnabled === true}
-                  onCheckedChange={(checked) => setUpdatedGracePeriodConfig({
-                    ...updatedGracePeriodConfig,
-                    lateFeesEnabled: checked
-                  })}
+                  onCheckedChange={(checked) => setUpdatedGracePeriodConfig(prev => ({
+                    ...prev,
+                    lateFeesEnabled: checked,
+                    lateFeePercentage: checked
+                      ? (prev.lateFeePercentage && prev.lateFeePercentage > 0 ? prev.lateFeePercentage : 5)
+                      : prev.lateFeePercentage,
+                    lateFeeFixedAmount: checked
+                      ? (prev.lateFeeFixedAmount && prev.lateFeeFixedAmount > 0 ? prev.lateFeeFixedAmount : 10)
+                      : prev.lateFeeFixedAmount
+                  }))}
                 />
               </div>
               <p className="text-xs text-muted-foreground mt-1 mb-3">Add fees to payments made after the grace period</p>
@@ -1270,7 +1328,7 @@ export default function AdminPaymentsPage() {
             )}
           </div>
 
-          <DialogFooter className="flex space-x-2 justify-end">
+          <DialogFooter className="flex space-x-2 justify-end px-0 pt-3 pb-1">
             <Button variant="outline" onClick={() => setShowGracePeriodDialog(false)} disabled={configSaving}>
               Cancel
             </Button>
@@ -1296,7 +1354,7 @@ export default function AdminPaymentsPage() {
         }
         setShowReminderDialog(open)
       }}>
-        <DialogContent className="max-w-md mx-auto">
+        <DialogContent className="w-[95vw] max-w-lg sm:max-w-xl md:max-w-2xl mx-auto max-h-[90vh] overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle>Payment Reminder Schedule</DialogTitle>
             <DialogDescription>
@@ -1304,64 +1362,89 @@ export default function AdminPaymentsPage() {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-6 py-4">
+          {/* Scrollable content area */}
+          <div className="dialog-scroll space-y-6 py-4 overflow-y-auto flex-1 px-3 pr-6">
+            <div className="flex items-center justify-between">
+              <div className="space-y-1">
+                <Label htmlFor="autoSendReminders" className="text-base font-medium">Automatically Send Reminders</Label>
+                <p className="text-xs text-muted-foreground">When enabled, the system sends reminders based on the schedule below.</p>
+              </div>
+              <Switch
+                id="autoSendReminders"
+                checked={updatedReminderConfig.autoSendReminders === true}
+                onCheckedChange={(checked) => setUpdatedReminderConfig({
+                  ...updatedReminderConfig,
+                  autoSendReminders: checked
+                })}
+              />
+            </div>
             {/* Timeline Preview */}
             <div className="mb-4 bg-muted/30 rounded-lg p-4 border border-muted">
               <h4 className="text-sm font-medium mb-3 flex items-center">
                 <Calendar className="h-4 w-4 mr-2" /> Reminder Timeline
               </h4>
-              <div className="h-2 w-full bg-muted rounded-full mb-4 relative">
-                <div className="absolute -top-5 text-xs text-muted-foreground">Due date</div>
-                <div className="absolute top-0 w-3 h-3 bg-primary rounded-full -mt-0.5 -ml-1.5" style={{ left: '0%' }} />
-
-                <div className="absolute top-0 w-3 h-3 bg-blue-400 rounded-full -mt-0.5 -ml-1.5"
-                  style={{ left: `${Math.min((parseInt(updatedReminderConfig.firstReminderDays?.toString() || '1') / 30) * 100, 100)}%` }} />
-                <div className="absolute top-7 text-xs text-blue-600"
-                  style={{ left: `${Math.min((parseInt(updatedReminderConfig.firstReminderDays?.toString() || '1') / 30) * 100, 95)}%` }}>
-                  Day {updatedReminderConfig.firstReminderDays || 1}
-                </div>
-
-                <div className="absolute top-0 w-3 h-3 bg-amber-400 rounded-full -mt-0.5 -ml-1.5"
-                  style={{ left: `${Math.min((parseInt(updatedReminderConfig.secondReminderDays?.toString() || '3') / 30) * 100, 100)}%` }} />
-                <div className="absolute top-7 text-xs text-amber-600"
-                  style={{ left: `${Math.min((parseInt(updatedReminderConfig.secondReminderDays?.toString() || '3') / 30) * 100, 95)}%` }}>
-                  Day {updatedReminderConfig.secondReminderDays || 3}
-                </div>
-
-                <div className="absolute top-0 w-3 h-3 bg-red-400 rounded-full -mt-0.5 -ml-1.5"
-                  style={{ left: `${Math.min((parseInt(updatedReminderConfig.finalReminderDays?.toString() || '7') / 30) * 100, 100)}%` }} />
-                <div className="absolute top-7 text-xs text-red-600"
-                  style={{ left: `${Math.min((parseInt(updatedReminderConfig.finalReminderDays?.toString() || '7') / 30) * 100, 95)}%` }}>
-                  Day {updatedReminderConfig.finalReminderDays || 7}
-                </div>
+              <div className="relative w-full h-8">
+                {/* Base rail */}
+                <div className="absolute inset-y-3 left-0 right-0 bg-muted rounded-full" />
+                {/* Markers, vertically centered to avoid overlap */}
+                <div className="absolute top-1/2 -translate-y-1/2 left-0 w-3 h-3 bg-primary rounded-full" />
+                <div
+                  className="absolute top-1/2 -translate-y-1/2 w-3 h-3 bg-blue-400 rounded-full"
+                  style={{ left: `${Math.min(Math.max((Number(updatedReminderConfig.firstReminderDays || 1) / 30) * 100, 2), 98)}%` }}
+                />
+                <div
+                  className="absolute top-1/2 -translate-y-1/2 w-3 h-3 bg-amber-400 rounded-full"
+                  style={{ left: `${Math.min(Math.max((Number(updatedReminderConfig.secondReminderDays || 3) / 30) * 100, 2), 98)}%` }}
+                />
+                <div
+                  className="absolute top-1/2 -translate-y-1/2 w-3 h-3 bg-red-400 rounded-full"
+                  style={{ left: `${Math.min(Math.max((Number(updatedReminderConfig.finalReminderDays || 7) / 30) * 100, 2), 98)}%` }}
+                />
               </div>
-              <div className="flex justify-between text-xs text-muted-foreground mt-10">
+              <div className="flex justify-between text-xs text-muted-foreground mt-2">
                 <span>Due Date</span>
                 <span>30 Days</span>
+              </div>
+              {/* Legend to clarify marker colors and reduce confusion */}
+              <div className="mt-3 grid grid-cols-3 gap-2 text-xs text-muted-foreground">
+                <div className="flex items-center space-x-2">
+                  <span className="inline-block w-2.5 h-2.5 rounded-full bg-blue-400" />
+                  <span>First</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <span className="inline-block w-2.5 h-2.5 rounded-full bg-amber-400" />
+                  <span>Second</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <span className="inline-block w-2.5 h-2.5 rounded-full bg-red-400" />
+                  <span>Final</span>
+                </div>
               </div>
             </div>
 
             <div className="space-y-5">
               <div className="space-y-2">
                 <Label htmlFor="firstReminderDays">First Reminder (days after due date)</Label>
-                <div className="relative">
+              <div className="relative">
                   <Input
                     id="firstReminderDays"
-                    type="number"
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
                     min="1"
                     max={parseInt(updatedReminderConfig.secondReminderDays?.toString() || '3') - 1}
                     value={updatedReminderConfig.firstReminderDays}
                     onChange={(e) => {
                       const value = parseInt(e.target.value);
-                      setUpdatedReminderConfig({
-                        ...updatedReminderConfig,
-                        firstReminderDays: isNaN(value) ? 1 : value
-                      });
-                    }}
-                    className="pr-12"
-                  />
-                  <span className="absolute right-3 top-2.5 text-sm text-muted-foreground">days</span>
-                </div>
+                    setUpdatedReminderConfig({
+                      ...updatedReminderConfig,
+                      firstReminderDays: isNaN(value) ? 1 : value
+                    });
+                  }}
+                  className="pr-16"
+                />
+                <span className="absolute right-3 top-2.5 text-sm text-muted-foreground select-none pointer-events-none">days</span>
+              </div>
                 <p className="text-xs text-muted-foreground">
                   First gentle reminder sent after this many days past due date.
                 </p>
@@ -1369,24 +1452,26 @@ export default function AdminPaymentsPage() {
 
               <div className="space-y-2">
                 <Label htmlFor="secondReminderDays">Second Reminder (days after due date)</Label>
-                <div className="relative">
+              <div className="relative">
                   <Input
                     id="secondReminderDays"
-                    type="number"
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
                     min={parseInt(updatedReminderConfig.firstReminderDays?.toString() || '1') + 1}
                     max={parseInt(updatedReminderConfig.finalReminderDays?.toString() || '7') - 1}
                     value={updatedReminderConfig.secondReminderDays}
                     onChange={(e) => {
                       const value = parseInt(e.target.value);
-                      setUpdatedReminderConfig({
-                        ...updatedReminderConfig,
-                        secondReminderDays: isNaN(value) ? 3 : value
-                      });
-                    }}
-                    className="pr-12"
-                  />
-                  <span className="absolute right-3 top-2.5 text-sm text-muted-foreground">days</span>
-                </div>
+                    setUpdatedReminderConfig({
+                      ...updatedReminderConfig,
+                      secondReminderDays: isNaN(value) ? 3 : value
+                    });
+                  }}
+                  className="pr-16"
+                />
+                <span className="absolute right-3 top-2.5 text-sm text-muted-foreground select-none pointer-events-none">days</span>
+              </div>
                 <p className="text-xs text-muted-foreground">
                   Second more urgent reminder sent after this many days past due date.
                 </p>
@@ -1394,24 +1479,26 @@ export default function AdminPaymentsPage() {
 
               <div className="space-y-2">
                 <Label htmlFor="finalReminderDays">Final Notice (days after due date)</Label>
-                <div className="relative">
+              <div className="relative">
                   <Input
                     id="finalReminderDays"
-                    type="number"
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
                     min={parseInt(updatedReminderConfig.secondReminderDays?.toString() || '3') + 1}
                     max="60"
                     value={updatedReminderConfig.finalReminderDays}
                     onChange={(e) => {
                       const value = parseInt(e.target.value);
-                      setUpdatedReminderConfig({
-                        ...updatedReminderConfig,
-                        finalReminderDays: isNaN(value) ? 7 : value
-                      });
-                    }}
-                    className="pr-12"
-                  />
-                  <span className="absolute right-3 top-2.5 text-sm text-muted-foreground">days</span>
-                </div>
+                    setUpdatedReminderConfig({
+                      ...updatedReminderConfig,
+                      finalReminderDays: isNaN(value) ? 7 : value
+                    });
+                  }}
+                  className="pr-16"
+                />
+                <span className="absolute right-3 top-2.5 text-sm text-muted-foreground select-none pointer-events-none">days</span>
+              </div>
                 <p className="text-xs text-muted-foreground">
                   Final notice of possible service suspension sent after this many days past due date.
                 </p>
@@ -1450,7 +1537,7 @@ export default function AdminPaymentsPage() {
             </div>
           </div>
 
-          <DialogFooter className="flex space-x-2 justify-end">
+          <DialogFooter className="flex space-x-2 justify-end px-0 pt-3 pb-1">
             <Button variant="outline" onClick={() => setShowReminderDialog(false)} disabled={configSaving}>
               Cancel
             </Button>
@@ -1467,6 +1554,26 @@ export default function AdminPaymentsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <style jsx global>{`
+        /* Thin, subtle scrollbars just for dialog content */
+        .dialog-scroll {
+          scrollbar-width: thin; /* Firefox */
+          scrollbar-color: rgba(100, 100, 100, 0.25) transparent; /* Firefox */
+          scrollbar-gutter: stable both-edges; /* Reserve space for scrollbar to avoid overlaying content */
+          -webkit-overflow-scrolling: touch; /* Smooth on iOS */
+        }
+        .dialog-scroll::-webkit-scrollbar {
+          width: 6px; /* Chrome, Safari */
+          height: 6px;
+        }
+        .dialog-scroll::-webkit-scrollbar-thumb {
+          background-color: rgba(100, 100, 100, 0.25);
+          border-radius: 9999px;
+        }
+        .dialog-scroll::-webkit-scrollbar-track {
+          background: transparent;
+        }
+      `}</style>
     </div>
   )
 }

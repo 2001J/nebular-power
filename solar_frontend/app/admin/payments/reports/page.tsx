@@ -487,7 +487,7 @@ export default function PaymentReportsPage() {
                 <TableCell>{getStatusBadge(payment.status)}</TableCell>
                 {activeTab === "overdue" && (
                   <TableCell>
-                    <Badge variant="outline">{payment.daysPastDue} days</Badge>
+                    <Badge variant="outline">{payment.daysOverdue ?? payment.daysPastDue ?? 0} days</Badge>
                   </TableCell>
                 )}
                 <TableCell className="text-right">
