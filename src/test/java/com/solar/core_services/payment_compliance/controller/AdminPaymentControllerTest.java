@@ -45,6 +45,7 @@ import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
@@ -64,6 +65,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Test class for AdminPaymentController
@@ -377,11 +379,13 @@ public class AdminPaymentControllerTest {
                 .thenReturn(testGracePeriodConfigDTO);
 
         // When
-        ResponseEntity<GracePeriodConfigDTO> response = controller.updateGracePeriodConfig(authentication,
+        ResponseEntity<?> response = controller.updateGracePeriodConfig(authentication,
                 testGracePeriodConfigDTO);
 
         // Then
         verify(gracePeriodConfigService, times(1)).updateConfig(any(GracePeriodConfigDTO.class), eq("admin"));
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertTrue(response.getBody() instanceof GracePeriodConfigDTO);
     }
 
     @Test
@@ -396,10 +400,11 @@ public class AdminPaymentControllerTest {
         doNothing().when(reminderService).sendManualReminder(eq(1L), any(PaymentReminder.ReminderType.class));
 
         // When
-        ResponseEntity<Void> response = controller.sendManualReminder(1L, "OVERDUE");
+        ResponseEntity<?> response = controller.sendReminderForPayment(1L, Map.of("reminderType", "OVERDUE"));
 
         // Then
-        verify(reminderService, times(1)).sendManualReminder(eq(1L), any(PaymentReminder.ReminderType.class));
+        verify(reminderService, times(1)).sendManualReminder(eq(1L), eq(PaymentReminder.ReminderType.OVERDUE));
+        assertEquals(HttpStatus.OK, response.getStatusCode());
     }
 
     @Test
