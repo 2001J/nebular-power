@@ -150,7 +150,7 @@ public class EnergySummaryServiceTest {
                 .thenReturn(Optional.empty());
         
         // Use lenient() for potentially unnecessary stubbings
-        lenient().when(dataRepository.findByInstallationAndTimestampBetweenOrderByTimestampDesc(
+        lenient().when(dataRepository.findByInstallationAndTimestampBetweenOrderByTimestampAsc(
                 eq(installation),
                 any(LocalDateTime.class),
                 any(LocalDateTime.class)))
@@ -177,7 +177,7 @@ public class EnergySummaryServiceTest {
 
         verify(installationRepository, times(1)).findById(1L);
         verify(summaryRepository, times(1)).findByInstallationAndPeriodAndDate(installation, EnergySummary.SummaryPeriod.DAILY, today);
-        verify(dataRepository, times(1)).findByInstallationAndTimestampBetweenOrderByTimestampDesc(
+        verify(dataRepository, times(1)).findByInstallationAndTimestampBetweenOrderByTimestampAsc(
                 eq(installation),
                 any(LocalDateTime.class),
                 any(LocalDateTime.class));
@@ -197,7 +197,7 @@ public class EnergySummaryServiceTest {
         assertThat(exception.getMessage()).contains("Solar installation not found with ID: 1");
         verify(installationRepository, times(1)).findById(1L);
         verify(summaryRepository, never()).findByInstallationAndPeriodAndDate(any(), any(), any());
-        verify(dataRepository, never()).findByInstallationAndTimestampBetweenOrderByTimestampDesc(any(), any(), any());
+        verify(dataRepository, never()).findByInstallationAndTimestampBetweenOrderByTimestampAsc(any(), any(), any());
         verify(summaryRepository, never()).save(any());
     }
 
