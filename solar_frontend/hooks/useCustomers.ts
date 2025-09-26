@@ -60,7 +60,6 @@ export function useCustomers(options?: { searchDebounceMs?: number }): UseCustom
   // Fetch function that incorporates search and filters
   const fetchCustomers = React.useCallback(
     async (search: string, page: number, pageSize: number) => {
-      console.log('fetchCustomers invoked', Object.keys(customerApi));
       if (!user || user.role !== 'ADMIN') {
         throw new Error('Unauthorized access');
       }
@@ -70,7 +69,7 @@ export function useCustomers(options?: { searchDebounceMs?: number }): UseCustom
       }
       return await customerApi.getAllCustomers(page, pageSize);
     },
-    [user]
+    [user?.role]
   );
 
   const paginatedData = usePaginatedData<Customer>(fetchCustomers, {

@@ -156,17 +156,28 @@ export function usePaginatedData<T>(
           pagination.pageSize
         );
 
-        if (response?.content) {
-          setData(response.content);
-          setPagination(prev => ({
-            ...prev,
-            totalPages: response.totalPages,
-            totalElements: response.totalElements,
-            currentPage: response.number,
-            pageSize: response.size
-          }));
+        if (response && Array.isArray((response as any).content)) {
+          const page = response as any;
+          setData(page.content);
+          setPagination(prev => {
+            const next = {
+              ...prev,
+              totalPages: typeof page.totalPages === 'number' ? page.totalPages : prev.totalPages,
+              totalElements: typeof page.totalElements === 'number' ? page.totalElements : prev.totalElements,
+              currentPage: typeof page.number === 'number' ? page.number : prev.currentPage,
+              pageSize: typeof page.size === 'number' ? page.size : prev.pageSize,
+            };
+            const unchanged =
+              next.totalPages === prev.totalPages &&
+              next.totalElements === prev.totalElements &&
+              next.currentPage === prev.currentPage &&
+              next.pageSize === prev.pageSize;
+            return unchanged ? prev : next;
+          });
+        } else if (Array.isArray(response)) {
+          setData(response as any);
         } else {
-          setData(Array.isArray(response) ? response : []);
+          setData([]);
         }
       } catch (err) {
         const error = err instanceof Error ? err : new Error('Failed to fetch data');
@@ -188,7 +199,7 @@ export function usePaginatedData<T>(
     };
 
     fetchData();
-  }, [debouncedSearchTerm, pagination.currentPage, pagination.pageSize, fetchFunction, showToastOnError, toast]);
+  }, [debouncedSearchTerm, pagination.currentPage, pagination.pageSize, fetchFunction, showToastOnError]);
 
   const setPage = useCallback((page: number) => {
     setPagination(prev => ({ ...prev, currentPage: page }));

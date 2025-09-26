@@ -1,4 +1,3 @@
-import React from 'react';
 import { describe, expect, test, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import { act } from 'react';
@@ -37,7 +36,8 @@ describe('useCustomers', () => {
 
 test('loads customers and actions work', async () => {
     render(<TestComponent />);
-    await waitFor(() => expect((customerApi.getAllCustomers as any)).toHaveBeenCalled());
+    // Wait for customers to load (count should reflect mock response)
+    await waitFor(() => expect(screen.getByTestId('count').textContent).toBe('1'));
     await act(async () => { screen.getByText('suspend').click(); });
     expect((customerApi.deactivateCustomer as any)).toHaveBeenCalledWith('1');
     await act(async () => { screen.getByText('delete').click(); });

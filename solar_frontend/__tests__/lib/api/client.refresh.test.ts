@@ -2,7 +2,7 @@ import { describe, expect, test, beforeEach } from 'vitest';
 import MockAdapter from 'axios-mock-adapter';
 import { apiClient } from '@/lib/api/client';
 
-describe('apiClient interceptors token refresh', () => {
+describe('apiClient interceptors token 401 handling (no refresh)', () => {
   let mock: MockAdapter;
   beforeEach(() => {
     mock = new MockAdapter(apiClient as any);
@@ -14,15 +14,7 @@ describe('apiClient interceptors token refresh', () => {
     localStorage.setItem('refreshToken', 'refresh');
   });
 
-  test('401 triggers refresh and retries original request', async () => {
-    mock.onGet('/api/protected').replyOnce(401).onGet('/api/protected').replyOnce(200, { ok: true });
-    mock.onPost('/api/auth/refresh').reply(200, { token: 'new', refreshToken: 'newR' });
-
-    const res = await apiClient.get('/api/protected');
-    expect(res.data.ok).toBe(true);
-  });
-
-  test.skip('refresh failure redirects to /login', async () => {
+  test('401 clears tokens and redirects to /login', async () => {
     // Set up to capture location change
     let assigned = '';
     const original = window.location;
@@ -35,12 +27,11 @@ describe('apiClient interceptors token refresh', () => {
     } as any);
 
     mock.onGet('/api/protected').replyOnce(401);
-    mock.onPost('/api/auth/refresh').reply(401);
 
     await expect(apiClient.get('/api/protected')).rejects.toBeTruthy();
     // Allow any microtasks to complete
     await new Promise(r => setTimeout(r, 0));
-    expect((window.location as any).href).toBe('/login');
+  expect((window.location as any).href).toBe('/login?reason=unauthorized');
 
     // Restore
     Object.defineProperty(window, 'location', { configurable: true, value: original });
