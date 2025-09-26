@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef } from "react"
 import { Chart, ChartContainer } from "@/components/ui/chart"
-import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, XAxis, YAxis, Tooltip, Line, LineChart } from "recharts"
+import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, XAxis, YAxis, Tooltip, Line, LineChart } from "@/components/ui/async-recharts"
 import { energyApi } from "@/lib/api/energy"
 import { energyWebSocket } from "@/lib/energyWebSocket"
 import { Skeleton } from "@/components/ui/skeleton"

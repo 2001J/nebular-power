@@ -19,10 +19,19 @@ export const paymentApi = {
     return makeApiRequest(() => apiClient.get('/api/payments/dashboard'));
   },
 
+  // Admin payment reports
+  async getPaymentReports(reportType: string, startDate?: string, endDate?: string): Promise<any> {
+    // Aligns to PaymentReportController: GET /api/admin/payments/reports/{reportType}
+    return makeApiRequest(() =>
+      apiClient.get(`/api/admin/payments/reports/${reportType}`, {
+        params: { startDate, endDate },
+      })
+    );
+  },
+
   async getCustomerPaymentPlan(userId: string): Promise<any> {
     return makeApiRequest(() => apiClient.get(`/api/payments/customers/${userId}/plan`));
   },
 };
 
 export default paymentApi;
-

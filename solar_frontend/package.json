@@ -6,7 +6,10 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "test": "vitest --run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest --run --coverage"
   },
   "dependencies": {
     "@hookform/resolvers": "latest",
@@ -39,7 +42,7 @@
     "@radix-ui/react-tooltip": "^1.1.6",
     "@stomp/stompjs": "^7.1.1",
     "autoprefixer": "^10.4.20",
-    "axios": "latest",
+    "axios": "^1.12.2",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "1.0.4",
@@ -47,7 +50,7 @@
     "embla-carousel-react": "8.5.1",
     "input-otp": "1.4.1",
     "lucide-react": "^0.454.0",
-    "next": "15.2.4",
+    "next": "^15.5.3",
     "next-themes": "latest",
     "react": "^19",
     "react-day-picker": "^9.6.4",
@@ -64,13 +67,23 @@
     "zod": "latest"
   },
   "devDependencies": {
+    "@testing-library/jest-dom": "^6.8.0",
+    "@testing-library/react": "^16.3.0",
+    "@testing-library/user-event": "^14.6.1",
     "@types/node": "^22",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@vitest/coverage-v8": "3.2.4",
     "eslint": "^9.25.1",
     "eslint-config-next": "^15.3.1",
+    "jsdom": "^27.0.0",
+    "msw": "^2.4.9",
+    "@playwright/test": "^1.47.2",
+    "axios-mock-adapter": "^2.1.0",
     "postcss": "^8",
     "tailwindcss": "^3.4.17",
-    "typescript": "^5.8.3"
-  }
+    "typescript": "^5.8.3",
+    "vitest": "^3.2.4"
+  },
+  "packageManager": "pnpm@10.16.1+sha512.0e155aa2629db8672b49e8475da6226aa4bdea85fdcdfdc15350874946d4f3c91faaf64cbdc4a5d1ab8002f473d5c3fcedcd197989cf0390f9badd3c04678706"
 }

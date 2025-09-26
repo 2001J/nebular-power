@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, type CSSProperties } from "react"
 import { Battery, Sun, Zap } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -102,8 +102,8 @@ export default function LayoutPage() {
   const currentSite = installationData[selectedSite]
 
   // Function to render a component in the layout
-  const renderComponent = (component) => {
-    const style = {
+  const renderComponent = (component: any) => {
+    const style: CSSProperties = {
       position: "absolute",
       left: `${component.x}px`,
       top: `${component.y}px`,
@@ -111,7 +111,7 @@ export default function LayoutPage() {
     }
 
     if (component.type === "panel") {
-      const panelStyle = {
+      const panelStyle: CSSProperties = {
         ...style,
         width: component.orientation === "portrait" ? "40px" : "50px",
         height: component.orientation === "portrait" ? "50px" : "40px",
@@ -141,7 +141,7 @@ export default function LayoutPage() {
             backgroundColor: component.status === "active" ? "#60a5fa" : "#f87171",
             border: "1px solid #333",
             borderRadius: "4px",
-          }}
+          } as CSSProperties}
           className="flex items-center justify-center"
           title="Inverter"
         >
@@ -159,7 +159,7 @@ export default function LayoutPage() {
             backgroundColor: component.status === "active" ? "#a78bfa" : "#f87171",
             border: "1px solid #333",
             borderRadius: "4px",
-          }}
+          } as CSSProperties}
           className="flex items-center justify-center"
           title="Battery"
         >
@@ -500,4 +500,3 @@ export default function LayoutPage() {
     </div>
   )
 }
-

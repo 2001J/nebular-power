@@ -48,7 +48,8 @@ interface UseCustomersReturn {
   };
 }
 
-export function useCustomers(): UseCustomersReturn {
+export function useCustomers(options?: { searchDebounceMs?: number }): UseCustomersReturn {
+  const searchDebounceMs = options?.searchDebounceMs ?? 500;
   const { user } = useAuth();
   const { toast } = useToast();
   
@@ -59,6 +60,7 @@ export function useCustomers(): UseCustomersReturn {
   // Fetch function that incorporates search and filters
   const fetchCustomers = React.useCallback(
     async (search: string, page: number, pageSize: number) => {
+      console.log('fetchCustomers invoked', Object.keys(customerApi));
       if (!user || user.role !== 'ADMIN') {
         throw new Error('Unauthorized access');
       }
@@ -73,7 +75,8 @@ export function useCustomers(): UseCustomersReturn {
 
   const paginatedData = usePaginatedData<Customer>(fetchCustomers, {
     pageSize: 10,
-    showToastOnError: true
+    searchDebounceMs,
+    showToastOnError: true,
   });
 
   // Customer actions

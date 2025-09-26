@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { CircleDollarSign, AlertCircle, ArrowRight, CalendarClock, Percent, Bell } from "lucide-react";
 import { paymentApi } from "@/lib/api/payments";
-import { paymentComplianceApi } from "@/lib/api";
+import { paymentComplianceApi } from "@/lib/api/paymentCompliance";
 import { Progress } from "@/components/ui/progress";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";

@@ -44,7 +44,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { useToast } from "@/components/ui/use-toast"
-import { settingsApi } from "@/lib/api"
+import { settingsApi } from "@/lib/api/settings"
 
 export default function SettingsPage() {
   const { toast } = useToast()

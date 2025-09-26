@@ -27,7 +27,7 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb"
 import { toast } from "@/components/ui/use-toast"
-import { paymentComplianceApi } from "@/lib/api"
+import { paymentComplianceApi } from "@/lib/api/paymentCompliance"
 import { format } from "date-fns"
 
 interface PaymentParams {

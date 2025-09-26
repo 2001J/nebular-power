@@ -25,7 +25,7 @@ import {
   Bar,
   BarChart,
   ReferenceLine,
-} from "recharts"
+} from "@/components/ui/async-recharts"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Checkbox } from "@/components/ui/checkbox"
 import { energyApi } from "@/lib/api/energy"

@@ -33,7 +33,7 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb"
-import { serviceControlApi } from "@/lib/api"
+import { serviceControlApi } from "@/lib/api/serviceControl"
 import { installationApi } from "@/lib/api/installations"
 import { securityApi } from "@/lib/api/security"
 

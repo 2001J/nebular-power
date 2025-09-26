@@ -40,7 +40,7 @@ import {
   ComposedChart,
   Bar,
   BarChart,
-} from "recharts"
+} from "@/components/ui/async-recharts"
 import {
   Breadcrumb,
   BreadcrumbItem,

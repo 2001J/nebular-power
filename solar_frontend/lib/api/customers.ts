@@ -1,10 +1,37 @@
 import { apiClient, makeApiRequest, buildQueryString } from './client';
-import type { 
-  Customer, 
+import type {
+  Customer,
   CustomerCreateRequest,
   PaginatedResponse,
-  ApiResponse 
+  CustomerActivityLog,
+  ApiResponse,
 } from './types';
+
+type ActivityResponse = PaginatedResponse<CustomerActivityLog> | CustomerActivityLog[];
+
+function normalizePaginated<T>(
+  data: PaginatedResponse<T> | T[],
+  page: number,
+  size: number
+): PaginatedResponse<T> {
+  if (Array.isArray(data)) {
+    return {
+      content: data,
+      totalElements: data.length,
+      totalPages: 1,
+      size: data.length,
+      number: 0,
+      first: true,
+      last: true,
+      empty: data.length === 0,
+    };
+  }
+
+  return {
+    ...data,
+    empty: data.empty ?? (Array.isArray(data.content) ? data.content.length === 0 : true),
+  };
+}
 
 export const customerApi = {
   /**
@@ -15,14 +42,14 @@ export const customerApi = {
     size: number = 10, 
     forceRefresh: boolean = false
   ): Promise<PaginatedResponse<Customer>> {
-    const params = { page, size };
+    const params: Record<string, any> = { page, size };
     if (forceRefresh) {
       params['_t'] = Date.now();
     }
     
     const queryString = buildQueryString(params);
     return makeApiRequest(() =>
-      apiClient.get<PaginatedResponse<Customer>>(`/api/admin/customers${queryString}`)
+      apiClient.get<PaginatedResponse<Customer>>(`/api/customers${queryString}`)
     );
   },
 
@@ -36,7 +63,7 @@ export const customerApi = {
   ): Promise<PaginatedResponse<Customer>> {
     const queryString = buildQueryString({ q: query, page, size });
     return makeApiRequest(() =>
-      apiClient.get<PaginatedResponse<Customer>>(`/api/admin/customers/search${queryString}`)
+      apiClient.get<PaginatedResponse<Customer>>(`/api/customers/search${queryString}`)
     );
   },
 
@@ -45,7 +72,7 @@ export const customerApi = {
    */
   async getCustomerById(id: string): Promise<Customer> {
     return makeApiRequest(() =>
-      apiClient.get<Customer>(`/api/admin/customers/${id}`)
+      apiClient.get<Customer>(`/api/customers/${id}`)
     );
   },
 
@@ -54,7 +81,7 @@ export const customerApi = {
    */
   async createCustomer(customerData: CustomerCreateRequest): Promise<ApiResponse<Customer>> {
     return makeApiRequest(() =>
-      apiClient.post<ApiResponse<Customer>>('/api/admin/customers', customerData)
+      apiClient.post<ApiResponse<Customer>>('/api/customers', customerData)
     );
   },
 
@@ -63,7 +90,7 @@ export const customerApi = {
    */
   async updateCustomer(id: string, customerData: Partial<Customer>): Promise<ApiResponse<Customer>> {
     return makeApiRequest(() =>
-      apiClient.put<ApiResponse<Customer>>(`/api/admin/customers/${id}`, customerData)
+      apiClient.put<ApiResponse<Customer>>(`/api/customers/${id}`, customerData)
     );
   },
 
@@ -72,7 +99,7 @@ export const customerApi = {
    */
   async deactivateCustomer(id: string): Promise<ApiResponse<{ message: string }>> {
     return makeApiRequest(() =>
-      apiClient.post<ApiResponse<{ message: string }>>(`/api/admin/customers/${id}/deactivate`)
+      apiClient.post<ApiResponse<{ message: string }>>(`/api/customers/${id}/deactivate`)
     );
   },
 
@@ -81,7 +108,13 @@ export const customerApi = {
    */
   async reactivateCustomer(id: string): Promise<ApiResponse<{ message: string }>> {
     return makeApiRequest(() =>
-      apiClient.post<ApiResponse<{ message: string }>>(`/api/admin/customers/${id}/activate`)
+      apiClient.post<ApiResponse<{ message: string }>>(`/api/customers/${id}/reactivate`)
+    );
+  },
+
+  async resetCustomerPassword(id: string): Promise<ApiResponse<{ message: string }>> {
+    return makeApiRequest(() =>
+      apiClient.post<ApiResponse<{ message: string }>>(`/api/customers/${id}/reset-password`)
     );
   },
 
@@ -90,7 +123,7 @@ export const customerApi = {
    */
   async deleteCustomer(id: string): Promise<ApiResponse<{ message: string }>> {
     return makeApiRequest(() =>
-      apiClient.delete<ApiResponse<{ message: string }>>(`/api/admin/customers/${id}`)
+      apiClient.delete<ApiResponse<{ message: string }>>(`/api/customers/${id}`)
     );
   },
 
@@ -109,7 +142,7 @@ export const customerApi = {
         active: number;
         inactive: number;
         suspended: number;
-      }>('/api/admin/customers/stats')
+      }>('/api/customers/stats')
     );
   },
 
@@ -123,7 +156,24 @@ export const customerApi = {
   ): Promise<PaginatedResponse<Customer>> {
     const queryString = buildQueryString({ status, page, size });
     return makeApiRequest(() =>
-      apiClient.get<PaginatedResponse<Customer>>(`/api/admin/customers${queryString}`)
+      apiClient.get<PaginatedResponse<Customer>>(`/api/customers${queryString}`)
     );
-  }
+  },
+
+  /**
+   * Fetch paginated activity logs for a specific customer
+   */
+  async getCustomerActivityLogs(
+    customerId: string,
+    page: number = 0,
+    size: number = 10
+  ): Promise<PaginatedResponse<CustomerActivityLog>> {
+    const response = await makeApiRequest<ActivityResponse>(() =>
+      apiClient.get<ActivityResponse>(`/api/customers/${customerId}/activity`, {
+        params: { page, size },
+      })
+    );
+
+    return normalizePaginated(response, page, size);
+  },
 };

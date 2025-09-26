@@ -36,9 +36,46 @@ export const installationApi = {
     type?: string;
     search?: string;
   }): Promise<any> {
-    return makeApiRequest(() =>
-      apiClient.get<any>('/monitoring/installations/overview', { params })
+    const data = await makeApiRequest<any>(() =>
+      apiClient.get('/monitoring/installations/overview', { params })
     );
+
+    // Normalize to a pageable-like structure for UI expectations
+    if (!data) return { content: [], totalElements: 0, totalPages: 0, size: params?.size ?? 10, number: params?.page ?? 0 };
+
+    if (Array.isArray(data)) {
+      return {
+        content: data,
+        totalElements: data.length,
+        totalPages: 1,
+        size: data.length,
+        number: 0,
+      };
+    }
+
+    if (data.content && Array.isArray(data.content)) {
+      return data;
+    }
+
+    if (data.recentlyActiveInstallations && Array.isArray(data.recentlyActiveInstallations)) {
+      return {
+        content: data.recentlyActiveInstallations,
+        totalElements: data.totalActiveInstallations ?? data.recentlyActiveInstallations.length,
+        totalPages: 1,
+        size: data.recentlyActiveInstallations.length,
+        number: 0,
+        overview: data,
+      };
+    }
+
+    return {
+      content: [],
+      totalElements: data.totalActiveInstallations ?? 0,
+      totalPages: 1,
+      size: 0,
+      number: 0,
+      overview: data,
+    };
   },
 
   async getTamperAlerts(): Promise<any[]> {
@@ -47,4 +84,3 @@ export const installationApi = {
 };
 
 export default installationApi;
-

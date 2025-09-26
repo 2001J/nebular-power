@@ -2,7 +2,7 @@
 
 import { useMemo } from "react"
 import { Chart, ChartContainer } from "@/components/ui/chart"
-import { Area, AreaChart, CartesianGrid, ResponsiveContainer, XAxis, YAxis, Tooltip } from "recharts"
+import { Area, AreaChart, CartesianGrid, ResponsiveContainer, XAxis, YAxis, Tooltip } from "@/components/ui/async-recharts"
 
 interface EnergyProductionChartProps {
   period: "day" | "week" | "month"
@@ -98,4 +98,3 @@ export function EnergyProductionChart({ period }: EnergyProductionChartProps) {
     </Chart>
   )
 }
-

@@ -44,7 +44,8 @@ import {
 import { Progress } from "@/components/ui/progress"
 import { toast } from "@/components/ui/use-toast"
 import { useRouter } from "next/navigation"
-import { customerApi, paymentComplianceApi } from "@/lib/api"
+import { customerApi } from "@/lib/api"
+import { paymentComplianceApi } from "@/lib/api/paymentCompliance"
 
 // Interface for loan data
 interface Loan {

@@ -20,7 +20,7 @@ import {
   XAxis,
   YAxis,
   Legend,
-} from "recharts"
+} from "@/components/ui/async-recharts"
 import { Checkbox } from "@/components/ui/checkbox"
 import { useTheme } from "next-themes"
 import axios from "axios"
@@ -1642,4 +1642,3 @@ export default function AnalyticsPage() {
     </div>
   )
 }
-

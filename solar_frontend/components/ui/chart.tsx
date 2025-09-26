@@ -17,7 +17,8 @@ const ChartContainer = React.forwardRef<HTMLDivElement, ChartContainerProps>(({ 
 ))
 ChartContainer.displayName = "ChartContainer"
 
-interface ChartTooltipProps extends React.HTMLAttributes<HTMLDivElement> {
+// Omit the "content" HTML attribute to avoid type conflict with our custom prop
+interface ChartTooltipProps extends Omit<React.HTMLAttributes<HTMLDivElement>, "content"> {
   content?: React.ReactNode
   cursor?: any
 }
@@ -56,4 +57,3 @@ function ChartTooltipItem({ label, value, color, className }: ChartTooltipItemPr
 }
 
 export { Chart, ChartContainer, ChartTooltip, ChartTooltipContent, ChartTooltipItem }
-

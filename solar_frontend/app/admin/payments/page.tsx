@@ -53,7 +53,7 @@ import {
 } from "@/components/ui/pagination"
 import { Badge } from "@/components/ui/badge"
 import { toast } from "@/components/ui/use-toast"
-import { paymentComplianceApi } from "@/lib/api"
+import { paymentComplianceApi } from "@/lib/api/paymentCompliance"
 import {
   Breadcrumb,
   BreadcrumbItem,

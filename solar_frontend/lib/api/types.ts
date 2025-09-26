@@ -11,6 +11,25 @@ export interface User {
   updatedAt?: string;
 }
 
+export interface UserProfile extends User {
+  emailVerified?: boolean;
+  lastLogin?: string;
+  installationDate?: string;
+  installationType?: string;
+  passwordChangeRequired?: boolean;
+}
+
+export interface ActivityLogEntry {
+  id: string;
+  activityType: string;
+  description?: string;
+  details?: string;
+  timestamp: string;
+  ipAddress?: string;
+  performedBy?: string;
+  metadata?: Record<string, unknown>;
+}
+
 export interface LoginRequest {
   email: string;
   password: string;
@@ -49,6 +68,12 @@ export interface CustomerCreateRequest {
   fullName: string;
   phoneNumber?: string;
   password?: string;
+}
+
+export interface CustomerActivityLog extends ActivityLogEntry {
+  customerId?: string;
+  installationId?: string;
+  status?: string;
 }
 
 // Energy types

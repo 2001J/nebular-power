@@ -1,4 +1,4 @@
-import axios, { AxiosError, AxiosRequestConfig, AxiosResponse } from 'axios';
+import axios, { AxiosError, AxiosResponse } from 'axios';
 
 // Network error handling configuration
 export const NETWORK_CONFIG = {
@@ -84,24 +84,7 @@ const clearTokens = () => {
   }
 };
 
-// Track if we're currently refreshing a token to prevent multiple refresh requests
-let isRefreshing = false;
-let failedQueue: Array<{
-  resolve: (token: string) => void;
-  reject: (error: any) => void;
-}> = [];
-
-const processQueue = (error: any, token: string | null = null) => {
-  failedQueue.forEach(({ resolve, reject }) => {
-    if (error) {
-      reject(error);
-    } else {
-      resolve(token!);
-    }
-  });
-
-  failedQueue = [];
-};
+// No token refresh queue; simplify handling
 
 // Request interceptor to add auth token
 apiClient.interceptors.request.use(
@@ -119,76 +102,17 @@ apiClient.interceptors.request.use(
 // Response interceptor to handle token refresh
 apiClient.interceptors.response.use(
   (response: AxiosResponse) => response,
-  async (error: AxiosError) => handleTokenRefresh(error)
+  async (error: AxiosError) => {
+    if (error.response?.status === 401) {
+      // Unauthorized: clear tokens and redirect to login without refresh attempts
+      clearTokens();
+      if (typeof window !== 'undefined') {
+        window.location.href = '/login?reason=unauthorized';
+      }
+    }
+    return Promise.reject(error instanceof Error ? error : new Error('API error'));
+  }
 );
-
-async function handleTokenRefresh(error: AxiosError) {
-  const originalRequest = error.config as AxiosRequestConfig & { _retry?: boolean };
-
-  if (error.response?.status === 401 && !originalRequest._retry) {
-    if (isRefreshing) {
-      return handleQueuedRequest(originalRequest);
-    }
-
-    return await attemptTokenRefresh(originalRequest);
-  }
-
-  return Promise.reject(error instanceof Error ? error : new Error('API error'));
-}
-
-async function handleQueuedRequest(originalRequest: AxiosRequestConfig) {
-  return new Promise((resolve, reject) => {
-    failedQueue.push({ resolve, reject });
-  }).then((token) => {
-    if (originalRequest.headers) {
-      originalRequest.headers.Authorization = `Bearer ${token}`;
-    }
-    return apiClient(originalRequest);
-  }).catch((err) => {
-    return Promise.reject(err instanceof Error ? err : new Error('Token refresh failed'));
-  });
-}
-
-async function attemptTokenRefresh(originalRequest: AxiosRequestConfig & { _retry?: boolean }) {
-  originalRequest._retry = true;
-  isRefreshing = true;
-
-  try {
-    const refreshToken = getRefreshToken();
-    if (!refreshToken) {
-      throw new Error('No refresh token available');
-    }
-
-    const response = await apiClient.post('/api/auth/refresh', { refreshToken });
-    const { token, refreshToken: newRefreshToken } = response.data;
-
-    // Update tokens in storage
-    setTokens(token, newRefreshToken);
-
-    processQueue(null, token);
-
-    if (originalRequest.headers) {
-      originalRequest.headers.Authorization = `Bearer ${token}`;
-    }
-    
-    return apiClient(originalRequest);
-  } catch (refreshError) {
-    processQueue(refreshError, null);
-    
-    // Clear tokens and redirect to login (client only)
-    clearTokens();
-    
-    // Redirect to login page
-    if (typeof window !== 'undefined') {
-      window.location.href = '/login';
-    }
-    
-    const error = refreshError instanceof Error ? refreshError : new Error('Token refresh failed');
-    return Promise.reject(error);
-  } finally {
-    isRefreshing = false;
-  }
-}
 
 /**
  * Generic API request handler with retry logic

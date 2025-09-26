@@ -51,7 +51,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         try {
           console.log("Fetching current user profile with token", storedToken.substring(0, 10) + "...");
 
-          // Add specific debug logging for this API call
+          // Add specific debug logging for this API call  
           const userData = await userApi.getCurrentUser();
           console.log("User profile successfully received:", JSON.stringify(userData));
 

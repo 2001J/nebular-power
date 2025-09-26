@@ -40,7 +40,7 @@ import {
   Tooltip,
   XAxis,
   YAxis,
-} from "recharts"
+} from "@/components/ui/async-recharts"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
@@ -66,6 +66,7 @@ import {
 } from "@/components/ui/breadcrumb"
 import { useRouter } from "next/navigation"
 import { customerApi, installationApi, paymentApi, securityApi } from "@/lib/api"
+import type { PaginatedResponse } from "@/lib/api/client"
 import { energyApi } from "@/lib/api/energy"
 import { serviceApi } from "@/lib/api/service"
 
@@ -77,14 +78,14 @@ export default function AdminDashboardPage() {
   const [loading, setLoading] = useState(true)
 
   // State to store API data
-  const [installations, setInstallations] = useState([])
-  const [customers, setCustomers] = useState([])
-  const [securityAlerts, setSecurityAlerts] = useState([])
-  const [payments, setPayments] = useState([])
-  const [systemOverview, setSystemOverview] = useState(null)
-  const [energyData, setEnergyData] = useState([])
-  const [systemHealth, setSystemHealth] = useState(null)
-  const [weatherImpactData, setWeatherImpactData] = useState(null)
+  const [installations, setInstallations] = useState<any[]>([])
+  const [customers, setCustomers] = useState<any[]>([])
+  const [securityAlerts, setSecurityAlerts] = useState<any[]>([])
+  const [payments, setPayments] = useState<any>(null)
+  const [systemOverview, setSystemOverview] = useState<any>(null)
+  const [energyData, setEnergyData] = useState<Array<{ name: string; residential: number; commercial: number; industrial: number; revenue: number }>>([])
+  const [systemHealth, setSystemHealth] = useState<any>(null)
+  const [weatherImpactData, setWeatherImpactData] = useState<any>(null)
 
   // State for search and filters
   const [searchTerm, setSearchTerm] = useState("")
@@ -98,18 +99,13 @@ export default function AdminDashboardPage() {
       setLoading(true)
 
       try {
+        // Keep installations fetched in this run to avoid relying on stale state
+        let fetchedInstallations: any[] = []
         // Fetch customers data
         try {
           console.log("Fetching customers data");
-          const customersResponse = await customerApi.getAllCustomers();
-          if (customersResponse?.content) {
-            setCustomers(customersResponse.content);
-          } else if (Array.isArray(customersResponse)) {
-            setCustomers(customersResponse);
-          } else {
-            console.error("Invalid customers data format");
-            setCustomers([]);
-          }
+          const customersResponse: PaginatedResponse<any> = await customerApi.getAllCustomers();
+          setCustomers(Array.isArray(customersResponse?.content) ? customersResponse.content : []);
         } catch (error) {
           console.error("Error fetching customers:", error);
           setCustomers([]);
@@ -123,27 +119,26 @@ export default function AdminDashboardPage() {
         // Fetch installations - Make sure we always get all installations
         try {
           console.log("Fetching all installations data");
-          let installationsData = [];
 
           // First, try to get installations from getAllInstallations API
           try {
             const installationsResponse = await installationApi.getAllInstallations();
             if (installationsResponse?.content && Array.isArray(installationsResponse.content)) {
-              installationsData = installationsResponse.content;
+              fetchedInstallations = installationsResponse.content;
             } else if (Array.isArray(installationsResponse)) {
-              installationsData = installationsResponse;
+              fetchedInstallations = installationsResponse;
             }
           } catch (installError) {
             console.error("Error fetching installations directly:", installError);
           }
 
           // If we still don't have installations, try via system overview
-          if (installationsData.length === 0) {
+          if (fetchedInstallations.length === 0) {
             try {
               const overview = await energyApi.getSystemOverview();
               setSystemOverview(overview);
               if (overview?.installations && Array.isArray(overview.installations)) {
-                installationsData = overview.installations;
+                fetchedInstallations = overview.installations;
               }
             } catch (overviewError) {
               console.error("Error fetching system overview:", overviewError);
@@ -161,8 +156,8 @@ export default function AdminDashboardPage() {
           }
 
           // Set the installations regardless of where they came from
-          console.log("Setting installations:", installationsData);
-          setInstallations(installationsData);
+          console.log("Setting installations:", fetchedInstallations);
+          setInstallations(fetchedInstallations);
         } catch (error) {
           console.error("Error in installations fetch flow:", error);
           setInstallations([]);
@@ -178,17 +173,17 @@ export default function AdminDashboardPage() {
           console.log("Fetching energy data");
           // Use existing API methods instead of the non-existent getSystemEnergyData
           // Find the first active installation to get data from
-          const activeInstallation = installations.find(i => i.status === 'ACTIVE' || i.status === 'Active')?.id;
+          const activeInstallation = fetchedInstallations.find((i: any) => i?.status === 'ACTIVE' || i?.status === 'Active')?.id;
           
           if (activeInstallation) {
-            const readings = await energyApi.getRecentReadings(activeInstallation, 30);
+            const readings = await energyApi.getRecentReadings(String(activeInstallation), 30);
             
             // Transform readings data to match expected chart format
-            const transformedData = [];
+            const transformedData: Array<{ name: string; residential: number; commercial: number; industrial: number; revenue: number }> = [];
             
             if (Array.isArray(readings) && readings.length > 0) {
               // Group by day for weekly view
-              const groupedByDay = {};
+              const groupedByDay: Record<string, { readings: any[]; total: number; count: number }> = {};
               readings.forEach(reading => {
                 const date = new Date(reading.timestamp);
                 const day = date.toLocaleDateString('en-US', { weekday: 'short' });

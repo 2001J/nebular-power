@@ -2,21 +2,29 @@ import { apiClient, makeApiRequest } from './client';
 
 export const securityApi = {
   async getTamperEvents(): Promise<any[]> {
-    return makeApiRequest(() => apiClient.get<any[]>('/api/security/admin/alerts'));
+    const res = await makeApiRequest<any>(() => apiClient.get('/api/security/admin/alerts'));
+    const data = res as any;
+    return Array.isArray(data) ? data : data?.content ?? [];
   },
 
   async getUnresolvedEvents(): Promise<any[]> {
-    return makeApiRequest(() => apiClient.get<any[]>('/api/security/admin/alerts'));
+    const res = await makeApiRequest<any>(() => apiClient.get('/api/security/admin/alerts'));
+    const data = res as any;
+    return Array.isArray(data) ? data : data?.content ?? [];
   },
 
   async getAllTamperEvents(): Promise<any[]> {
-    return makeApiRequest(() => apiClient.get<any[]>('/api/security/admin/all-alerts'));
+    const res = await makeApiRequest<any>(() => apiClient.get('/api/security/admin/all-alerts'));
+    const data = res as any;
+    return Array.isArray(data) ? data : data?.content ?? [];
   },
 
   async getInstallationAlerts(installationId: string): Promise<any[]> {
-    return makeApiRequest(() =>
-      apiClient.get<any[]>(`/api/security/installations/${installationId}/events`)
+    const res = await makeApiRequest<any>(() =>
+      apiClient.get(`/api/security/installations/${installationId}/events`)
     );
+    const data = res as any;
+    return Array.isArray(data) ? data : data?.content ?? [];
   },
 
   async getAdminAuditLogs(page = 0, size = 20, activityType?: string): Promise<any> {
@@ -62,4 +70,3 @@ export const securityApi = {
 };
 
 export default securityApi;
-
