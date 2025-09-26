@@ -377,19 +377,19 @@ public class SolarInstallationServiceTest {
         installation2.setTamperDetected(true);
         
         // Mock energy data repository to return empty lists for installations
-        when(energyDataRepository.findByInstallationOrderByTimestampDesc(any(SolarInstallation.class)))
+        lenient().when(energyDataRepository.findByInstallationOrderByTimestampDesc(any(SolarInstallation.class)))
             .thenReturn(Collections.emptyList());
         
         // Mock sum methods to return null (no data)
-        when(energyDataRepository.sumPowerGenerationForPeriod(any(SolarInstallation.class), any(LocalDateTime.class), any(LocalDateTime.class)))
+        lenient().when(energyDataRepository.sumPowerGenerationForPeriod(any(SolarInstallation.class), any(LocalDateTime.class), any(LocalDateTime.class)))
             .thenReturn(null);
-        when(energyDataRepository.sumPowerConsumptionForPeriod(any(SolarInstallation.class), any(LocalDateTime.class), any(LocalDateTime.class)))
+        lenient().when(energyDataRepository.sumPowerConsumptionForPeriod(any(SolarInstallation.class), any(LocalDateTime.class), any(LocalDateTime.class)))
             .thenReturn(null);
             
         // Mock energy summary repository methods
-        when(energySummaryRepository.findByPeriodAndDate(any(), any(LocalDate.class)))
+        lenient().when(energySummaryRepository.findByPeriodAndDate(any(), any(LocalDate.class)))
             .thenReturn(Collections.emptyList());
-        when(energySummaryRepository.findByPeriodAndDateBetween(any(), any(LocalDate.class), any(LocalDate.class)))
+        lenient().when(energySummaryRepository.findByPeriodAndDateBetween(any(), any(LocalDate.class), any(LocalDate.class)))
             .thenReturn(Collections.emptyList());
 
         // When

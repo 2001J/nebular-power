@@ -334,7 +334,8 @@ public class PaymentServiceTest {
                 Payment.PaymentStatus.GRACE_PERIOD,
                 Payment.PaymentStatus.SUSPENSION_PENDING
         );
-        when(paymentRepository.findByStatusIn(eq(overdueStatuses))).thenReturn(overduePayments);
+        when(paymentRepository.findByStatusIn(eq(overdueStatuses), eq(pageable)))
+                .thenReturn(new PageImpl<>(overduePayments, pageable, overduePayments.size()));
         
         // When
         Page<PaymentDTO> result = paymentService.getOverduePayments(pageable);
@@ -343,7 +344,7 @@ public class PaymentServiceTest {
         assertNotNull(result);
         assertEquals(1, result.getTotalElements());
         assertEquals(testPayment3.getId(), result.getContent().get(0).getId());
-        verify(paymentRepository, times(1)).findByStatusIn(eq(overdueStatuses));
+        verify(paymentRepository, times(1)).findByStatusIn(eq(overdueStatuses), eq(pageable));
     }
 
     @Test
