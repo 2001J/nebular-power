@@ -52,7 +52,6 @@ import {
   PaginationPrevious,
 } from "@/components/ui/pagination"
 import { Badge } from "@/components/ui/badge"
-import { toast } from "@/components/ui/use-toast"
 import { paymentComplianceApi } from "@/lib/api"
 import {
   Breadcrumb,
@@ -64,6 +63,7 @@ import {
 } from "@/components/ui/breadcrumb"
 import { Switch } from "@/components/ui/switch"
 import { Calendar as CalendarIcon, DollarSign, Mail, MessageSquare } from "lucide-react"
+import { Toaster } from "@/components/ui/toaster"
 import { useToast } from "@/components/ui/use-toast"
 
 // Define Payment type for improved type checking
@@ -397,20 +397,25 @@ export default function AdminPaymentsPage() {
         return
       }
 
+      const parseOrZero = (value: number | string) => {
+        const parsed = typeof value === "string" ? parseFloat(value) : value;
+        return Number.isFinite(parsed) ? parsed : 0;
+      };
+
+      const parsedDays = parseInt(updatedGracePeriodConfig.numberOfDays.toString());
+      const parsedReminderFrequency = parseInt(updatedGracePeriodConfig.reminderFrequency.toString());
+      const parsedLateFeePercentage = parseOrZero(updatedGracePeriodConfig.lateFeePercentage);
+      const parsedLateFeeFixedAmount = parseOrZero(updatedGracePeriodConfig.lateFeeFixedAmount);
+
       // Ensure the correct field mapping and type conversion
       const configToUpdate = {
-        // Use numberOfDays for consistency
-        numberOfDays: parseInt(updatedGracePeriodConfig.numberOfDays.toString()) || 7,
-        gracePeriodDays: parseInt(updatedGracePeriodConfig.numberOfDays.toString()) || 7,
-        // Respect admin toggle for auto-suspension
+        numberOfDays: Number.isNaN(parsedDays) ? gracePeriodConfig.numberOfDays : parsedDays,
+        gracePeriodDays: Number.isNaN(parsedDays) ? gracePeriodConfig.gracePeriodDays : parsedDays,
         autoSuspendEnabled: Boolean(updatedGracePeriodConfig.autoSuspendEnabled),
-        // Set reminder frequency
-        reminderFrequency: parseInt(updatedGracePeriodConfig.reminderFrequency.toString()) || 2,
-        // Make sure boolean values are properly set - explicitly cast to boolean
+        reminderFrequency: Number.isNaN(parsedReminderFrequency) ? gracePeriodConfig.reminderFrequency : parsedReminderFrequency,
         lateFeesEnabled: Boolean(updatedGracePeriodConfig.lateFeesEnabled),
-        // Ensure numeric values for fee settings
-        lateFeePercentage: parseFloat(updatedGracePeriodConfig.lateFeePercentage.toString()) || 0,
-        lateFeeFixedAmount: parseFloat(updatedGracePeriodConfig.lateFeeFixedAmount.toString()) || 0
+        lateFeePercentage: parsedLateFeePercentage,
+        lateFeeFixedAmount: parsedLateFeeFixedAmount
       };
 
       console.log("Updating grace period config with:", configToUpdate);
@@ -577,13 +582,29 @@ export default function AdminPaymentsPage() {
       }
     }
 
-    // If not valid, show toast with error messages
+    // If not valid, show toast with error messages and guide focus
     if (!isValid) {
       toast({
         title: "Validation Error",
         description: errors.join(". "),
         variant: "destructive",
+        // @ts-ignore allow duration on toast API if supported
+        duration: 5000,
       });
+
+      // If late fees are enabled but nothing entered, focus the first fee field
+      if (updatedGracePeriodConfig.lateFeesEnabled) {
+        const perc = parseFloat(updatedGracePeriodConfig.lateFeePercentage?.toString() || '0');
+        const fixed = parseFloat(updatedGracePeriodConfig.lateFeeFixedAmount?.toString() || '0');
+        const hasPerc = !isNaN(perc) && perc > 0;
+        const hasFixed = !isNaN(fixed) && fixed > 0;
+        if (!hasPerc && !hasFixed) {
+          setTimeout(() => {
+            const el = document?.getElementById('lateFeePercentage');
+            if (el && 'focus' in el) (el as HTMLElement).focus();
+          }, 0);
+        }
+      }
     }
 
     return isValid;
@@ -687,22 +708,37 @@ export default function AdminPaymentsPage() {
           </dd>
         </div>
         {gracePeriodConfig.lateFeesEnabled && (
-          <>
-            <div className="flex justify-between items-center">
-              <dt className="text-sm font-medium">Late Fee Amount</dt>
-              <dd className="text-sm">{gracePeriodConfig.lateFeePercentage}% + ${gracePeriodConfig.lateFeeFixedAmount}</dd>
-            </div>
-            <div className="mt-2 text-xs text-muted-foreground p-2 bg-muted/50 rounded">
-              Example: For a $100 payment, late fee would be ${(100 * (gracePeriodConfig.lateFeePercentage / 100) + gracePeriodConfig.lateFeeFixedAmount).toFixed(2)}
-            </div>
-          </>
+          (() => {
+            const hasPercentage = !!gracePeriodConfig.lateFeePercentage && gracePeriodConfig.lateFeePercentage > 0;
+            const hasFixed = !!gracePeriodConfig.lateFeeFixedAmount && gracePeriodConfig.lateFeeFixedAmount > 0;
+            const parts = [] as string[];
+            if (hasPercentage) parts.push(`${gracePeriodConfig.lateFeePercentage}% of installment`);
+            if (hasFixed) parts.push(`$${gracePeriodConfig.lateFeeFixedAmount} fixed`);
+            const exampleAmount = (100 * (hasPercentage ? gracePeriodConfig.lateFeePercentage / 100 : 0) + (hasFixed ? gracePeriodConfig.lateFeeFixedAmount : 0)).toFixed(2);
+            return (
+              <>
+                <div className="flex justify-between items-center">
+                  <dt className="text-sm font-medium">Late Fee Amount</dt>
+                  <dd className="text-sm">{parts.join(' + ')}</dd>
+                </div>
+                <div className="mt-2 text-xs text-muted-foreground p-2 bg-muted/50 rounded">
+                  Example: For a $100 installment, late fee would be ${exampleAmount}
+                </div>
+              </>
+            );
+          })()
         )}
       </dl>
+      <div className="mt-3 text-xs text-muted-foreground">
+        Note: These settings apply globally to all customers and payment plans. Percent fees are calculated as a percentage of each plan's installment amount.
+      </div>
     </CardContent>
   );
 
   return (
     <div className="w-full space-y-4">
+      {/* Ensure toasts render above dialog overlays on this page */}
+      <Toaster />
       <Breadcrumb className="mb-4">
         <BreadcrumbList>
           <BreadcrumbItem>
@@ -1264,12 +1300,8 @@ export default function AdminPaymentsPage() {
                   onCheckedChange={(checked) => setUpdatedGracePeriodConfig(prev => ({
                     ...prev,
                     lateFeesEnabled: checked,
-                    lateFeePercentage: checked
-                      ? (prev.lateFeePercentage && prev.lateFeePercentage > 0 ? prev.lateFeePercentage : 5)
-                      : prev.lateFeePercentage,
-                    lateFeeFixedAmount: checked
-                      ? (prev.lateFeeFixedAmount && prev.lateFeeFixedAmount > 0 ? prev.lateFeeFixedAmount : 10)
-                      : prev.lateFeeFixedAmount
+                    lateFeePercentage: checked ? prev.lateFeePercentage || 0 : 0,
+                    lateFeeFixedAmount: checked ? prev.lateFeeFixedAmount || 0 : 0
                   }))}
                 />
               </div>
@@ -1279,23 +1311,27 @@ export default function AdminPaymentsPage() {
             {updatedGracePeriodConfig.lateFeesEnabled && (
               <div className="space-y-4 pl-3 border-l-2 border-muted">
                 <div className="space-y-2">
-                  <Label htmlFor="lateFeePercentage">Percentage Fee</Label>
+                  <Label htmlFor="lateFeePercentage">Percentage Fee (% of installment)</Label>
                   <div className="relative">
-                    <Input
-                      id="lateFeePercentage"
-                      type="number"
-                      min="0"
-                      max="100"
-                      step="0.1"
-                      value={updatedGracePeriodConfig.lateFeePercentage}
-                      onChange={(e) => setUpdatedGracePeriodConfig({
+                  <Input
+                    id="lateFeePercentage"
+                    type="text"
+                    inputMode="decimal"
+                    pattern="[0-9]*[.]?[0-9]*"
+                    onWheel={(e) => (e.currentTarget as HTMLInputElement).blur()}
+                    value={updatedGracePeriodConfig.lateFeePercentage}
+                    onChange={(e) => {
+                      const raw = e.target.value.replace(/[^0-9.]/g, '');
+                      const val = parseFloat(raw);
+                      setUpdatedGracePeriodConfig({
                         ...updatedGracePeriodConfig,
-                        lateFeePercentage: parseFloat(e.target.value) || 0
-                      })}
-                    />
+                        lateFeePercentage: isNaN(val) ? 0 : val
+                      })
+                    }}
+                  />
                     <span className="absolute right-3 top-2 text-sm text-muted-foreground">%</span>
                   </div>
-                  <p className="text-xs text-muted-foreground">Percentage of original payment amount</p>
+                  <p className="text-xs text-muted-foreground">Percentage of installment amount</p>
                 </div>
 
                 <div className="space-y-2">
@@ -1304,15 +1340,20 @@ export default function AdminPaymentsPage() {
                     <span className="absolute left-3 top-2 text-sm text-muted-foreground">$</span>
                     <Input
                       id="lateFeeFixedAmount"
-                      type="number"
-                      min="0"
-                      step="0.01"
+                      type="text"
+                      inputMode="decimal"
+                      pattern="[0-9]*[.]?[0-9]*"
+                      onWheel={(e) => (e.currentTarget as HTMLInputElement).blur()}
                       className="pl-7"
                       value={updatedGracePeriodConfig.lateFeeFixedAmount}
-                      onChange={(e) => setUpdatedGracePeriodConfig({
-                        ...updatedGracePeriodConfig,
-                        lateFeeFixedAmount: parseFloat(e.target.value) || 0
-                      })}
+                      onChange={(e) => {
+                        const raw = e.target.value.replace(/[^0-9.]/g, '');
+                        const val = parseFloat(raw);
+                        setUpdatedGracePeriodConfig({
+                          ...updatedGracePeriodConfig,
+                          lateFeeFixedAmount: isNaN(val) ? 0 : val
+                        })
+                      }}
                     />
                   </div>
                   <p className="text-xs text-muted-foreground">Fixed dollar amount added to late payments</p>

@@ -38,6 +38,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -243,9 +244,10 @@ public class PaymentServiceTest {
                 .transactionId("TX789012")
                 .build();
         
-        when(paymentRepository.findById(testPayment2.getId())).thenReturn(Optional.of(testPayment2));
+        // recordManualPayment() fetches by paymentId argument; stub generically to avoid strict mismatch
+        lenient().when(paymentRepository.findById(anyLong())).thenReturn(Optional.of(testPayment2));
+        lenient().when(userRepository.findById(testUser.getId())).thenReturn(Optional.of(testUser));
         when(paymentRepository.save(any(Payment.class))).thenReturn(testPayment2);
-        when(userRepository.findById(testUser.getId())).thenReturn(Optional.of(testUser));
         
         // Set up the payment plan and installation for the test payment
         testPayment2.setPaymentPlan(testPaymentPlan);
@@ -274,6 +276,43 @@ public class PaymentServiceTest {
         verify(paymentRepository, times(2)).save(any(Payment.class));
         // With our fix, expect only 1 publishPaymentReceived call (for suspended installations)
         verify(paymentEventPublisher, times(1)).publishPaymentReceived(any(Payment.class));
+    }
+
+    @Test
+    @DisplayName("Should apply late fee after grace period using global config")
+    void shouldApplyLateFeeAfterGracePeriod() {
+        // Given: payment due 10 days ago; grace is 7 days; fees: 5% + $10
+        testPayment2.setDueDate(LocalDateTime.now().minusDays(10));
+        lenient().when(paymentRepository.findById(anyLong())).thenReturn(Optional.of(testPayment2));
+        when(paymentRepository.save(any(Payment.class))).thenReturn(testPayment2);
+
+        // Scheduled generation stubs
+        doNothing().when(paymentPlanService).updateRemainingAmount(anyLong(), any(BigDecimal.class));
+        when(paymentRepository.findByPaymentPlanAndStatus(any(PaymentPlan.class), eq(Payment.PaymentStatus.SCHEDULED)))
+                .thenReturn(Collections.emptyList());
+        when(paymentRepository.findByPaymentPlanAndDueDate(any(PaymentPlan.class), any(LocalDateTime.class)))
+                .thenReturn(Collections.emptyList());
+
+        // Grace period + late fee config
+        when(gracePeriodConfigService.isLateFeesEnabled()).thenReturn(true);
+        when(gracePeriodConfigService.getGracePeriodDays()).thenReturn(7);
+        when(gracePeriodConfigService.getLateFeePercentage()).thenReturn(new BigDecimal("5"));
+        when(gracePeriodConfigService.getLateFeeAmount()).thenReturn(new BigDecimal("10"));
+
+        // When
+        MakePaymentRequest request = MakePaymentRequest.builder()
+                .paymentId(testPayment2.getId())
+                .amount(new BigDecimal("416.67"))
+                .paymentMethod("CASH")
+                .transactionId("LATEFEE123")
+                .build();
+
+        PaymentDTO dto = paymentService.recordManualPayment(request.getPaymentId(), request);
+
+        // Then: late fee = 5% of 416.67 + 10 = 20.8335 + 10 ≈ 30.83 (HALF_UP)
+        assertNotNull(dto);
+        assertNotNull(dto.getLateFee());
+        assertEquals(new BigDecimal("30.83"), dto.getLateFee().setScale(2, BigDecimal.ROUND_HALF_UP));
     }
 
     @Test
