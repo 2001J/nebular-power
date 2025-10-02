@@ -581,6 +581,30 @@ public class PaymentServiceImpl implements PaymentService {
             statusReason = "Partial payment received";
         }
 
+        // Evaluate and apply late fee before saving status update
+        try {
+            if (gracePeriodConfigService.isLateFeesEnabled()) {
+                int graceDays = gracePeriodConfigService.getGracePeriodDays();
+                LocalDateTime graceDeadline = payment.getDueDate().plusDays(graceDays);
+                if (payment.getPaidAt() != null && payment.getPaidAt().isAfter(graceDeadline)) {
+                    BigDecimal percent = gracePeriodConfigService.getLateFeePercentage();
+                    BigDecimal fixed = gracePeriodConfigService.getLateFeeAmount();
+                    BigDecimal base = payment.getAmount() != null ? payment.getAmount() : BigDecimal.ZERO;
+                    BigDecimal pctFee = (percent != null)
+                            ? base.multiply(percent).divide(new BigDecimal("100"), java.math.RoundingMode.HALF_UP)
+                            : BigDecimal.ZERO;
+                    BigDecimal fixedFee = (fixed != null) ? fixed : BigDecimal.ZERO;
+                    payment.setLateFee(pctFee.add(fixedFee));
+                } else {
+                    payment.setLateFee(BigDecimal.ZERO);
+                }
+            } else {
+                payment.setLateFee(BigDecimal.ZERO);
+            }
+        } catch (Exception ex) {
+            log.warn("Late fee evaluation failed for payment {}: {}", payment.getId(), ex.getMessage());
+        }
+
         // Update payment status
         updatePaymentStatus(payment, newStatus, statusReason);
 
@@ -671,6 +695,7 @@ public class PaymentServiceImpl implements PaymentService {
                 .paidAt(payment.getPaidAt())
                 .transactionId(payment.getTransactionId())
                 .paymentMethod(payment.getPaymentMethod())
+                .lateFee(payment.getLateFee())
                 .daysOverdue(payment.getDaysOverdue())
                 .status(payment.getStatus())
                 .statusUpdatedAt(payment.getStatusUpdatedAt())
