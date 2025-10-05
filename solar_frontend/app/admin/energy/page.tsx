@@ -1059,7 +1059,7 @@ export default function EnergyMonitoringPage() {
                   <Chart>
                     <ChartContainer>
                       <ResponsiveContainer width="100%" height="100%">
-                        <ComposedChart data={energyData}>
+                        <ComposedChart data={energyData} margin={{ top: 10, right: 70, left: 70, bottom: 20 }}>
                           <XAxis 
                             dataKey="name" 
                             stroke="hsl(var(--muted-foreground))"

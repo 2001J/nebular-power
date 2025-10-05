@@ -812,17 +812,30 @@ export default function DashboardPage() {
         monthData[dayLabel].count += 1
       })
 
-      // Convert to array and sort by day
-      Object.values(monthData).forEach(day => {
-        chartData.push({
-          time: day.time,
-          production: day.production,
-          consumption: day.consumption
-        })
-      })
+      // Show all days of the month, including days with zero readings
+      const now = new Date()
+      const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()
+      
+      // Convert to array with all days of the month
+      for (let d = 1; d <= daysInMonth; d++) {
+        const dayLabel = d.toString()
+        if (monthData[dayLabel]) {
+          chartData.push({
+            time: dayLabel,
+            production: monthData[dayLabel].production,
+            consumption: monthData[dayLabel].consumption
+          })
+        } else {
+          // Add zero entry for days without data
+          chartData.push({
+            time: dayLabel,
+            production: 0,
+            consumption: 0
+          })
+        }
+      }
 
-      // Sort by day number
-      chartData.sort((a, b) => parseInt(a.time) - parseInt(b.time))
+      // Already sorted since we loop from 1 to daysInMonth
     } else if (selectedPeriod === "year") {
       // Group by month for year
       const yearData = {}
@@ -934,10 +947,22 @@ export default function DashboardPage() {
               />
               <YAxis 
                 tick={{ fontSize: 12 }}
+                tickFormatter={(value) => {
+                  if (value === 0) return '0';
+                  if (value < 0.001) return value.toFixed(4);
+                  if (value < 1) return value.toFixed(3);
+                  if (value >= 1000) return `${(value / 1000).toFixed(1)}k`;
+                  return value.toFixed(1);
+                }}
                 label={{ value: "Power (kW)", angle: -90, position: "insideLeft" }}
               />
               <Tooltip 
-                formatter={(value: number) => [`${value.toFixed(2)} kW`, ""]} 
+                formatter={(value: number) => {
+                  if (value === 0) return ['0 kW', ''];
+                  if (value < 0.01) return [`${value.toFixed(5)} kW`, ''];
+                  if (value < 1) return [`${value.toFixed(3)} kW`, ''];
+                  return [`${value.toFixed(2)} kW`, ''];
+                }} 
                 labelFormatter={(label) => `${label} (Hour)`}
               />
               <Legend content={<CustomLegend />} />
@@ -985,19 +1010,37 @@ export default function DashboardPage() {
               <XAxis 
                 dataKey="time" 
                 tick={{ fontSize: 12 }}
+                {...(selectedPeriod === 'month' ? {
+                  interval: 2,
+                  angle: -45,
+                  textAnchor: 'end',
+                  height: 60
+                } : {})}
                 label={{ 
                   value: selectedPeriod === 'week' ? "Day" : 
                          selectedPeriod === 'month' ? "Day of Month" : "Month", 
                   position: "insideBottom", 
-                  offset: -10 
+                  offset: selectedPeriod === 'month' ? -45 : -10 
                 }}
               />
               <YAxis 
                 tick={{ fontSize: 12 }}
+                tickFormatter={(value) => {
+                  if (value === 0) return '0';
+                  if (value < 0.001) return value.toFixed(4);
+                  if (value < 1) return value.toFixed(3);
+                  if (value >= 1000) return `${(value / 1000).toFixed(1)}k`;
+                  return value.toFixed(1);
+                }}
                 label={{ value: "Energy (kWh)", angle: -90, position: "insideLeft" }}
               />
               <Tooltip 
-                formatter={(value: number) => [`${value.toFixed(2)} kWh`, ""]} 
+                formatter={(value: number) => {
+                  if (value === 0) return ['0 kWh', ''];
+                  if (value < 0.01) return [`${value.toFixed(5)} kWh`, ''];
+                  if (value < 1) return [`${value.toFixed(3)} kWh`, ''];
+                  return [`${value.toFixed(2)} kWh`, ''];
+                }} 
               />
               <Legend content={<CustomLegend />} />
               {visibleSeries.production && (
