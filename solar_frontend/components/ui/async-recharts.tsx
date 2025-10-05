@@ -1,15 +1,46 @@
 "use client";
 
+// DEPRECATED: This file is no longer used. All charts now use direct-recharts.tsx
+// for better reliability and to prevent disappearing chart issues.
+
 import dynamic from 'next/dynamic';
+
+// Loading placeholder component
+const ChartLoading = () => (
+  <div className="w-full h-full flex items-center justify-center">
+    <div className="animate-pulse">
+      <div className="h-4 bg-gray-200 rounded w-24 mb-2"></div>
+      <div className="h-32 bg-gray-200 rounded w-full"></div>
+    </div>
+  </div>
+);
 
 // Dynamically import Recharts components to cut initial JS and disable SSR for them
 // Cast to any to appease TS generics for dynamic loader types
-export const ResponsiveContainer = dynamic<any>(() => import('recharts').then(m => m.ResponsiveContainer as any), { ssr: false });
-export const AreaChart = dynamic<any>(() => import('recharts').then(m => m.AreaChart as any), { ssr: false });
-export const LineChart = dynamic<any>(() => import('recharts').then(m => m.LineChart as any), { ssr: false });
-export const BarChart = dynamic<any>(() => import('recharts').then(m => m.BarChart as any), { ssr: false });
-export const ComposedChart = dynamic<any>(() => import('recharts').then(m => m.ComposedChart as any), { ssr: false });
-export const PieChart = dynamic<any>(() => import('recharts').then(m => m.PieChart as any), { ssr: false });
+export const ResponsiveContainer = dynamic<any>(() => import('recharts').then(m => m.ResponsiveContainer as any), { 
+  ssr: false,
+  loading: () => <ChartLoading />
+});
+export const AreaChart = dynamic<any>(() => import('recharts').then(m => m.AreaChart as any), { 
+  ssr: false,
+  loading: () => <ChartLoading />
+});
+export const LineChart = dynamic<any>(() => import('recharts').then(m => m.LineChart as any), { 
+  ssr: false,
+  loading: () => <ChartLoading />
+});
+export const BarChart = dynamic<any>(() => import('recharts').then(m => m.BarChart as any), { 
+  ssr: false,
+  loading: () => <ChartLoading />
+});
+export const ComposedChart = dynamic<any>(() => import('recharts').then(m => m.ComposedChart as any), { 
+  ssr: false,
+  loading: () => <ChartLoading />
+});
+export const PieChart = dynamic<any>(() => import('recharts').then(m => m.PieChart as any), { 
+  ssr: false,
+  loading: () => <ChartLoading />
+});
 
 export const Area = dynamic<any>(() => import('recharts').then(m => m.Area as any), { ssr: false });
 export const Line = dynamic<any>(() => import('recharts').then(m => m.Line as any), { ssr: false });

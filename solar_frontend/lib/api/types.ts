@@ -36,6 +36,23 @@ export interface LoginRequest {
   rememberMe?: boolean;
 }
 
+// Backend-auth response (AuthResponse on the server)
+export interface BackendAuthResponse {
+  accessToken: string;
+  tokenType?: string; // "Bearer"
+  id?: string | number;
+  email: string;
+  fullName?: string;
+  // Server returns role as a string (e.g., "ADMIN" | "CUSTOMER")
+  role: string;
+  passwordChangeRequired?: boolean;
+  lastLogin?: string;
+  // Optional/forward-compatible
+  refreshToken?: string;
+  expiresIn?: number;
+}
+
+// App-normalized login response shape used across the frontend and tests
 export interface LoginResponse {
   token: string;
   refreshToken: string;

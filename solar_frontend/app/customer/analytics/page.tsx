@@ -20,7 +20,7 @@ import {
   XAxis,
   YAxis,
   Legend,
-} from "@/components/ui/async-recharts"
+} from "@/components/ui/direct-recharts"
 import { Checkbox } from "@/components/ui/checkbox"
 import { useTheme } from "next-themes"
 import axios from "axios"

@@ -48,9 +48,56 @@ export const customerApi = {
     }
     
     const queryString = buildQueryString(params);
-    return makeApiRequest(() =>
-      apiClient.get<PaginatedResponse<Customer>>(`/api/customers${queryString}`)
+    const data = await makeApiRequest<any>(() =>
+      apiClient.get(`/api/customers${queryString}`)
     );
+
+    // Normalize backend List<UserProfileResponse> or Page-like responses
+    if (!data) {
+      return {
+        content: [],
+        totalElements: 0,
+        totalPages: 0,
+        size,
+        number: page,
+        first: page === 0,
+        last: true,
+        empty: true,
+      } as PaginatedResponse<Customer>;
+    }
+
+    if (Array.isArray(data)) {
+      return {
+        content: data as Customer[],
+        totalElements: data.length,
+        totalPages: 1,
+        size: data.length,
+        number: 0,
+        first: true,
+        last: true,
+        empty: data.length === 0,
+      } as PaginatedResponse<Customer>;
+    }
+
+    if (data.content && Array.isArray(data.content)) {
+      const pageResp = data as PaginatedResponse<Customer>;
+      return {
+        ...pageResp,
+        empty: pageResp.empty ?? pageResp.content.length === 0,
+      };
+    }
+
+    // Unknown shape: return empty page to keep UI stable
+    return {
+      content: [],
+      totalElements: 0,
+      totalPages: 0,
+      size,
+      number: page,
+      first: page === 0,
+      last: true,
+      empty: true,
+    } as PaginatedResponse<Customer>;
   },
 
   /**

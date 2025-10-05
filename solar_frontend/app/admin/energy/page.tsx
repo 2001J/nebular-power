@@ -40,7 +40,7 @@ import {
   ComposedChart,
   Bar,
   BarChart,
-} from "@/components/ui/async-recharts"
+} from "@/components/ui/direct-recharts"
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -152,11 +152,11 @@ export default function EnergyMonitoringPage() {
 
         // Process energy reading data - use the recent installation readings if available
         if (systemResponse.recentInstallationReadings && systemResponse.recentInstallationReadings.length > 0) {
-          const chartData = processRecentReadings(systemResponse.recentInstallationReadings, timeRange, 
-            {
-              generationTotal: getExpectedGenerationTotal(timeRange, systemResponse),
-              consumptionTotal: getExpectedConsumptionTotal(timeRange, systemResponse)
-            })
+          const chartData = processRecentReadings(
+            systemResponse.recentInstallationReadings,
+            timeRange,
+            systemResponse
+          )
           setEnergyData(chartData)
         } else if (systemResponse.recentlyActiveInstallations && systemResponse.recentlyActiveInstallations.length > 0) {
           try {
@@ -181,7 +181,7 @@ export default function EnergyMonitoringPage() {
 
             if (allReadings.length > 0) {
               // Transform combined readings into chart data
-              const chartData = transformReadingsToChartData(allReadings, timeRange)
+              const chartData = transformReadingsToChartData(allReadings, timeRange, systemResponse)
               setEnergyData(chartData)
             } else {
               // Fallback to basic chart data
@@ -221,39 +221,18 @@ export default function EnergyMonitoringPage() {
   }
 
   // Helper function to process recent readings directly from system overview
-  const processRecentReadings = (readings, timeRangeType, expectedTotals) => {
-    // Map API readings to consistent format
+  const processRecentReadings = (readings, timeRangeType, overviewData) => {
+    // Map API readings to consistent format while preserving original units (kWh)
     const formattedReadings = readings.map(reading => ({
       timestamp: reading.timestamp,
-      powerGenerationWatts: reading.energyProduced || 0,
-      powerConsumptionWatts: reading.energyConsumed || 0,
+      energyProduced: reading.energyProduced ?? null,
+      energyConsumed: reading.energyConsumed ?? null,
+      installationId: reading.installationId,
       installationType: reading.installationType || 'RESIDENTIAL'
     }))
 
     // Use the transformed readings function with our expected totals
-    return transformReadingsToChartData(formattedReadings, timeRangeType)
-  }
-
-  // Helper to get expected generation total based on time range
-  const getExpectedGenerationTotal = (timeRange, systemResponse) => {
-    switch(timeRange) {
-      case 'day': return systemResponse.todayTotalGenerationKWh || 0
-      case 'week': return systemResponse.weekToDateGenerationKWh || 0
-      case 'month': return systemResponse.monthToDateGenerationKWh || 0
-      case 'year': return systemResponse.yearToDateGenerationKWh || 0
-      default: return systemResponse.todayTotalGenerationKWh || 0
-    }
-  }
-
-  // Helper to get expected consumption total based on time range
-  const getExpectedConsumptionTotal = (timeRange, systemResponse) => {
-    switch(timeRange) {
-      case 'day': return systemResponse.todayTotalConsumptionKWh || 0
-      case 'week': return systemResponse.weekToDateConsumptionKWh || 0
-      case 'month': return systemResponse.monthToDateConsumptionKWh || 0
-      case 'year': return systemResponse.yearToDateConsumptionKWh || 0
-      default: return systemResponse.todayTotalConsumptionKWh || 0
-    }
+    return transformReadingsToChartData(formattedReadings, timeRangeType, overviewData)
   }
 
   // Auto-fetch data when component mounts or timeRange changes
@@ -283,7 +262,11 @@ export default function EnergyMonitoringPage() {
   }
 
   // Transform raw installation readings into chart data
-  const transformReadingsToChartData = (readings: any[], timeRangeType: string) => {
+  const transformReadingsToChartData = (
+    readings: any[],
+    timeRangeType: string,
+    overviewData?: any
+  ) => {
     if (!readings || readings.length === 0) return []
 
     // Sort readings by timestamp in ascending order
@@ -291,24 +274,42 @@ export default function EnergyMonitoringPage() {
       new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
     )
 
+    const getGenerationKWh = (reading: any): number => {
+      if (typeof reading.energyProduced === 'number') return reading.energyProduced
+      if (typeof reading.totalGenerationKWh === 'number') return reading.totalGenerationKWh
+      if (typeof reading.dailyYieldKWh === 'number') return reading.dailyYieldKWh
+      if (typeof reading.powerGenerationWatts === 'number') return reading.powerGenerationWatts / 1000
+      return 0
+    }
+
+    const getConsumptionKWh = (reading: any): number => {
+      if (typeof reading.energyConsumed === 'number') return reading.energyConsumed
+      if (typeof reading.totalConsumptionKWh === 'number') return reading.totalConsumptionKWh
+      if (typeof reading.dailyConsumptionKWh === 'number') return reading.dailyConsumptionKWh
+      if (typeof reading.powerConsumptionWatts === 'number') return reading.powerConsumptionWatts / 1000
+      return 0
+    }
+
     // Handle the case when systemOverview is null
-    if (!systemOverview) {
+    const overview = overviewData ?? systemOverview
+
+    if (!overview) {
       console.warn('systemOverview is null in transformReadingsToChartData, using empty chart structure');
       // Return empty data with the correct structure for each time range
       return createBasicChartData(null, timeRangeType);
     }
 
     // Get exact values from the system overview to use as reference
-    const todayTotal = systemOverview.todayTotalGenerationKWh || 0;
-    const weekTotal = systemOverview.weekToDateGenerationKWh || 0;
-    const monthTotal = systemOverview.monthToDateGenerationKWh || 0;
-    const yearTotal = systemOverview.yearToDateGenerationKWh || 0;
+    const todayTotal = overview.todayTotalGenerationKWh || 0;
+    const weekTotal = overview.weekToDateGenerationKWh || 0;
+    const monthTotal = overview.monthToDateGenerationKWh || 0;
+    const yearTotal = overview.yearToDateGenerationKWh || 0;
 
     // Get consumption totals for normalization
-    const todayConsumption = systemOverview.todayTotalConsumptionKWh || 0;
-    const weekConsumption = systemOverview.weekToDateConsumptionKWh || 0;
-    const monthConsumption = systemOverview.monthToDateConsumptionKWh || 0;
-    const yearConsumption = systemOverview.yearToDateConsumptionKWh || 0;
+    const todayConsumption = overview.todayTotalConsumptionKWh || 0;
+    const weekConsumption = overview.weekToDateConsumptionKWh || 0;
+    const monthConsumption = overview.monthToDateConsumptionKWh || 0;
+    const yearConsumption = overview.yearToDateConsumptionKWh || 0;
 
     // For very small values (below threshold), treat them as zero to prevent misleading visualizations 
     // BUT ONLY FOR PRODUCTION - we still want to show consumption data even with tiny production
@@ -345,29 +346,29 @@ export default function EnergyMonitoringPage() {
     if (shouldUseZeroValues) {
       console.log(`Using zero values for ${timeRangeType} due to very small official totals`);
       // Return empty data with the correct structure for each time range
-      return createBasicChartData(systemOverview, timeRangeType);
+      return createBasicChartData(overview, timeRangeType);
     }
 
     // Calculate the total energy from all readings to normalize later
     const totalProductionFromReadings = sortedReadings.reduce((sum, reading) => 
-      sum + (reading.powerGenerationWatts / 1000), 0);
+      sum + getGenerationKWh(reading), 0);
 
     const totalConsumptionFromReadings = sortedReadings.reduce((sum, reading) => 
-      sum + (reading.powerConsumptionWatts / 1000), 0);
+      sum + getConsumptionKWh(reading), 0);
 
     // Get expected totals from the system overview
     const expectedProduction: Record<string, number> = {
-      day: systemOverview.todayTotalGenerationKWh || 0,
-      week: systemOverview.weekToDateGenerationKWh || 0,
-      month: systemOverview.monthToDateGenerationKWh || 0,
-      year: systemOverview.yearToDateGenerationKWh || 0
+      day: overview.todayTotalGenerationKWh || 0,
+      week: overview.weekToDateGenerationKWh || 0,
+      month: overview.monthToDateGenerationKWh || 0,
+      year: overview.yearToDateGenerationKWh || 0
     };
 
     const expectedConsumption: Record<string, number> = {
-      day: systemOverview.todayTotalConsumptionKWh || 0,
-      week: systemOverview.weekToDateConsumptionKWh || 0,
-      month: systemOverview.monthToDateConsumptionKWh || 0,
-      year: systemOverview.yearToDateConsumptionKWh || 0
+      day: overview.todayTotalConsumptionKWh || 0,
+      week: overview.weekToDateConsumptionKWh || 0,
+      month: overview.monthToDateConsumptionKWh || 0,
+      year: overview.yearToDateConsumptionKWh || 0
     };
 
     // Calculate normalization factors if readings have values and expected values exist
@@ -431,24 +432,24 @@ export default function EnergyMonitoringPage() {
           const hourLabel = `${hour}:00`
 
           // Add values - normalize to match the summary total
-          const powerGen = (reading.powerGenerationWatts / 1000) * productionNormalizationFactor // Convert to kW and normalize
-          hourlyData[hourLabel].total += powerGen
+          const generationKWh = getGenerationKWh(reading) * productionNormalizationFactor
+          hourlyData[hourLabel].total += generationKWh
 
           // Categorize by installation type
           const type = reading.installationType?.toUpperCase() || 'RESIDENTIAL'
           if (type === 'RESIDENTIAL') {
-            hourlyData[hourLabel].residential += powerGen
+            hourlyData[hourLabel].residential += generationKWh
           } else if (type === 'COMMERCIAL') {
-            hourlyData[hourLabel].commercial += powerGen
+            hourlyData[hourLabel].commercial += generationKWh
           } else if (type === 'INDUSTRIAL') {
-            hourlyData[hourLabel].industrial += powerGen
+            hourlyData[hourLabel].industrial += generationKWh
           } else {
             // Default to residential if unknown
-            hourlyData[hourLabel].residential += powerGen
+            hourlyData[hourLabel].residential += generationKWh
           }
 
           // Normalize consumption data using the consumption factor
-          hourlyData[hourLabel].consumption += (reading.powerConsumptionWatts / 1000) * consumptionNormalizationFactor
+          hourlyData[hourLabel].consumption += getConsumptionKWh(reading) * consumptionNormalizationFactor
           hourlyData[hourLabel].count += 1
         })
       })
@@ -490,24 +491,24 @@ export default function EnergyMonitoringPage() {
           const dayLabel = dayNames[day]
 
           // Add values - normalize to match the summary total
-          const powerGen = (reading.powerGenerationWatts / 1000) * productionNormalizationFactor // Convert to kW and normalize
-          dailyData[dayLabel].total += powerGen
+          const generationKWh = getGenerationKWh(reading) * productionNormalizationFactor
+          dailyData[dayLabel].total += generationKWh
 
           // Categorize by installation type
           const type = reading.installationType?.toUpperCase() || 'RESIDENTIAL'
           if (type === 'RESIDENTIAL') {
-            dailyData[dayLabel].residential += powerGen
+            dailyData[dayLabel].residential += generationKWh
           } else if (type === 'COMMERCIAL') {
-            dailyData[dayLabel].commercial += powerGen
+            dailyData[dayLabel].commercial += generationKWh
           } else if (type === 'INDUSTRIAL') {
-            dailyData[dayLabel].industrial += powerGen
+            dailyData[dayLabel].industrial += generationKWh
           } else {
             // Default to residential if unknown
-            dailyData[dayLabel].residential += powerGen
+            dailyData[dayLabel].residential += generationKWh
           }
 
           // Normalize consumption data using the consumption factor
-          dailyData[dayLabel].consumption += (reading.powerConsumptionWatts / 1000) * consumptionNormalizationFactor
+          dailyData[dayLabel].consumption += getConsumptionKWh(reading) * consumptionNormalizationFactor
           dailyData[dayLabel].count += 1
         })
       })
@@ -549,24 +550,24 @@ export default function EnergyMonitoringPage() {
           const dayLabel = day.toString()
 
           // Add values - normalize to match the summary total
-          const powerGen = (reading.powerGenerationWatts / 1000) * productionNormalizationFactor // Convert to kW and normalize
-          monthData[dayLabel].total += powerGen
+          const generationKWh = getGenerationKWh(reading) * productionNormalizationFactor
+          monthData[dayLabel].total += generationKWh
 
           // Categorize by installation type
           const type = reading.installationType?.toUpperCase() || 'RESIDENTIAL'
           if (type === 'RESIDENTIAL') {
-            monthData[dayLabel].residential += powerGen
+            monthData[dayLabel].residential += generationKWh
           } else if (type === 'COMMERCIAL') {
-            monthData[dayLabel].commercial += powerGen
+            monthData[dayLabel].commercial += generationKWh
           } else if (type === 'INDUSTRIAL') {
-            monthData[dayLabel].industrial += powerGen
+            monthData[dayLabel].industrial += generationKWh
           } else {
             // Default to residential if unknown
-            monthData[dayLabel].residential += powerGen
+            monthData[dayLabel].residential += generationKWh
           }
 
           // Normalize consumption data using the consumption factor
-          monthData[dayLabel].consumption += (reading.powerConsumptionWatts / 1000) * consumptionNormalizationFactor
+          monthData[dayLabel].consumption += getConsumptionKWh(reading) * consumptionNormalizationFactor
           monthData[dayLabel].count += 1
         })
       })
@@ -609,24 +610,24 @@ export default function EnergyMonitoringPage() {
           const monthLabel = monthNames[month]
 
           // Add values - normalize to match the summary total
-          const powerGen = (reading.powerGenerationWatts / 1000) * productionNormalizationFactor // Convert to kW and normalize
-          yearData[monthLabel].total += powerGen
+          const generationKWh = getGenerationKWh(reading) * productionNormalizationFactor
+          yearData[monthLabel].total += generationKWh
 
           // Categorize by installation type
           const type = reading.installationType?.toUpperCase() || 'RESIDENTIAL'
           if (type === 'RESIDENTIAL') {
-            yearData[monthLabel].residential += powerGen
+            yearData[monthLabel].residential += generationKWh
           } else if (type === 'COMMERCIAL') {
-            yearData[monthLabel].commercial += powerGen
+            yearData[monthLabel].commercial += generationKWh
           } else if (type === 'INDUSTRIAL') {
-            yearData[monthLabel].industrial += powerGen
+            yearData[monthLabel].industrial += generationKWh
           } else {
             // Default to residential if unknown
-            yearData[monthLabel].residential += powerGen
+            yearData[monthLabel].residential += generationKWh
           }
 
           // Normalize consumption data using the consumption factor
-          yearData[monthLabel].consumption += (reading.powerConsumptionWatts / 1000) * consumptionNormalizationFactor
+          yearData[monthLabel].consumption += getConsumptionKWh(reading) * consumptionNormalizationFactor
           yearData[monthLabel].count += 1
         })
       })

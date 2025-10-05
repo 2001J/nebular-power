@@ -2,20 +2,23 @@ import { apiClient, makeApiRequest } from './client';
 
 export const securityApi = {
   async getTamperEvents(): Promise<any[]> {
+    // Get unresolved tamper events from the proper endpoint
     const res = await makeApiRequest<any>(() => apiClient.get('/api/security/admin/alerts'));
-    const data = res as any;
+    const data = res;
     return Array.isArray(data) ? data : data?.content ?? [];
   },
 
   async getUnresolvedEvents(): Promise<any[]> {
+    // Get unresolved tamper events
     const res = await makeApiRequest<any>(() => apiClient.get('/api/security/admin/alerts'));
-    const data = res as any;
+    const data = res;
     return Array.isArray(data) ? data : data?.content ?? [];
   },
 
   async getAllTamperEvents(): Promise<any[]> {
+    // Get all tamper events (resolved and unresolved)
     const res = await makeApiRequest<any>(() => apiClient.get('/api/security/admin/all-alerts'));
-    const data = res as any;
+    const data = res;
     return Array.isArray(data) ? data : data?.content ?? [];
   },
 
@@ -23,7 +26,7 @@ export const securityApi = {
     const res = await makeApiRequest<any>(() =>
       apiClient.get(`/api/security/installations/${installationId}/events`)
     );
-    const data = res as any;
+  const data = res;
     return Array.isArray(data) ? data : data?.content ?? [];
   },
 
@@ -44,6 +47,29 @@ export const securityApi = {
       apiClient.get(`/api/security/admin/installations/${installationId}/audit/time-range`, {
         params: { startTime, endTime, page, size },
       })
+    );
+  },
+
+  async getTamperEventById(eventId: string): Promise<any> {
+    return makeApiRequest(() => apiClient.get(`/api/security/tamper-events/${eventId}`));
+  },
+
+  async acknowledgeEvent(eventId: string): Promise<any> {
+    return makeApiRequest(() => apiClient.put(`/api/security/events/${eventId}/acknowledge`));
+  },
+
+  async updateEventStatus(eventId: string, status: string): Promise<any> {
+    return makeApiRequest(() => 
+      apiClient.put(`/api/security/admin/events/${eventId}/status`, { status })
+    );
+  },
+
+  async resolveEvent(eventId: string, resolvedBy: string, resolutionNotes?: string): Promise<any> {
+    const params = new URLSearchParams({ resolvedBy });
+    if (resolutionNotes) params.append('resolutionNotes', resolutionNotes);
+    
+    return makeApiRequest(() => 
+      apiClient.post(`/api/security/admin/events/${eventId}/resolve?${params.toString()}`)
     );
   },
 

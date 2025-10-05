@@ -2,7 +2,7 @@
 
 import { useMemo } from "react"
 import { Chart, ChartContainer } from "@/components/ui/chart"
-import { Area, AreaChart, CartesianGrid, ResponsiveContainer, XAxis, YAxis, Tooltip } from "@/components/ui/async-recharts"
+import { Area, AreaChart, CartesianGrid, ResponsiveContainer, XAxis, YAxis, Tooltip } from "@/components/ui/direct-recharts"
 
 interface EnergyConsumptionChartProps {
   period: "day" | "week" | "month"

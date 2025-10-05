@@ -3,7 +3,12 @@ import type { EnergyReading } from './types';
 
 export const energyApi = {
   async getSystemOverview(): Promise<any> {
-    return makeApiRequest(() => apiClient.get<any>('/monitoring/installations/overview'));
+    try {
+      return await makeApiRequest(() => apiClient.get<any>('/monitoring/installations/overview'));
+    } catch (_e) {
+      // Fallback to integration overview endpoint if monitoring overview is unavailable
+      return makeApiRequest(() => apiClient.get<any>('/api/service/system/overview'));
+    }
   },
 
   async getInstallationDashboard(installationId: string): Promise<any> {

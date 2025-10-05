@@ -1,20 +1,50 @@
 import { apiClient, makeApiRequest } from './client';
-import type { 
-  LoginRequest, 
-  LoginResponse, 
-  RegisterRequest, 
+import type {
+  LoginRequest,
+  LoginResponse,
+  RegisterRequest,
   User,
-  ApiResponse 
+  ApiResponse,
 } from './types';
 
 export const authApi = {
   /**
    * Authenticate user with email and password
+   * Accepts either a credentials object or (email, password) for convenience.
    */
-  async login(credentials: LoginRequest): Promise<LoginResponse> {
-    return makeApiRequest(() => 
-      apiClient.post<LoginResponse>('/api/auth/login', credentials)
+  async login(
+    credentialsOrEmail: LoginRequest | string,
+    password?: string
+  ): Promise<LoginResponse> {
+    const credentials: LoginRequest =
+      typeof credentialsOrEmail === 'string'
+        ? { email: credentialsOrEmail, password: password ?? '' }
+        : credentialsOrEmail;
+
+    const raw = await makeApiRequest<any>(() =>
+      apiClient.post('/api/auth/login', credentials)
     );
+
+    // Normalize backend AuthResponse -> LoginResponse used by the app/tests
+    if (raw && typeof raw === 'object' && 'accessToken' in raw) {
+      const user: User = {
+        id: (raw.id ?? '').toString(),
+        email: raw.email ?? '',
+        name: raw.fullName ?? raw.email ?? '',
+        role: raw.role === 'ADMIN' ? 'ADMIN' : 'CUSTOMER',
+      };
+
+      const normalized: LoginResponse = {
+        token: raw.accessToken ?? '',
+        refreshToken: raw.refreshToken ?? '',
+        user,
+        expiresIn: raw.expiresIn ?? 0,
+      };
+      return normalized;
+    }
+
+    // Already in expected shape (e.g., in tests)
+    return raw as LoginResponse;
   },
 
   /**

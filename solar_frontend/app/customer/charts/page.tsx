@@ -25,7 +25,7 @@ import {
   Bar,
   BarChart,
   ReferenceLine,
-} from "@/components/ui/async-recharts"
+} from "@/components/ui/direct-recharts"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Checkbox } from "@/components/ui/checkbox"
 import { energyApi } from "@/lib/api/energy"
@@ -207,14 +207,12 @@ export default function DashboardPage() {
         const dashboardResponse = await energyApi.getInstallationDashboard(selectedInstallation)
 
         if (!dashboardResponse) {
-          setHasError(true)
+          // Do not bail; we can still render charts from readings or fallbacks
           toast({
             variant: "destructive",
-            title: "Data Unavailable",
-            description: "No dashboard data is available for this installation at the moment.",
+            title: "Limited Data",
+            description: "Dashboard metrics are unavailable. Showing recent readings if possible.",
           })
-          setIsLoading(false)
-          return
         }
 
         console.log("Installation dashboard data:", dashboardResponse)
@@ -290,10 +288,8 @@ export default function DashboardPage() {
             } else {
               console.warn(`No energy summaries available for ${selectedPeriod} period`)
               // Generate sample data if no actual data is available
-              if (dashboardData) {
-                console.log('Generating sample data based on dashboard metrics')
-                energyData = generateSampleData(selectedPeriod, dashboardResponse)
-              }
+              console.log('Generating sample data as last resort')
+              energyData = generateSampleData(selectedPeriod)
             }
           }
         }
@@ -302,54 +298,56 @@ export default function DashboardPage() {
         setEnergyReadings(energyData)
         console.log(`Set ${energyData.length} energy readings for charts`)
 
-        // Check for security and system status
-        try {
-          console.log(`Fetching security status for installation ${selectedInstallation}`)
-          const securityResponse = await securityApi.getInstallationSecurityStatus(selectedInstallation)
+        // Check for security and system status only if dashboard exists
+        if (dashboardResponse) {
+          try {
+            console.log(`Fetching security status for installation ${selectedInstallation}`)
+            const securityResponse = await securityApi.getInstallationSecurityStatus(selectedInstallation)
 
-          if (securityResponse) {
-            console.log("Security status response:", securityResponse)
+            if (securityResponse) {
+              console.log("Security status response:", securityResponse)
 
-            // Build system status from security data
-            const systemStatusData = {
-              tamperDetected: securityResponse.tamperDetected || dashboardResponse.installationDetails?.tamperDetected || false,
-              lastTamperCheck: securityResponse.lastCheck || dashboardResponse.installationDetails?.lastTamperCheck || new Date().toISOString(),
-              systemHealth: determineSystemHealth(
-                dashboardResponse.averageEfficiencyPercentage !== undefined ? dashboardResponse.averageEfficiencyPercentage : dashboardResponse.currentEfficiencyPercentage || 0, 
-                securityResponse.tamperDetected || false,
-                securityResponse.alerts?.length || 0
-              ),
-              efficiency: dashboardResponse.averageEfficiencyPercentage !== undefined ? dashboardResponse.averageEfficiencyPercentage : dashboardResponse.currentEfficiencyPercentage || 0,
-              lastMaintenance: securityResponse.lastMaintenance || null,
-              alerts: securityResponse.alerts || [],
-              recommendations: generateRecommendations(
-                dashboardResponse.averageEfficiencyPercentage !== undefined ? dashboardResponse.averageEfficiencyPercentage : dashboardResponse.currentEfficiencyPercentage || 0,
-                securityResponse.tamperDetected || false,
-                securityResponse.alerts || []
-              )
+              // Build system status from security data
+              const systemStatusData = {
+                tamperDetected: securityResponse.tamperDetected || dashboardResponse.installationDetails?.tamperDetected || false,
+                lastTamperCheck: securityResponse.lastCheck || dashboardResponse.installationDetails?.lastTamperCheck || new Date().toISOString(),
+                systemHealth: determineSystemHealth(
+                  (dashboardResponse?.averageEfficiencyPercentage ?? dashboardResponse?.currentEfficiencyPercentage ?? 0), 
+                  securityResponse.tamperDetected || false,
+                  securityResponse.alerts?.length || 0
+                ),
+                efficiency: (dashboardResponse?.averageEfficiencyPercentage ?? dashboardResponse?.currentEfficiencyPercentage ?? 0),
+                lastMaintenance: securityResponse.lastMaintenance || null,
+                alerts: securityResponse.alerts || [],
+                recommendations: generateRecommendations(
+                  (dashboardResponse?.averageEfficiencyPercentage ?? dashboardResponse?.currentEfficiencyPercentage ?? 0),
+                  securityResponse.tamperDetected || false,
+                  securityResponse.alerts || []
+                )
+              }
+
+              setSystemStatus(systemStatusData)
             }
-
-            setSystemStatus(systemStatusData)
+          } catch (error) {
+            console.error("Error fetching security status:", error)
+            // Create minimal system status from dashboard data
+            setSystemStatus({
+              tamperDetected: dashboardResponse.installationDetails?.tamperDetected || false,
+              lastTamperCheck: dashboardResponse.installationDetails?.lastTamperCheck || new Date().toISOString(),
+              systemHealth: determineSystemHealth(
+                (dashboardResponse?.averageEfficiencyPercentage ?? dashboardResponse?.currentEfficiencyPercentage ?? 0),
+                dashboardResponse.installationDetails?.tamperDetected || false,
+                0
+              ),
+              efficiency: (dashboardResponse?.averageEfficiencyPercentage ?? dashboardResponse?.currentEfficiencyPercentage ?? 0),
+              alerts: [],
+              recommendations: generateRecommendations(
+                (dashboardResponse?.averageEfficiencyPercentage ?? dashboardResponse?.currentEfficiencyPercentage ?? 0),
+                dashboardResponse.installationDetails?.tamperDetected || false,
+                []
+              )
+            })
           }
-        } catch (error) {
-          console.error("Error fetching security status:", error)
-          // Create minimal system status from dashboard data
-          setSystemStatus({
-            tamperDetected: dashboardResponse.installationDetails?.tamperDetected || false,
-            lastTamperCheck: dashboardResponse.installationDetails?.lastTamperCheck || new Date().toISOString(),
-            systemHealth: determineSystemHealth(
-              dashboardResponse.averageEfficiencyPercentage !== undefined ? dashboardResponse.averageEfficiencyPercentage : dashboardResponse.currentEfficiencyPercentage || 0, 
-              dashboardResponse.installationDetails?.tamperDetected || false,
-              0
-            ),
-            efficiency: dashboardResponse.averageEfficiencyPercentage !== undefined ? dashboardResponse.averageEfficiencyPercentage : dashboardResponse.currentEfficiencyPercentage || 0,
-            alerts: [],
-            recommendations: generateRecommendations(
-              dashboardResponse.averageEfficiencyPercentage !== undefined ? dashboardResponse.averageEfficiencyPercentage : dashboardResponse.currentEfficiencyPercentage || 0,
-              dashboardResponse.installationDetails?.tamperDetected || false,
-              []
-            )
-          })
         }
       } catch (error) {
         console.error("Error fetching dashboard data:", error)
@@ -479,7 +477,7 @@ export default function DashboardPage() {
   }
 
   // Update the generateSampleData function for week view
-  function generateSampleData(period: string, dashboardData: InstallationDashboard): any[] {
+  function generateSampleData(period: string, dashboardData?: InstallationDashboard): any[] {
     console.log('Generating sample data for period:', period);
     const now = new Date();
     const sampleData: any[] = [];
@@ -579,21 +577,36 @@ export default function DashboardPage() {
 
   // Process data for chart display based on period
   const getProcessedChartData = () => {
-    if (!dashboardData || energyReadings.length === 0) {
+    if (energyReadings.length === 0) {
       return []
     }
 
     const chartData = []
 
+    const getGenerationKWh = (reading: any): number => {
+      if (typeof reading.energyProduced === 'number') return reading.energyProduced
+      if (typeof reading.totalGenerationKWh === 'number') return reading.totalGenerationKWh
+      if (typeof reading.dailyYieldKWh === 'number') return reading.dailyYieldKWh
+      if (typeof reading.powerGenerationWatts === 'number') return reading.powerGenerationWatts / 1000
+      return 0
+    }
+
+    const getConsumptionKWh = (reading: any): number => {
+      if (typeof reading.energyConsumed === 'number') return reading.energyConsumed
+      if (typeof reading.totalConsumptionKWh === 'number') return reading.totalConsumptionKWh
+      if (typeof reading.powerConsumptionWatts === 'number') return reading.powerConsumptionWatts / 1000
+      return 0
+    }
+
     // Get reference values from dashboard for normalization
-    const todayGeneration = dashboardData.todayGenerationKWh || 0
-    const todayConsumption = dashboardData.todayConsumptionKWh || 0
-    const weekGeneration = dashboardData.weekToDateGenerationKWh || 0
-    const weekConsumption = dashboardData.weekToDateConsumptionKWh || 0
-    const monthGeneration = dashboardData.monthToDateGenerationKWh || 0
-    const monthConsumption = dashboardData.monthToDateConsumptionKWh || 0
-    const yearGeneration = dashboardData.yearToDateGenerationKWh || 0
-    const yearConsumption = dashboardData.yearToDateConsumptionKWh || 0
+    const todayGeneration = dashboardData?.todayGenerationKWh || 0
+    const todayConsumption = dashboardData?.todayConsumptionKWh || 0
+    const weekGeneration = dashboardData?.weekToDateGenerationKWh || 0
+    const weekConsumption = dashboardData?.weekToDateConsumptionKWh || 0
+    const monthGeneration = dashboardData?.monthToDateGenerationKWh || 0
+    const monthConsumption = dashboardData?.monthToDateConsumptionKWh || 0
+    const yearGeneration = dashboardData?.yearToDateGenerationKWh || 0
+    const yearConsumption = dashboardData?.yearToDateConsumptionKWh || 0
 
     // Get the appropriate generation and consumption totals based on period
     let expectedGeneration = 0
@@ -620,11 +633,11 @@ export default function DashboardPage() {
 
     // Calculate total readings values for normalization
     const totalReadingsGeneration = energyReadings.reduce(
-      (sum, reading) => sum + (reading.powerGenerationWatts / 1000), 0
+      (sum, reading) => sum + getGenerationKWh(reading), 0
     )
 
     const totalReadingsConsumption = energyReadings.reduce(
-      (sum, reading) => sum + (reading.powerConsumptionWatts / 1000), 0
+      (sum, reading) => sum + getConsumptionKWh(reading), 0
     )
 
     // Calculate normalization factors - if readings have values and expected values exist
@@ -672,8 +685,8 @@ export default function DashboardPage() {
         const hourLabel = `${hour}:00`
 
         // Apply normalization factors
-        const normalizedGeneration = (reading.powerGenerationWatts / 1000) * generationNormalizationFactor
-        const normalizedConsumption = (reading.powerConsumptionWatts / 1000) * consumptionNormalizationFactor
+        const normalizedGeneration = getGenerationKWh(reading) * generationNormalizationFactor
+        const normalizedConsumption = getConsumptionKWh(reading) * consumptionNormalizationFactor
 
         hourlyData[hourLabel].production += normalizedGeneration
         hourlyData[hourLabel].consumption += normalizedConsumption
@@ -737,8 +750,8 @@ export default function DashboardPage() {
           dayData[dayName].consumption += (reading.totalConsumptionKWh || 0) * consumptionNormalizationFactor
         } else {
           // For hourly readings
-          dayData[dayName].production += (reading.powerGenerationWatts / 1000) * generationNormalizationFactor
-          dayData[dayName].consumption += (reading.powerConsumptionWatts / 1000) * consumptionNormalizationFactor
+          dayData[dayName].production += getGenerationKWh(reading) * generationNormalizationFactor
+          dayData[dayName].consumption += getConsumptionKWh(reading) * consumptionNormalizationFactor
         }
 
         dayData[dayName].count += 1
@@ -792,8 +805,8 @@ export default function DashboardPage() {
           monthData[dayLabel].consumption += (reading.totalConsumptionKWh || 0) * consumptionNormalizationFactor
         } else {
           // For hourly readings
-          monthData[dayLabel].production += (reading.powerGenerationWatts / 1000) * generationNormalizationFactor
-          monthData[dayLabel].consumption += (reading.powerConsumptionWatts / 1000) * consumptionNormalizationFactor
+          monthData[dayLabel].production += getGenerationKWh(reading) * generationNormalizationFactor
+          monthData[dayLabel].consumption += getConsumptionKWh(reading) * consumptionNormalizationFactor
         }
 
         monthData[dayLabel].count += 1
@@ -849,8 +862,8 @@ export default function DashboardPage() {
           yearData[monthLabel].consumption += (reading.totalConsumptionKWh || 0) * consumptionNormalizationFactor
         } else {
           // For hourly readings
-          yearData[monthLabel].production += (reading.powerGenerationWatts / 1000) * generationNormalizationFactor
-          yearData[monthLabel].consumption += (reading.powerConsumptionWatts / 1000) * consumptionNormalizationFactor
+          yearData[monthLabel].production += getGenerationKWh(reading) * generationNormalizationFactor
+          yearData[monthLabel].consumption += getConsumptionKWh(reading) * consumptionNormalizationFactor
         }
 
         yearData[monthLabel].count += 1
