@@ -46,9 +46,9 @@ public class ReminderConfigServiceTest {
         testConfig = new ReminderConfig();
         testConfig.setId(1L);
         testConfig.setAutoSendReminders(true);
-        testConfig.setFirstReminderDays(1);
-        testConfig.setSecondReminderDays(3);
-        testConfig.setFinalReminderDays(7);
+        testConfig.setFirstReminderDays(10);
+        testConfig.setSecondReminderDays(5);
+        testConfig.setFinalReminderDays(2);
         testConfig.setReminderMethod("EMAIL");
         testConfig.setCreatedAt(LocalDateTime.now().minusDays(30));
         testConfig.setUpdatedAt(LocalDateTime.now().minusDays(15));
@@ -59,9 +59,9 @@ public class ReminderConfigServiceTest {
         testConfigDTO = ReminderConfigDTO.builder()
                 .id(1L)
                 .autoSendReminders(true)
-                .firstReminderDays(2)
+                .firstReminderDays(10)
                 .secondReminderDays(5)
-                .finalReminderDays(10)
+                .finalReminderDays(2)
                 .reminderMethod("BOTH")
                 .build();
     }
@@ -131,8 +131,11 @@ public class ReminderConfigServiceTest {
     @DisplayName("Should throw exception for invalid reminder sequence")
     void shouldThrowExceptionForInvalidReminderSequence() {
         // Given
+        // New rule is descending: first > second > final
+        // Make it invalid by setting first <= second
         testConfigDTO.setFirstReminderDays(5);
-        testConfigDTO.setSecondReminderDays(3); // Second is before first - invalid
+        testConfigDTO.setSecondReminderDays(7);
+        testConfigDTO.setFinalReminderDays(3);
 
         // When/Then
         assertThrows(IllegalArgumentException.class, () -> reminderConfigService.updateConfig(testConfigDTO, "user"));

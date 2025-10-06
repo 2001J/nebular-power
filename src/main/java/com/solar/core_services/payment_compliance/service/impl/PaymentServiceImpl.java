@@ -376,21 +376,19 @@ public class PaymentServiceImpl implements PaymentService {
 
         for (Payment payment : dueTodayPayments) {
             updatePaymentStatus(payment, Payment.PaymentStatus.DUE_TODAY, "Payment due today");
-
-            // Create and send a due today reminder
-            reminderService.sendPaymentReminder(payment, PaymentReminder.ReminderType.DUE_TODAY);
+            // Do not send reminders here; dispatch job handles all automated sends
         }
 
         // Get the configured first reminder days from the reminder config service
-        int reminderDays = reminderConfigService.getFirstReminderDays();
-        LocalDateTime configuredReminderThreshold = LocalDateTime.now().plusDays(reminderDays);
+        int firstReminderDays = reminderConfigService.getFirstReminderDays();
+        LocalDateTime firstThreshold = LocalDateTime.now().plusDays(firstReminderDays);
 
-        log.info("Using configured reminder threshold of {} days before due date", reminderDays);
+        log.info("Using first reminder threshold of {} days before due date", firstReminderDays);
 
         // Find payments that are scheduled and due within the reminder threshold
         List<Payment> upcomingPayments = paymentRepository.findByDueDateBetweenAndStatus(
                 LocalDateTime.now(),
-                configuredReminderThreshold,
+                firstThreshold,
                 Payment.PaymentStatus.SCHEDULED);
 
         log.info("Found {} upcoming payments", upcomingPayments.size());
@@ -399,9 +397,46 @@ public class PaymentServiceImpl implements PaymentService {
             // Update status to UPCOMING
             updatePaymentStatus(payment, Payment.PaymentStatus.UPCOMING,
                     "Payment due date is within reminder window");
+            // Do not send reminders here; dispatch job handles all automated sends
+        }
 
-            // Send reminder
-            reminderService.sendPaymentReminder(payment, PaymentReminder.ReminderType.UPCOMING_PAYMENT);
+        // Handle second reminder (still pre-due)
+        try {
+            int secondReminderDays = reminderConfigService.getSecondReminderDays();
+            if (secondReminderDays > 0 && secondReminderDays < firstReminderDays) {
+                LocalDateTime secondThreshold = LocalDateTime.now().plusDays(secondReminderDays);
+                List<Payment> secondWindowPayments = paymentRepository.findByDueDateBetweenAndStatus(
+                        LocalDateTime.now(), secondThreshold, Payment.PaymentStatus.UPCOMING);
+                log.info("Second reminder window ({} days) - found {} payments", secondReminderDays, secondWindowPayments.size());
+                for (Payment payment : secondWindowPayments) {
+                    // Keep as UPCOMING; dispatch job handles automated sends
+                }
+            }
+        } catch (Exception ex) {
+            log.warn("Failed processing second pre-due reminder: {}", ex.getMessage());
+        }
+
+        // Handle final pre-due reminder (e.g., 1 day before)
+        try {
+            int finalReminderDays = reminderConfigService.getFinalReminderDays();
+            if (finalReminderDays > 0 && finalReminderDays <= firstReminderDays) {
+                LocalDateTime finalThreshold = LocalDateTime.now().plusDays(finalReminderDays);
+                // Include both SCHEDULED and UPCOMING to ensure we catch any that haven't flipped yet
+                List<Payment> finalScheduled = paymentRepository.findByDueDateBetweenAndStatus(
+                        LocalDateTime.now(), finalThreshold, Payment.PaymentStatus.SCHEDULED);
+                List<Payment> finalUpcoming = paymentRepository.findByDueDateBetweenAndStatus(
+                        LocalDateTime.now(), finalThreshold, Payment.PaymentStatus.UPCOMING);
+                log.info("Final pre-due reminder window ({} days) - found {} scheduled and {} upcoming",
+                        finalReminderDays, finalScheduled.size(), finalUpcoming.size());
+                for (Payment p : finalScheduled) {
+                    updatePaymentStatus(p, Payment.PaymentStatus.UPCOMING, "Payment due within final reminder window");
+                }
+                for (Payment p : finalUpcoming) {
+                    // Dispatch job handles automated sends
+                }
+            }
+        } catch (Exception ex) {
+            log.warn("Failed processing final pre-due reminder: {}", ex.getMessage());
         }
     }
 

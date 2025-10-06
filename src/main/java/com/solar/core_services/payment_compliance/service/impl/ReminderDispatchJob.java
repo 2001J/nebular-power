@@ -109,13 +109,44 @@ public class ReminderDispatchJob {
     }
     
     private void dispatchUpcomingReminders() {
-        log.info("Dispatching upcoming payment reminders");
-        
-        List<Payment> upcomingPayments = paymentRepository.findByStatus(Payment.PaymentStatus.UPCOMING);
-        
-        for (Payment payment : upcomingPayments) {
-            if (!reminderService.hasRecentReminderOfType(payment, PaymentReminder.ReminderType.UPCOMING_PAYMENT)) {
-                reminderService.sendPaymentReminder(payment, PaymentReminder.ReminderType.UPCOMING_PAYMENT);
+        log.info("Dispatching upcoming payment reminders (exact-day thresholds)");
+
+        // Read configured days-before thresholds
+        int firstDays = 0;
+        int secondDays = 0;
+        int finalDays = 0;
+        try {
+            firstDays = reminderConfigService.getFirstReminderDays();
+            secondDays = reminderConfigService.getSecondReminderDays();
+            finalDays = reminderConfigService.getFinalReminderDays();
+        } catch (Exception ex) {
+            log.warn("Failed to read reminder thresholds: {}. Skipping upcoming reminders.", ex.getMessage());
+            return;
+        }
+
+        // Helper to compute day window
+        java.util.function.Function<Integer, java.time.LocalDateTime[]> windowForDays = days -> {
+            java.time.LocalDateTime start = java.time.LocalDate.now().plusDays(days).atStartOfDay();
+            java.time.LocalDateTime end = start.plusDays(1).minusNanos(1);
+            return new java.time.LocalDateTime[]{ start, end };
+        };
+
+        // Consider SCHEDULED and UPCOMING to be safe
+        java.util.List<Payment.PaymentStatus> statuses = java.util.Arrays.asList(
+                Payment.PaymentStatus.SCHEDULED,
+                Payment.PaymentStatus.UPCOMING
+        );
+
+        // Process each configured day (first, second, final)
+        for (int days : new int[]{ firstDays, secondDays, finalDays }) {
+            if (days <= 0) continue; // ignore non-positive
+            java.time.LocalDateTime[] w = windowForDays.apply(days);
+            List<Payment> payments = paymentRepository.findByDueDateBetweenAndStatusIn(w[0], w[1], statuses);
+            log.info("Found {} payments due in {} day(s)", payments.size(), days);
+            for (Payment payment : payments) {
+                if (!reminderService.hasRecentReminderOfType(payment, PaymentReminder.ReminderType.UPCOMING_PAYMENT)) {
+                    reminderService.sendPaymentReminder(payment, PaymentReminder.ReminderType.UPCOMING_PAYMENT);
+                }
             }
         }
     }

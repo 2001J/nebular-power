@@ -109,6 +109,8 @@ public class UserServiceTest {
         when(authenticationManager.authenticate(any(UsernamePasswordAuthenticationToken.class)))
                 .thenReturn(authentication);
         when(tokenProvider.generateToken(any(Authentication.class))).thenReturn("jwt-token");
+        when(userRepository.saveAndFlush(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(userRepository.findById(anyLong())).thenReturn(Optional.of(testUser));
 
         // Act
         AuthResponse response = userService.authenticateUser(loginRequest);
@@ -135,7 +137,7 @@ public class UserServiceTest {
         when(userRepository.findByEmail(anyString())).thenReturn(Optional.of(testUser));
         when(authenticationManager.authenticate(any(UsernamePasswordAuthenticationToken.class)))
                 .thenThrow(new BadCredentialsException("Bad credentials"));
-        
+
         // Use spy to verify the method call
         UserServiceImpl userServiceSpy = spy(userService);
         doNothing().when(userServiceSpy).incrementFailedLoginAttempts(anyString());
@@ -181,7 +183,7 @@ public class UserServiceTest {
         updatedUser.setId(1L);
         updatedUser.setFullName("Updated User");
         updatedUser.setRole(User.UserRole.CUSTOMER);
-        
+
         when(userRepository.findById(anyLong())).thenReturn(Optional.of(testUser));
         when(userRepository.save(any(User.class))).thenReturn(updatedUser);
 
@@ -437,4 +439,4 @@ public class UserServiceTest {
         verify(userRepository).findByEmail("test@example.com");
         verify(userRepository).save(testUser);
     }
-} 
+}
