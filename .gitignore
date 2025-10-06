@@ -49,3 +49,6 @@ ehthumbs.db
 
 
 venv
+.venv
+*.log
+__pycache__

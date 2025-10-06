@@ -196,12 +196,18 @@ export default function AdminPaymentsPage() {
         const reminderConfigData = await paymentComplianceApi.getReminderConfig()
         console.log("Loaded reminder config from API:", reminderConfigData);
 
-        // Ensure all fields exist with correct types
+        // Ensure all fields exist with correct types and normalize to descending order for UI
+        const srvFirst = parseInt(reminderConfigData.firstReminderDays?.toString()) || 1;
+        const srvSecond = parseInt(reminderConfigData.secondReminderDays?.toString()) || 3;
+        const srvFinal = parseInt(reminderConfigData.finalReminderDays?.toString()) || 7;
+
+        const daysDesc = [srvFirst, srvSecond, srvFinal].sort((a, b) => b - a);
+
         const enhancedReminderConfig = {
           autoSendReminders: reminderConfigData.autoSendReminders === false ? false : true,
-          firstReminderDays: parseInt(reminderConfigData.firstReminderDays?.toString()) || 1,
-          secondReminderDays: parseInt(reminderConfigData.secondReminderDays?.toString()) || 3,
-          finalReminderDays: parseInt(reminderConfigData.finalReminderDays?.toString()) || 7,
+          firstReminderDays: daysDesc[0],
+          secondReminderDays: daysDesc[1],
+          finalReminderDays: daysDesc[2],
           reminderMethod: reminderConfigData.reminderMethod || "EMAIL"
         };
 
@@ -507,7 +513,7 @@ export default function AdminPaymentsPage() {
       // Show error message
       toast({
         title: "Error",
-        description: "Failed to update reminder configuration. Please try again.",
+        description: (error as any)?.response?.data?.message || "Failed to update reminder configuration. Please try again.",
         variant: "destructive",
       })
     } finally {
@@ -620,37 +626,37 @@ export default function AdminPaymentsPage() {
     const secondDays = parseInt(updatedReminderConfig.secondReminderDays?.toString() || '3');
     const finalDays = parseInt(updatedReminderConfig.finalReminderDays?.toString() || '7');
 
-    // Validate that all reminder days are positive integers
+    // Validate that all reminder days are positive integers (days BEFORE due date)
     if (isNaN(firstDays) || firstDays < 1) {
       isValid = false;
-      errors.push("First reminder must be at least 1 day after due date");
+      errors.push("First reminder must be at least 1 day before due date");
     }
 
     if (isNaN(secondDays) || secondDays < 1) {
       isValid = false;
-      errors.push("Second reminder must be at least 1 day after due date");
+      errors.push("Second reminder must be at least 1 day before due date");
     }
 
     if (isNaN(finalDays) || finalDays < 1) {
       isValid = false;
-      errors.push("Final reminder must be at least 1 day after due date");
+      errors.push("Final reminder must be at least 1 day before due date");
     }
 
-    // Validate that reminder days are in ascending order
-    if (firstDays >= secondDays) {
+    // Validate that reminder days are in descending order (e.g., 14 > 7 > 3 days before)
+    if (firstDays <= secondDays) {
       isValid = false;
-      errors.push("Second reminder must be scheduled after first reminder");
+      errors.push("First reminder must be scheduled earlier than (more days before) second reminder");
     }
 
-    if (secondDays >= finalDays) {
+    if (secondDays <= finalDays) {
       isValid = false;
-      errors.push("Final reminder must be scheduled after second reminder");
+      errors.push("Second reminder must be scheduled earlier than (more days before) final reminder");
     }
 
     // Validate maximum days (reasonable limit)
-    if (finalDays > 60) {
+    if (firstDays > 60 || secondDays > 60 || finalDays > 60) {
       isValid = false;
-      errors.push("Final reminder cannot be more than 60 days after due date");
+      errors.push("Reminders cannot be more than 60 days before due date");
     }
 
     // Ensure reminder method is selected
@@ -1000,38 +1006,38 @@ export default function AdminPaymentsPage() {
                           {/* Base rail */}
                           <div className="absolute inset-y-2 left-0 right-0 bg-muted rounded-full" />
                           {/* Markers centered vertically to avoid overlap */}
-                          <div className="absolute top-1/2 -translate-y-1/2 left-0 w-2 h-2 bg-primary rounded-full" />
+                          <div className="absolute top-1/2 -translate-y-1/2 right-0 w-2 h-2 bg-primary rounded-full" />
                           <div
                             className="absolute top-1/2 -translate-y-1/2 w-2 h-2 bg-primary rounded-full"
-                            style={{ left: `${Math.min((Number(reminderConfig.firstReminderDays || 1) / 30) * 100, 100)}%` }}
+                            style={{ left: `${Math.max(0, 100 - (Number(reminderConfig.firstReminderDays || 1) / 30) * 100)}%` }}
                           />
                           <div
                             className="absolute top-1/2 -translate-y-1/2 w-2 h-2 bg-primary rounded-full"
-                            style={{ left: `${Math.min((Number(reminderConfig.secondReminderDays || 3) / 30) * 100, 100)}%` }}
+                            style={{ left: `${Math.max(0, 100 - (Number(reminderConfig.secondReminderDays || 3) / 30) * 100)}%` }}
                           />
                           <div
                             className="absolute top-1/2 -translate-y-1/2 w-2 h-2 bg-primary rounded-full"
-                            style={{ left: `${Math.min((Number(reminderConfig.finalReminderDays || 7) / 30) * 100, 100)}%` }}
+                            style={{ left: `${Math.max(0, 100 - (Number(reminderConfig.finalReminderDays || 7) / 30) * 100)}%` }}
                           />
                         </div>
                         <div className="flex justify-between text-xs text-muted-foreground mt-2">
+                          <span>30 Days Before</span>
                           <span>Due Date</span>
-                          <span>30 Days</span>
                         </div>
                       </div>
 
                       <dl className="space-y-3">
                         <div className="flex justify-between items-center">
                           <dt className="text-sm font-medium">First Reminder</dt>
-                          <dd className="text-sm">{reminderConfig.firstReminderDays} days after due date</dd>
+                          <dd className="text-sm">{reminderConfig.firstReminderDays} days before due date</dd>
                         </div>
                         <div className="flex justify-between items-center">
                           <dt className="text-sm font-medium">Second Reminder</dt>
-                          <dd className="text-sm">{reminderConfig.secondReminderDays} days after due date</dd>
+                          <dd className="text-sm">{reminderConfig.secondReminderDays} days before due date</dd>
                         </div>
                         <div className="flex justify-between items-center">
-                          <dt className="text-sm font-medium">Final Notice</dt>
-                          <dd className="text-sm">{reminderConfig.finalReminderDays} days after due date</dd>
+                          <dt className="text-sm font-medium">Final Reminder</dt>
+                          <dd className="text-sm">{reminderConfig.finalReminderDays} days before due date</dd>
                         </div>
                         <div className="flex justify-between items-center">
                           <dt className="text-sm font-medium">Delivery Method</dt>
@@ -1399,7 +1405,7 @@ export default function AdminPaymentsPage() {
           <DialogHeader>
             <DialogTitle>Payment Reminder Schedule</DialogTitle>
             <DialogDescription>
-              Configure when reminder notifications are sent after a payment is past due.
+              Configure when pre‑due reminder notifications are sent. Post‑due reminders are controlled by Grace Period settings.
             </DialogDescription>
           </DialogHeader>
 
@@ -1408,7 +1414,7 @@ export default function AdminPaymentsPage() {
             <div className="flex items-center justify-between">
               <div className="space-y-1">
                 <Label htmlFor="autoSendReminders" className="text-base font-medium">Automatically Send Reminders</Label>
-                <p className="text-xs text-muted-foreground">When enabled, the system sends reminders based on the schedule below.</p>
+                <p className="text-xs text-muted-foreground">When enabled, the system sends pre‑due reminders as scheduled below.</p>
               </div>
               <Switch
                 id="autoSendReminders"
@@ -1428,23 +1434,23 @@ export default function AdminPaymentsPage() {
                 {/* Base rail */}
                 <div className="absolute inset-y-3 left-0 right-0 bg-muted rounded-full" />
                 {/* Markers, vertically centered to avoid overlap */}
-                <div className="absolute top-1/2 -translate-y-1/2 left-0 w-3 h-3 bg-primary rounded-full" />
+                <div className="absolute top-1/2 -translate-y-1/2 right-0 w-3 h-3 bg-primary rounded-full" />
                 <div
                   className="absolute top-1/2 -translate-y-1/2 w-3 h-3 bg-blue-400 rounded-full"
-                  style={{ left: `${Math.min(Math.max((Number(updatedReminderConfig.firstReminderDays || 1) / 30) * 100, 2), 98)}%` }}
+                  style={{ left: `${Math.min(Math.max(100 - (Number(updatedReminderConfig.firstReminderDays || 1) / 30) * 100, 2), 98)}%` }}
                 />
                 <div
                   className="absolute top-1/2 -translate-y-1/2 w-3 h-3 bg-amber-400 rounded-full"
-                  style={{ left: `${Math.min(Math.max((Number(updatedReminderConfig.secondReminderDays || 3) / 30) * 100, 2), 98)}%` }}
+                  style={{ left: `${Math.min(Math.max(100 - (Number(updatedReminderConfig.secondReminderDays || 3) / 30) * 100, 2), 98)}%` }}
                 />
                 <div
                   className="absolute top-1/2 -translate-y-1/2 w-3 h-3 bg-red-400 rounded-full"
-                  style={{ left: `${Math.min(Math.max((Number(updatedReminderConfig.finalReminderDays || 7) / 30) * 100, 2), 98)}%` }}
+                  style={{ left: `${Math.min(Math.max(100 - (Number(updatedReminderConfig.finalReminderDays || 7) / 30) * 100, 2), 98)}%` }}
                 />
               </div>
               <div className="flex justify-between text-xs text-muted-foreground mt-2">
+                <span>30 Days Before</span>
                 <span>Due Date</span>
-                <span>30 Days</span>
               </div>
               {/* Legend to clarify marker colors and reduce confusion */}
               <div className="mt-3 grid grid-cols-3 gap-2 text-xs text-muted-foreground">
@@ -1465,15 +1471,15 @@ export default function AdminPaymentsPage() {
 
             <div className="space-y-5">
               <div className="space-y-2">
-                <Label htmlFor="firstReminderDays">First Reminder (days after due date)</Label>
+              <Label htmlFor="firstReminderDays">First Reminder (days before due date)</Label>
               <div className="relative">
                   <Input
                     id="firstReminderDays"
                     type="text"
                     inputMode="numeric"
                     pattern="[0-9]*"
-                    min="1"
-                    max={parseInt(updatedReminderConfig.secondReminderDays?.toString() || '3') - 1}
+                    min={Math.max(1, parseInt(updatedReminderConfig.secondReminderDays?.toString() || '0') + 1)}
+                    max={60}
                     value={updatedReminderConfig.firstReminderDays}
                     onChange={(e) => {
                       const value = parseInt(e.target.value);
@@ -1487,20 +1493,20 @@ export default function AdminPaymentsPage() {
                 <span className="absolute right-3 top-2.5 text-sm text-muted-foreground select-none pointer-events-none">days</span>
               </div>
                 <p className="text-xs text-muted-foreground">
-                  First gentle reminder sent after this many days past due date.
+                  First gentle reminder sent this many days before due date.
                 </p>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="secondReminderDays">Second Reminder (days after due date)</Label>
+              <Label htmlFor="secondReminderDays">Second Reminder (days before due date)</Label>
               <div className="relative">
                   <Input
                     id="secondReminderDays"
                     type="text"
                     inputMode="numeric"
                     pattern="[0-9]*"
-                    min={parseInt(updatedReminderConfig.firstReminderDays?.toString() || '1') + 1}
-                    max={parseInt(updatedReminderConfig.finalReminderDays?.toString() || '7') - 1}
+                    min={Math.max(1, parseInt(updatedReminderConfig.finalReminderDays?.toString() || '0') + 1)}
+                    max={Math.max(1, parseInt(updatedReminderConfig.firstReminderDays?.toString() || '60') - 1)}
                     value={updatedReminderConfig.secondReminderDays}
                     onChange={(e) => {
                       const value = parseInt(e.target.value);
@@ -1514,20 +1520,20 @@ export default function AdminPaymentsPage() {
                 <span className="absolute right-3 top-2.5 text-sm text-muted-foreground select-none pointer-events-none">days</span>
               </div>
                 <p className="text-xs text-muted-foreground">
-                  Second more urgent reminder sent after this many days past due date.
+                  Second, more urgent reminder sent this many days before due date.
                 </p>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="finalReminderDays">Final Notice (days after due date)</Label>
+              <Label htmlFor="finalReminderDays">Final Reminder (days before due date)</Label>
               <div className="relative">
                   <Input
                     id="finalReminderDays"
                     type="text"
                     inputMode="numeric"
                     pattern="[0-9]*"
-                    min={parseInt(updatedReminderConfig.secondReminderDays?.toString() || '3') + 1}
-                    max="60"
+                    min={1}
+                    max={Math.max(1, parseInt(updatedReminderConfig.secondReminderDays?.toString() || '2') - 1)}
                     value={updatedReminderConfig.finalReminderDays}
                     onChange={(e) => {
                       const value = parseInt(e.target.value);
@@ -1541,7 +1547,7 @@ export default function AdminPaymentsPage() {
                 <span className="absolute right-3 top-2.5 text-sm text-muted-foreground select-none pointer-events-none">days</span>
               </div>
                 <p className="text-xs text-muted-foreground">
-                  Final notice of possible service suspension sent after this many days past due date.
+                  Final notice before due date (service actions after due date follow Grace Period settings).
                 </p>
               </div>
 
@@ -1572,8 +1578,8 @@ export default function AdminPaymentsPage() {
             <div className="mt-4 pt-3 border-t">
               <div className="text-xs text-muted-foreground bg-muted p-3 rounded-md">
                 <p className="font-medium mb-1">Note:</p>
-                <p>These settings affect all new reminders. Customers will receive a maximum of one reminder per day.</p>
-                <p className="mt-1">Reminders scheduling begins after a payment is determined to be overdue.</p>
+                <p>These settings control pre‑due reminders. Customers receive at most one reminder per day.</p>
+                <p className="mt-1">After the due date, Grace Period settings determine post‑due communications.</p>
               </div>
             </div>
           </div>
