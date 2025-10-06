@@ -13,20 +13,25 @@ import java.util.List;
 
 public interface PaymentReminderRepository extends JpaRepository<PaymentReminder, Long> {
     List<PaymentReminder> findByPayment(Payment payment);
-    
+
     List<PaymentReminder> findByPaymentAndReminderType(Payment payment, PaymentReminder.ReminderType reminderType);
-    
+
     List<PaymentReminder> findByDeliveryStatus(PaymentReminder.DeliveryStatus deliveryStatus);
-    
+
     @Query("SELECT pr FROM PaymentReminder pr WHERE pr.deliveryStatus = :status AND pr.retryCount < :maxRetries")
-    List<PaymentReminder> findFailedRemindersForRetry(@Param("status") PaymentReminder.DeliveryStatus status, @Param("maxRetries") Integer maxRetries);
-    
+    List<PaymentReminder> findFailedRemindersForRetry(@Param("status") PaymentReminder.DeliveryStatus status,
+            @Param("maxRetries") Integer maxRetries);
+
     @Query("SELECT pr FROM PaymentReminder pr WHERE pr.payment.installation.id = :installationId")
     List<PaymentReminder> findByInstallationId(@Param("installationId") Long installationId);
-    
+
     @Query("SELECT pr FROM PaymentReminder pr WHERE pr.payment.installation.user.id = :userId")
     Page<PaymentReminder> findByUserId(@Param("userId") Long userId, Pageable pageable);
-    
+
     @Query("SELECT COUNT(pr) FROM PaymentReminder pr WHERE pr.payment = :payment AND pr.reminderType = :reminderType AND pr.sentDate > :cutoffDate")
-    Long countRecentRemindersByType(@Param("payment") Payment payment, @Param("reminderType") PaymentReminder.ReminderType reminderType, @Param("cutoffDate") LocalDateTime cutoffDate);
-} 
+    Long countRecentRemindersByType(@Param("payment") Payment payment,
+            @Param("reminderType") PaymentReminder.ReminderType reminderType,
+            @Param("cutoffDate") LocalDateTime cutoffDate);
+
+    long countByPaymentAndReminderType(Payment payment, PaymentReminder.ReminderType reminderType);
+}

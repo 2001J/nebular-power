@@ -296,16 +296,16 @@ public class AdminPaymentControllerTest {
 
         // Set up the mocks properly
         when(installationRepository.findById(1L)).thenReturn(java.util.Optional.of(mockInstallation));
-        when(mockInstallation.getId()).thenReturn(1L);  // This is critical - setting installation ID
+        when(mockInstallation.getId()).thenReturn(1L); // This is critical - setting installation ID
         when(mockInstallation.getUser()).thenReturn(mockUser);
         when(mockUser.getId()).thenReturn(1L);
-        
+
         // First, set installationId in DTO before mocking getPaymentPlanById response
         testPaymentPlanDTO.setInstallationId(1L);
-        
+
         // Mock getPaymentPlanById to return our DTO with the correct installationId
         when(paymentPlanService.getPaymentPlanById(1L)).thenReturn(testPaymentPlanDTO);
-        
+
         // Mock updatePaymentPlan to return our DTO
         when(paymentPlanService.updatePaymentPlan(eq(1L), any(PaymentPlanRequest.class)))
                 .thenReturn(testPaymentPlanDTO);
@@ -317,7 +317,7 @@ public class AdminPaymentControllerTest {
         verify(installationRepository, times(1)).findById(1L);
         verify(mockInstallation, times(1)).getUser();
         verify(mockUser, times(1)).getId();
-        verify(mockInstallation, times(1)).getId();  // Verify that getId() was called
+        verify(mockInstallation, times(1)).getId(); // Verify that getId() was called
         verify(paymentPlanService, times(1)).getPaymentPlanById(1L);
         verify(paymentPlanService, times(1)).updatePaymentPlan(eq(1L), any(PaymentPlanRequest.class));
         assertEquals(testPaymentPlanDTO, response.getBody());
@@ -456,7 +456,7 @@ public class AdminPaymentControllerTest {
                 .thenReturn(testReminderConfigDTO);
 
         // When
-        ResponseEntity<ReminderConfigDTO> response = controller.updateReminderConfig(authentication,
+        ResponseEntity<?> response = controller.updateReminderConfig(authentication,
                 testReminderConfigDTO);
 
         // Then
@@ -477,12 +477,13 @@ public class AdminPaymentControllerTest {
                 .thenThrow(new IllegalArgumentException("Invalid reminder configuration"));
 
         // When
-        ResponseEntity<ReminderConfigDTO> response = controller.updateReminderConfig(authentication,
+        ResponseEntity<?> response = controller.updateReminderConfig(authentication,
                 testReminderConfigDTO);
 
         // Then
         verify(reminderConfigService, times(1)).updateConfig(any(ReminderConfigDTO.class), eq("admin"));
         assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+        assertTrue(response.getBody() instanceof Map);
     }
 
     @Test
