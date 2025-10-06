@@ -999,9 +999,9 @@ export default function AdminPaymentsPage() {
                         Automated payment reminder timelines
                       </CardDescription>
                     </CardHeader>
-                    <CardContent className="pt-4">
+                    <CardContent className="pt-4 space-y-4">
                       {/* Robust timeline visualization */}
-                      <div className="mb-4">
+                      <div className="space-y-2">
                         <div className="relative w-full h-6 rounded-full overflow-hidden">
                           {/* Base rail */}
                           <div className="absolute inset-y-2 left-0 right-0 bg-muted rounded-full" />
@@ -1020,13 +1020,28 @@ export default function AdminPaymentsPage() {
                             style={{ left: `${Math.max(0, 100 - (Number(reminderConfig.finalReminderDays || 7) / 30) * 100)}%` }}
                           />
                         </div>
-                        <div className="flex justify-between text-xs text-muted-foreground mt-2">
+                        <div className="flex justify-between text-xs text-muted-foreground">
                           <span>30 Days Before</span>
                           <span>Due Date</span>
                         </div>
                       </div>
 
                       <dl className="space-y-3">
+                        <div className="flex justify-between items-center">
+                          <dt className="text-sm font-medium">Auto-Send Status</dt>
+                          <dd className="text-sm">
+                            <Badge
+                              variant="outline"
+                              className={
+                                reminderConfig.autoSendReminders
+                                  ? "bg-emerald-500/10 text-emerald-700 border-emerald-200"
+                                  : "bg-destructive/10 text-destructive border-destructive/40"
+                              }
+                            >
+                              {reminderConfig.autoSendReminders ? "Enabled" : "Disabled"}
+                            </Badge>
+                          </dd>
+                        </div>
                         <div className="flex justify-between items-center">
                           <dt className="text-sm font-medium">First Reminder</dt>
                           <dd className="text-sm">{reminderConfig.firstReminderDays} days before due date</dd>
@@ -1050,6 +1065,14 @@ export default function AdminPaymentsPage() {
                           </dd>
                         </div>
                       </dl>
+
+                      <div className="rounded-md border bg-muted/30 p-3">
+                        <p className="text-xs text-muted-foreground">
+                          {reminderConfig.autoSendReminders
+                            ? "Auto-send reminders follow this schedule exactly. Update the settings if you need to pause automated messaging."
+                            : "Auto-send reminders are off. No customers will receive automated messages until you enable the feature or send reminders manually."}
+                        </p>
+                      </div>
                     </CardContent>
                   </Card>
                 </div>
