@@ -90,12 +90,12 @@ public class AdminPaymentController {
         })
         public ResponseEntity<PaymentPlanDTO> getPaymentPlanById(
                         @Parameter(description = "ID of the payment plan to retrieve", required = true) @PathVariable Long planId) {
-            try {
-                PaymentPlanDTO paymentPlan = paymentPlanService.getPaymentPlanById(planId);
-                return ResponseEntity.ok(paymentPlan);
-            } catch (ResourceNotFoundException e) {
-                return ResponseEntity.notFound().build();
-            }
+                try {
+                        PaymentPlanDTO paymentPlan = paymentPlanService.getPaymentPlanById(planId);
+                        return ResponseEntity.ok(paymentPlan);
+                } catch (ResourceNotFoundException e) {
+                        return ResponseEntity.notFound().build();
+                }
         }
 
         @GetMapping("/customers/{customerId}/plan")
@@ -147,7 +147,8 @@ public class AdminPaymentController {
                         // Verify the installation exists
                         SolarInstallation installation = installationRepository.findById(request.getInstallationId())
                                         .orElseThrow(() -> new ResourceNotFoundException(
-                                                        "Solar installation not found with id: " + request.getInstallationId()));
+                                                        "Solar installation not found with id: "
+                                                                        + request.getInstallationId()));
 
                         // Check if this installation belongs to the customer
                         if (!installation.getUser().getId().equals(customerId)) {
@@ -161,7 +162,7 @@ public class AdminPaymentController {
                         PaymentPlanDTO existingPlan = paymentPlanService.getPaymentPlanById(planId);
                         if (!existingPlan.getInstallationId().equals(installation.getId())) {
                                 Map<String, String> errorResponse = new HashMap<>();
-                                errorResponse.put("error", "Payment plan #" + planId + 
+                                errorResponse.put("error", "Payment plan #" + planId +
                                                 " does not belong to installation #" + installation.getId());
                                 return ResponseEntity.badRequest().body(errorResponse);
                         }
@@ -274,11 +275,11 @@ public class AdminPaymentController {
                         @RequestParam(defaultValue = "10") int size,
                         @RequestParam(defaultValue = "dueDate") String sortBy,
                         @RequestParam(defaultValue = "desc") String direction) {
-                Sort.Direction sortDirection = direction.equalsIgnoreCase("asc") ? Sort.Direction.ASC : Sort.Direction.DESC;
+                Sort.Direction sortDirection = direction.equalsIgnoreCase("asc") ? Sort.Direction.ASC
+                                : Sort.Direction.DESC;
                 Page<PaymentDTO> payments = paymentService.getPaymentsByInstallation(
                                 installationId,
-                                PageRequest.of(page, size, Sort.by(sortDirection, sortBy))
-                );
+                                PageRequest.of(page, size, Sort.by(sortDirection, sortBy)));
                 return ResponseEntity.ok(payments);
         }
 
@@ -301,7 +302,8 @@ public class AdminPaymentController {
                         Object idsObj = body.get("paymentIds");
                         Object typeObj = body.get("reminderType");
                         if (!(idsObj instanceof List) || !(typeObj instanceof String)) {
-                                return ResponseEntity.badRequest().body(Map.of("error", "Invalid bulk reminder payload"));
+                                return ResponseEntity.badRequest()
+                                                .body(Map.of("error", "Invalid bulk reminder payload"));
                         }
                         @SuppressWarnings("unchecked")
                         List<Object> ids = (List<Object>) idsObj;
@@ -333,7 +335,8 @@ public class AdminPaymentController {
                         return ResponseEntity.ok().build();
                 }
 
-                return ResponseEntity.badRequest().body(Map.of("error", "Provide paymentId+reminderType as query params or paymentIds+reminderType in JSON body"));
+                return ResponseEntity.badRequest().body(Map.of("error",
+                                "Provide paymentId+reminderType as query params or paymentIds+reminderType in JSON body"));
         }
 
         @PostMapping("/{paymentId}/send-reminder")
@@ -368,7 +371,8 @@ public class AdminPaymentController {
                                         Payment payment = paymentService.getPaymentById(paymentId);
                                         if (payment.getStatus() == Payment.PaymentStatus.DUE_TODAY) {
                                                 type = PaymentReminder.ReminderType.DUE_TODAY;
-                                        } else if (payment.getStatus() == Payment.PaymentStatus.UPCOMING || payment.getStatus() == Payment.PaymentStatus.SCHEDULED) {
+                                        } else if (payment.getStatus() == Payment.PaymentStatus.UPCOMING
+                                                        || payment.getStatus() == Payment.PaymentStatus.SCHEDULED) {
                                                 type = PaymentReminder.ReminderType.UPCOMING_PAYMENT;
                                         } else if (payment.getStatus() == Payment.PaymentStatus.GRACE_PERIOD) {
                                                 type = PaymentReminder.ReminderType.GRACE_PERIOD;
@@ -397,7 +401,8 @@ public class AdminPaymentController {
         })
         public ResponseEntity<List<com.solar.core_services.payment_compliance.dto.PaymentReminderDTO>> getPaymentReminders(
                         @PathVariable Long paymentId) {
-                List<com.solar.core_services.payment_compliance.dto.PaymentReminderDTO> reminders = reminderService.getRemindersByPayment(paymentId);
+                List<com.solar.core_services.payment_compliance.dto.PaymentReminderDTO> reminders = reminderService
+                                .getRemindersByPayment(paymentId);
                 return ResponseEntity.ok(reminders);
         }
 
@@ -432,8 +437,7 @@ public class AdminPaymentController {
                         return ResponseEntity.ok(updatedConfig);
                 } catch (IllegalArgumentException ex) {
                         return ResponseEntity.badRequest().body(Map.of(
-                                        "message", ex.getMessage()
-                        ));
+                                        "message", ex.getMessage()));
                 }
         }
 
@@ -457,7 +461,7 @@ public class AdminPaymentController {
                         @ApiResponse(responseCode = "401", description = "Unauthorized", content = @Content),
                         @ApiResponse(responseCode = "403", description = "Forbidden - requires ADMIN role", content = @Content)
         })
-        public ResponseEntity<ReminderConfigDTO> updateReminderConfig(
+        public ResponseEntity<?> updateReminderConfig(
                         @Parameter(description = "Authentication object containing admin credentials", hidden = true) Authentication authentication,
 
                         @Parameter(description = "Updated reminder configuration", required = true) @Valid @RequestBody ReminderConfigDTO configDTO) {
@@ -467,35 +471,33 @@ public class AdminPaymentController {
                         ReminderConfigDTO updatedConfig = reminderConfigService.updateConfig(configDTO, username);
                         return ResponseEntity.ok(updatedConfig);
                 } catch (IllegalArgumentException e) {
-                        // Return bad request for validation errors
-                        return ResponseEntity.badRequest().build();
+                        // Return bad request for validation errors with message body
+                        return ResponseEntity.badRequest().body(java.util.Map.of(
+                                        "message", e.getMessage()));
                 }
         }
 
         @PostMapping("/update-statuses")
-        @Operation(
-            summary = "Force payment status update",
-            description = "Manually triggers the payment status update process to recalculate overdue, upcoming, and due payments."
-        )
+        @Operation(summary = "Force payment status update", description = "Manually triggers the payment status update process to recalculate overdue, upcoming, and due payments.")
         @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Status update completed successfully"),
-            @ApiResponse(responseCode = "401", description = "Unauthorized", content = @Content),
-            @ApiResponse(responseCode = "403", description = "Forbidden - requires ADMIN role", content = @Content)
+                        @ApiResponse(responseCode = "200", description = "Status update completed successfully"),
+                        @ApiResponse(responseCode = "401", description = "Unauthorized", content = @Content),
+                        @ApiResponse(responseCode = "403", description = "Forbidden - requires ADMIN role", content = @Content)
         })
         public ResponseEntity<Map<String, String>> forcePaymentStatusUpdate() {
-            try {
-                // Run the status update job
-                paymentService.updatePaymentStatuses();
+                try {
+                        // Run the status update job
+                        paymentService.updatePaymentStatuses();
 
-                Map<String, String> response = new HashMap<>();
-                response.put("status", "success");
-                response.put("message", "Payment status update completed successfully");
-                return ResponseEntity.ok(response);
-            } catch (Exception e) {
-                Map<String, String> errorResponse = new HashMap<>();
-                errorResponse.put("status", "error");
-                errorResponse.put("message", "Error updating payment statuses: " + e.getMessage());
-                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
-            }
+                        Map<String, String> response = new HashMap<>();
+                        response.put("status", "success");
+                        response.put("message", "Payment status update completed successfully");
+                        return ResponseEntity.ok(response);
+                } catch (Exception e) {
+                        Map<String, String> errorResponse = new HashMap<>();
+                        errorResponse.put("status", "error");
+                        errorResponse.put("message", "Error updating payment statuses: " + e.getMessage());
+                        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
+                }
         }
 }

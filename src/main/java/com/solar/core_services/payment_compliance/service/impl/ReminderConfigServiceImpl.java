@@ -25,10 +25,16 @@ public class ReminderConfigServiceImpl implements ReminderConfigService {
     @Override
     @Transactional
     public ReminderConfigDTO updateConfig(ReminderConfigDTO configDTO, String username) {
-        // Validate configuration
-        if (configDTO.getFirstReminderDays() >= configDTO.getSecondReminderDays() ||
-                configDTO.getSecondReminderDays() >= configDTO.getFinalReminderDays()) {
-            throw new IllegalArgumentException("Reminder days must be in ascending order: first < second < final");
+        // Validate configuration to reflect pre‑due schedule semantics:
+        // first > second > final and all values > 0
+        if (configDTO.getFirstReminderDays() == null || configDTO.getSecondReminderDays() == null || configDTO.getFinalReminderDays() == null
+                || configDTO.getFirstReminderDays() <= 0 || configDTO.getSecondReminderDays() <= 0 || configDTO.getFinalReminderDays() <= 0) {
+            throw new IllegalArgumentException("Reminder days must be positive integers");
+        }
+
+        if (configDTO.getFirstReminderDays() <= configDTO.getSecondReminderDays() ||
+                configDTO.getSecondReminderDays() <= configDTO.getFinalReminderDays()) {
+            throw new IllegalArgumentException("Reminder days must be in descending order: first > second > final");
         }
 
         // Always update the latest config, regardless of whether ID is provided

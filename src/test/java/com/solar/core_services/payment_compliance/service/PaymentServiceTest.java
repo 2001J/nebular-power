@@ -12,6 +12,7 @@ import com.solar.core_services.payment_compliance.repository.PaymentRepository;
 import com.solar.core_services.payment_compliance.repository.PaymentPlanRepository;
 import com.solar.user_management.repository.UserRepository;
 import com.solar.core_services.payment_compliance.service.impl.PaymentServiceImpl;
+import com.solar.core_services.payment_compliance.service.ReminderConfigService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -25,7 +26,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 
 import java.math.BigDecimal;
-import java.time.LocalDate;
+import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.Collections;
@@ -36,8 +37,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -48,8 +51,10 @@ import com.solar.core_services.energy_monitoring.model.SolarInstallation.Install
 
 /**
  * Test class for PaymentService
- * Source file: src/main/java/com/solar/core_services/payment_compliance/service/PaymentService.java
- * Implementation: src/main/java/com/solar/core_services/payment_compliance/service/impl/PaymentServiceImpl.java
+ * Source file:
+ * src/main/java/com/solar/core_services/payment_compliance/service/PaymentService.java
+ * Implementation:
+ * src/main/java/com/solar/core_services/payment_compliance/service/impl/PaymentServiceImpl.java
  */
 @ExtendWith(MockitoExtension.class)
 public class PaymentServiceTest {
@@ -59,10 +64,10 @@ public class PaymentServiceTest {
 
     @Mock
     private SolarInstallationRepository installationRepository;
-    
+
     @Mock
     private PaymentPlanRepository paymentPlanRepository;
-    
+
     @Mock
     private UserRepository userRepository;
 
@@ -77,6 +82,9 @@ public class PaymentServiceTest {
 
     @Mock
     private GracePeriodConfigService gracePeriodConfigService;
+
+    @Mock
+    private ReminderConfigService reminderConfigService;
 
     @InjectMocks
     private PaymentServiceImpl paymentService;
@@ -95,14 +103,14 @@ public class PaymentServiceTest {
         testUser.setId(1L);
         testUser.setEmail("test@example.com");
         testUser.setFullName("Test User");
-        
+
         // Create test installation
         testInstallation = new SolarInstallation();
         testInstallation.setId(1L);
         testInstallation.setCapacity(5.0);
         testInstallation.setStatus(InstallationStatus.ACTIVE);
         testInstallation.setUser(testUser);
-        
+
         // Create test payment plan
         testPaymentPlan = PaymentPlan.builder()
                 .id(1L)
@@ -117,10 +125,10 @@ public class PaymentServiceTest {
                 .endDate(LocalDateTime.now().plusMonths(22))
                 .status(PaymentPlan.PaymentPlanStatus.ACTIVE)
                 .build();
-        
+
         // Create test payments
         LocalDateTime now = LocalDateTime.now();
-        
+
         testPayment1 = Payment.builder()
                 .id(1L)
                 .installation(testInstallation)
@@ -135,7 +143,7 @@ public class PaymentServiceTest {
                 .transactionId("TX123456")
                 .paymentMethod("CREDIT_CARD")
                 .build();
-        
+
         testPayment2 = Payment.builder()
                 .id(2L)
                 .installation(testInstallation)
@@ -147,7 +155,7 @@ public class PaymentServiceTest {
                 .statusUpdatedAt(now.minusDays(1))
                 .daysOverdue(0)
                 .build();
-        
+
         testPayment3 = Payment.builder()
                 .id(3L)
                 .installation(testInstallation)
@@ -162,22 +170,59 @@ public class PaymentServiceTest {
     }
 
     @Test
+    @DisplayName("identifyUpcomingPayments should not send pre-due reminders (dispatch job handles sends)")
+    void identifyUpcomingPaymentsDoesNotSendPreDue() {
+        // Given: payments within upcoming window
+        LocalDateTime now = LocalDateTime.now();
+        Payment scheduled = Payment.builder()
+                .id(100L)
+                .installation(testInstallation)
+                .paymentPlan(testPaymentPlan)
+                .amount(new BigDecimal("100.00"))
+                .dueDate(now.plusDays(5))
+                .status(Payment.PaymentStatus.SCHEDULED)
+                .build();
+        when(paymentRepository.findByDueDateBetweenAndStatus(any(LocalDateTime.class), any(LocalDateTime.class),
+                eq(Payment.PaymentStatus.SCHEDULED)))
+                .thenReturn(Collections.singletonList(scheduled));
+
+        // And: due today path
+        when(paymentRepository.findDueTodayPayments(any(LocalDateTime.class), any(LocalDateTime.class),
+                eq(Payment.PaymentStatus.UPCOMING)))
+                .thenReturn(Collections.emptyList());
+
+        when(reminderConfigService.getFirstReminderDays()).thenReturn(7);
+        when(reminderConfigService.getSecondReminderDays()).thenReturn(3);
+        when(reminderConfigService.getFinalReminderDays()).thenReturn(1);
+
+        // When
+        paymentService.identifyUpcomingPayments(now.plusDays(7));
+
+        // Then: no reminder sends here
+        verify(reminderService, never()).sendPaymentReminder(any(Payment.class), any());
+        // But status update attempted
+        verify(paymentRepository, atLeastOnce()).save(any(Payment.class));
+    }
+
+    @Test
     @DisplayName("Should get customer dashboard")
     void shouldGetCustomerDashboard() {
         // Given
-        when(installationRepository.findByUserId(testUser.getId())).thenReturn(Collections.singletonList(testInstallation));
+        when(installationRepository.findByUserId(testUser.getId()))
+                .thenReturn(Collections.singletonList(testInstallation));
         when(paymentRepository.findByInstallation(eq(testInstallation), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(Arrays.asList(testPayment1, testPayment2)));
-        when(paymentRepository.findUpcomingPaymentsByInstallation(eq(testInstallation), any(LocalDateTime.class), eq(Payment.PaymentStatus.SCHEDULED)))
+        when(paymentRepository.findUpcomingPaymentsByInstallation(eq(testInstallation), any(LocalDateTime.class),
+                eq(Payment.PaymentStatus.SCHEDULED)))
                 .thenReturn(Collections.emptyList());
-        when(paymentRepository.countOverduePaymentsByInstallation(eq(testInstallation), any(List.class)))
+        when(paymentRepository.countOverduePaymentsByInstallation(eq(testInstallation), anyList()))
                 .thenReturn(0L);
         when(paymentPlanRepository.findActivePaymentPlan(eq(testInstallation), any(LocalDateTime.class)))
                 .thenReturn(Optional.of(testPaymentPlan));
-        
+
         // When
         PaymentDashboardDTO dashboard = paymentService.getCustomerDashboard(testUser.getId());
-        
+
         // Then
         assertNotNull(dashboard);
         assertEquals(2, dashboard.getRecentPayments().size());
@@ -185,8 +230,9 @@ public class PaymentServiceTest {
         assertFalse(dashboard.isHasOverduePayments());
         verify(installationRepository, times(1)).findByUserId(testUser.getId());
         verify(paymentRepository, times(1)).findByInstallation(eq(testInstallation), any(Pageable.class));
-        verify(paymentRepository, times(1)).findUpcomingPaymentsByInstallation(eq(testInstallation), any(LocalDateTime.class), eq(Payment.PaymentStatus.SCHEDULED));
-        verify(paymentRepository, times(1)).countOverduePaymentsByInstallation(eq(testInstallation), any(List.class));
+        verify(paymentRepository, times(1)).findUpcomingPaymentsByInstallation(eq(testInstallation),
+                any(LocalDateTime.class), eq(Payment.PaymentStatus.SCHEDULED));
+        verify(paymentRepository, times(1)).countOverduePaymentsByInstallation(eq(testInstallation), anyList());
         verify(paymentPlanRepository, times(1)).findActivePaymentPlan(eq(testInstallation), any(LocalDateTime.class));
     }
 
@@ -196,15 +242,15 @@ public class PaymentServiceTest {
         // Given
         Long userId = 1L;
         Pageable pageable = PageRequest.of(0, 10);
-        
+
         when(installationRepository.findByUserId(userId)).thenReturn(Collections.singletonList(testInstallation));
         List<Payment> payments = Arrays.asList(testPayment1, testPayment2);
         Page<Payment> pagedPayments = new PageImpl<>(payments, pageable, payments.size());
         when(paymentRepository.findByInstallation(eq(testInstallation), any(Pageable.class))).thenReturn(pagedPayments);
-        
+
         // When
         List<PaymentDTO> result = paymentService.getPaymentHistory(userId, pageable);
-        
+
         // Then
         assertNotNull(result);
         assertEquals(2, result.size());
@@ -218,19 +264,21 @@ public class PaymentServiceTest {
         // Given
         when(installationRepository.findByUserId(testUser.getId()))
                 .thenReturn(Collections.singletonList(testInstallation));
-        
+
         // Updated to use findUpcomingPaymentsByInstallation
-        when(paymentRepository.findUpcomingPaymentsByInstallation(eq(testInstallation), any(LocalDateTime.class), eq(Payment.PaymentStatus.SCHEDULED)))
+        when(paymentRepository.findUpcomingPaymentsByInstallation(eq(testInstallation), any(LocalDateTime.class),
+                eq(Payment.PaymentStatus.SCHEDULED)))
                 .thenReturn(Collections.emptyList());
-        
+
         // When
         List<PaymentDTO> upcomingPayments = paymentService.getUpcomingPayments(testUser.getId());
-        
+
         // Then
         assertNotNull(upcomingPayments);
         assertEquals(0, upcomingPayments.size());
         verify(installationRepository, times(1)).findByUserId(testUser.getId());
-        verify(paymentRepository, times(1)).findUpcomingPaymentsByInstallation(eq(testInstallation), any(LocalDateTime.class), eq(Payment.PaymentStatus.SCHEDULED));
+        verify(paymentRepository, times(1)).findUpcomingPaymentsByInstallation(eq(testInstallation),
+                any(LocalDateTime.class), eq(Payment.PaymentStatus.SCHEDULED));
     }
 
     @Test
@@ -243,38 +291,41 @@ public class PaymentServiceTest {
                 .paymentMethod("CREDIT_CARD")
                 .transactionId("TX789012")
                 .build();
-        
-        // recordManualPayment() fetches by paymentId argument; stub generically to avoid strict mismatch
+
+        // recordManualPayment() fetches by paymentId argument; stub generically to
+        // avoid strict mismatch
         lenient().when(paymentRepository.findById(anyLong())).thenReturn(Optional.of(testPayment2));
         lenient().when(userRepository.findById(testUser.getId())).thenReturn(Optional.of(testUser));
         when(paymentRepository.save(any(Payment.class))).thenReturn(testPayment2);
-        
+
         // Set up the payment plan and installation for the test payment
         testPayment2.setPaymentPlan(testPaymentPlan);
         testPayment2.setInstallation(testInstallation);
         testInstallation.setStatus(SolarInstallation.InstallationStatus.SUSPENDED);
-        
+
         // Mock the payment plan service
         doNothing().when(paymentPlanService).updateRemainingAmount(anyLong(), any(BigDecimal.class));
-        
-        // Mock the findByPaymentPlanAndStatus call to return an empty list, so it will create a new payment
+
+        // Mock the findByPaymentPlanAndStatus call to return an empty list, so it will
+        // create a new payment
         when(paymentRepository.findByPaymentPlanAndStatus(any(PaymentPlan.class), eq(Payment.PaymentStatus.SCHEDULED)))
-            .thenReturn(Collections.emptyList());
-        
+                .thenReturn(Collections.emptyList());
+
         // Mock the findByPaymentPlanAndDueDate to return empty list
         when(paymentRepository.findByPaymentPlanAndDueDate(any(PaymentPlan.class), any(LocalDateTime.class)))
-            .thenReturn(Collections.emptyList());
-        
+                .thenReturn(Collections.emptyList());
+
         // When
         PaymentDTO result = paymentService.makePayment(testUser.getId(), request);
-        
+
         // Then
         assertNotNull(result);
         assertEquals(testPayment2.getId(), result.getId());
         verify(paymentRepository, times(1)).findById(testPayment2.getId());
         // Now expect 2 saves: one for updating status, one for the new payment
         verify(paymentRepository, times(2)).save(any(Payment.class));
-        // With our fix, expect only 1 publishPaymentReceived call (for suspended installations)
+        // With our fix, expect only 1 publishPaymentReceived call (for suspended
+        // installations)
         verify(paymentEventPublisher, times(1)).publishPaymentReceived(any(Payment.class));
     }
 
@@ -312,7 +363,7 @@ public class PaymentServiceTest {
         // Then: late fee = 5% of 416.67 + 10 = 20.8335 + 10 ≈ 30.83 (HALF_UP)
         assertNotNull(dto);
         assertNotNull(dto.getLateFee());
-        assertEquals(new BigDecimal("30.83"), dto.getLateFee().setScale(2, BigDecimal.ROUND_HALF_UP));
+        assertEquals(new BigDecimal("30.83"), dto.getLateFee().setScale(2, RoundingMode.HALF_UP));
     }
 
     @Test
@@ -325,31 +376,32 @@ public class PaymentServiceTest {
                 .paymentMethod("CREDIT_CARD")
                 .transactionId("TX789012")
                 .build();
-        
+
         when(paymentRepository.findById(testPayment2.getId())).thenReturn(Optional.of(testPayment2));
         when(paymentRepository.save(any(Payment.class))).thenReturn(testPayment2);
         when(userRepository.findById(testUser.getId())).thenReturn(Optional.of(testUser));
-        
+
         // Set up the payment plan and installation for the test payment
         testPayment2.setPaymentPlan(testPaymentPlan);
         testPayment2.setInstallation(testInstallation);
         // Set to ACTIVE status to test the fix
         testInstallation.setStatus(SolarInstallation.InstallationStatus.ACTIVE);
-        
+
         // Mock the payment plan service
         doNothing().when(paymentPlanService).updateRemainingAmount(anyLong(), any(BigDecimal.class));
-        
-        // Mock the findByPaymentPlanAndStatus call to return an empty list, so it will create a new payment
+
+        // Mock the findByPaymentPlanAndStatus call to return an empty list, so it will
+        // create a new payment
         when(paymentRepository.findByPaymentPlanAndStatus(any(PaymentPlan.class), eq(Payment.PaymentStatus.SCHEDULED)))
-            .thenReturn(Collections.emptyList());
-        
+                .thenReturn(Collections.emptyList());
+
         // Mock the findByPaymentPlanAndDueDate to return empty list
         when(paymentRepository.findByPaymentPlanAndDueDate(any(PaymentPlan.class), any(LocalDateTime.class)))
-            .thenReturn(Collections.emptyList());
-        
+                .thenReturn(Collections.emptyList());
+
         // When
         PaymentDTO result = paymentService.makePayment(testUser.getId(), request);
-        
+
         // Then
         assertNotNull(result);
         assertEquals(testPayment2.getId(), result.getId());
@@ -366,19 +418,18 @@ public class PaymentServiceTest {
         // Given
         Pageable pageable = PageRequest.of(0, 10);
         List<Payment> overduePayments = Collections.singletonList(testPayment3);
-        
+
         // The actual implementation uses findByStatusIn
         List<Payment.PaymentStatus> overdueStatuses = Arrays.asList(
                 Payment.PaymentStatus.OVERDUE,
                 Payment.PaymentStatus.GRACE_PERIOD,
-                Payment.PaymentStatus.SUSPENSION_PENDING
-        );
+                Payment.PaymentStatus.SUSPENSION_PENDING);
         when(paymentRepository.findByStatusIn(eq(overdueStatuses), eq(pageable)))
                 .thenReturn(new PageImpl<>(overduePayments, pageable, overduePayments.size()));
-        
+
         // When
         Page<PaymentDTO> result = paymentService.getOverduePayments(pageable);
-        
+
         // Then
         assertNotNull(result);
         assertEquals(1, result.getTotalElements());
@@ -396,36 +447,38 @@ public class PaymentServiceTest {
                 .paymentMethod("CASH")
                 .transactionId("MANUAL123")
                 .build();
-        
+
         when(paymentRepository.findById(testPayment2.getId())).thenReturn(Optional.of(testPayment2));
         when(paymentRepository.save(any(Payment.class))).thenReturn(testPayment2);
-        
+
         // Set up the payment plan and installation for the test payment
         testPayment2.setPaymentPlan(testPaymentPlan);
         testPayment2.setInstallation(testInstallation);
         testInstallation.setStatus(SolarInstallation.InstallationStatus.SUSPENDED);
-        
+
         // Mock the payment plan service
         doNothing().when(paymentPlanService).updateRemainingAmount(anyLong(), any(BigDecimal.class));
-        
-        // Mock the findByPaymentPlanAndStatus call to return an empty list, so it will create a new payment
+
+        // Mock the findByPaymentPlanAndStatus call to return an empty list, so it will
+        // create a new payment
         when(paymentRepository.findByPaymentPlanAndStatus(any(PaymentPlan.class), eq(Payment.PaymentStatus.SCHEDULED)))
-            .thenReturn(Collections.emptyList());
-        
+                .thenReturn(Collections.emptyList());
+
         // Mock the findByPaymentPlanAndDueDate to return empty list
         when(paymentRepository.findByPaymentPlanAndDueDate(any(PaymentPlan.class), any(LocalDateTime.class)))
-            .thenReturn(Collections.emptyList());
-        
+                .thenReturn(Collections.emptyList());
+
         // When
         PaymentDTO result = paymentService.recordManualPayment(testPayment2.getId(), request);
-        
+
         // Then
         assertNotNull(result);
         assertEquals(testPayment2.getId(), result.getId());
         verify(paymentRepository, times(1)).findById(testPayment2.getId());
         // Now expect 2 saves: one for updating status, one for the new payment
         verify(paymentRepository, times(2)).save(any(Payment.class));
-        // With our fix, expect only 1 publishPaymentReceived call for suspended installations
+        // With our fix, expect only 1 publishPaymentReceived call for suspended
+        // installations
         verify(paymentEventPublisher, times(1)).publishPaymentReceived(any(Payment.class));
     }
 
@@ -434,10 +487,10 @@ public class PaymentServiceTest {
     void shouldUpdatePaymentStatus() {
         // Given
         when(paymentRepository.save(any(Payment.class))).thenReturn(testPayment1);
-        
+
         // When
         paymentService.updatePaymentStatus(testPayment1, Payment.PaymentStatus.PAID, "Payment received");
-        
+
         // Then
         assertEquals(Payment.PaymentStatus.PAID, testPayment1.getStatus());
         assertEquals("Payment received", testPayment1.getStatusReason());
@@ -450,10 +503,10 @@ public class PaymentServiceTest {
     void shouldGetPaymentById() {
         // Given
         when(paymentRepository.findById(testPayment1.getId())).thenReturn(Optional.of(testPayment1));
-        
+
         // When
         Payment result = paymentService.getPaymentById(testPayment1.getId());
-        
+
         // Then
         assertNotNull(result);
         assertEquals(testPayment1.getId(), result.getId());
@@ -465,12 +518,12 @@ public class PaymentServiceTest {
     void shouldThrowExceptionWhenPaymentNotFound() {
         // Given
         when(paymentRepository.findById(anyLong())).thenReturn(Optional.empty());
-        
+
         // When/Then
         assertThrows(RuntimeException.class, () -> {
             paymentService.getPaymentById(999L);
         });
-        
+
         verify(paymentRepository, times(1)).findById(999L);
     }
 
@@ -482,13 +535,13 @@ public class PaymentServiceTest {
         when(gracePeriodConfigService.getGracePeriodDays()).thenReturn(14);
         when(paymentRepository.findByStatus(Payment.PaymentStatus.GRACE_PERIOD))
                 .thenReturn(Collections.singletonList(testPayment3));
-        
+
         // Set up the test payment
         testPayment3.setDaysOverdue(15); // More than grace period
-        
+
         // When
         paymentService.flagAccountsForSuspension();
-        
+
         // Then
         verify(paymentRepository, times(1)).findByStatus(Payment.PaymentStatus.GRACE_PERIOD);
         verify(paymentRepository, times(1)).save(testPayment3);
@@ -500,13 +553,13 @@ public class PaymentServiceTest {
     void shouldNotFlagAccountsWhenAutoSuspendDisabled() {
         // Given
         when(gracePeriodConfigService.isAutoSuspendEnabled()).thenReturn(false);
-        
+
         // When
         paymentService.flagAccountsForSuspension();
-        
+
         // Then
         verify(gracePeriodConfigService, times(1)).isAutoSuspendEnabled();
         verify(paymentRepository, times(0)).findByStatus(any(Payment.PaymentStatus.class));
         verify(paymentEventPublisher, times(0)).publishGracePeriodExpired(any(Payment.class));
     }
-} 
+}
