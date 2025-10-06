@@ -679,9 +679,9 @@ export default function AdminPaymentsPage() {
 
   // Fix Badge variants in UI
   const CardWithBadges = () => (
-    <CardContent className="pt-4">
-      <dl className="space-y-3">
-        <div className="flex justify-between items-center">
+    <CardContent className="pt-5 space-y-5">
+      <dl className="space-y-4">
+        <div className="flex justify-between items-center gap-3">
           <dt className="text-sm font-medium">Grace Period</dt>
           <dd className="text-sm">
             <Badge variant={gracePeriodConfig.numberOfDays > 0 ? "default" : "destructive"} className={gracePeriodConfig.numberOfDays > 0 ? "bg-green-100 text-green-800 border-green-300" : ""}>
@@ -689,7 +689,7 @@ export default function AdminPaymentsPage() {
             </Badge>
           </dd>
         </div>
-        <div className="flex justify-between items-center">
+        <div className="flex justify-between items-center gap-3">
           <dt className="text-sm font-medium">Auto-Suspension</dt>
           <dd className="text-sm">
             {gracePeriodConfig.autoSuspendEnabled ? (
@@ -699,11 +699,11 @@ export default function AdminPaymentsPage() {
             )}
           </dd>
         </div>
-        <div className="flex justify-between items-center">
+        <div className="flex justify-between items-center gap-3">
           <dt className="text-sm font-medium">Reminder Frequency</dt>
           <dd className="text-sm">Every {gracePeriodConfig.reminderFrequency} day(s)</dd>
         </div>
-        <div className="flex justify-between items-center">
+        <div className="flex justify-between items-center gap-3">
           <dt className="text-sm font-medium">Late Fee Status</dt>
           <dd className="text-sm">
             {gracePeriodConfig.lateFeesEnabled ? (
@@ -723,11 +723,11 @@ export default function AdminPaymentsPage() {
             const exampleAmount = (100 * (hasPercentage ? gracePeriodConfig.lateFeePercentage / 100 : 0) + (hasFixed ? gracePeriodConfig.lateFeeFixedAmount : 0)).toFixed(2);
             return (
               <>
-                <div className="flex justify-between items-center">
+                <div className="flex justify-between items-center gap-3">
                   <dt className="text-sm font-medium">Late Fee Amount</dt>
                   <dd className="text-sm">{parts.join(' + ')}</dd>
                 </div>
-                <div className="mt-2 text-xs text-muted-foreground p-2 bg-muted/50 rounded">
+                <div className="mt-2 text-xs text-muted-foreground p-3 bg-muted/50 rounded">
                   Example: For a $100 installment, late fee would be ${exampleAmount}
                 </div>
               </>
@@ -735,7 +735,7 @@ export default function AdminPaymentsPage() {
           })()
         )}
       </dl>
-      <div className="mt-3 text-xs text-muted-foreground">
+      <div className="text-xs text-muted-foreground leading-relaxed">
         Note: These settings apply globally to all customers and payment plans. Percent fees are calculated as a percentage of each plan's installment amount.
       </div>
     </CardContent>
@@ -999,7 +999,7 @@ export default function AdminPaymentsPage() {
                         Automated payment reminder timelines
                       </CardDescription>
                     </CardHeader>
-                    <CardContent className="pt-4 space-y-4">
+                    <CardContent className="pt-5 space-y-5">
                       {/* Robust timeline visualization */}
                       <div className="space-y-2">
                         <div className="relative w-full h-6 rounded-full overflow-hidden">
@@ -1026,8 +1026,8 @@ export default function AdminPaymentsPage() {
                         </div>
                       </div>
 
-                      <dl className="space-y-3">
-                        <div className="flex justify-between items-center">
+                      <dl className="space-y-4">
+                        <div className="flex justify-between items-center gap-3">
                           <dt className="text-sm font-medium">Auto-Send Status</dt>
                           <dd className="text-sm">
                             <Badge
@@ -1042,19 +1042,19 @@ export default function AdminPaymentsPage() {
                             </Badge>
                           </dd>
                         </div>
-                        <div className="flex justify-between items-center">
+                        <div className="flex justify-between items-center gap-3">
                           <dt className="text-sm font-medium">First Reminder</dt>
                           <dd className="text-sm">{reminderConfig.firstReminderDays} days before due date</dd>
                         </div>
-                        <div className="flex justify-between items-center">
+                        <div className="flex justify-between items-center gap-3">
                           <dt className="text-sm font-medium">Second Reminder</dt>
                           <dd className="text-sm">{reminderConfig.secondReminderDays} days before due date</dd>
                         </div>
-                        <div className="flex justify-between items-center">
+                        <div className="flex justify-between items-center gap-3">
                           <dt className="text-sm font-medium">Final Reminder</dt>
                           <dd className="text-sm">{reminderConfig.finalReminderDays} days before due date</dd>
                         </div>
-                        <div className="flex justify-between items-center">
+                        <div className="flex justify-between items-center gap-3">
                           <dt className="text-sm font-medium">Delivery Method</dt>
                           <dd className="text-sm">
                             <Badge variant="outline">
@@ -1067,7 +1067,7 @@ export default function AdminPaymentsPage() {
                       </dl>
 
                       <div className="rounded-md border bg-muted/30 p-3">
-                        <p className="text-xs text-muted-foreground">
+                        <p className="text-xs text-muted-foreground leading-relaxed">
                           {reminderConfig.autoSendReminders
                             ? "Auto-send reminders follow this schedule exactly. Update the settings if you need to pause automated messaging."
                             : "Auto-send reminders are off. No customers will receive automated messages until you enable the feature or send reminders manually."}
