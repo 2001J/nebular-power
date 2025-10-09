@@ -133,7 +133,12 @@ export const paymentApi = {
   },
 
   async getCustomerPaymentPlan(userId: string): Promise<any> {
-    return makeApiRequest(() => apiClient.get(`/api/payments/customers/${userId}/plan`));
+    try {
+      return await makeApiRequest(() => apiClient.get(`/api/payments/customers/${userId}/plan`));
+    } catch (e: any) {
+      if (e?.response?.status === 404) return [];
+      throw e;
+    }
   },
 };
 
