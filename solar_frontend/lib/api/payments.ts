@@ -49,7 +49,35 @@ export const paymentApi = {
   },
 
   async getPaymentDashboard(): Promise<any> {
-    return makeApiRequest(() => apiClient.get('/api/payments/dashboard'));
+    try {
+      return await makeApiRequest(() => apiClient.get('/api/payments/dashboard'));
+    } catch (e: any) {
+      // If no installations or plan yet, backend may return 404; normalize to empty dashboard
+      const status = e?.response?.status;
+      if (status === 404) {
+        return {
+          installationId: null,
+          totalAmount: 0,
+          remainingAmount: 0,
+          nextPaymentAmount: 0,
+          nextPaymentDueDate: null,
+          totalInstallments: 0,
+          remainingInstallments: 0,
+          completedInstallments: 0,
+          hasOverduePayments: false,
+          recentPayments: [],
+          upcomingPayments: [],
+          activePlan: null,
+          paymentPlanId: null,
+          startDate: null,
+          endDate: null,
+          frequency: 'MONTHLY',
+          installmentAmount: 0,
+          status: 'ACTIVE',
+        };
+      }
+      throw e;
+    }
   },
 
   // Admin summary used by admin dashboard

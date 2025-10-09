@@ -11,6 +11,23 @@ export const energyApi = {
     }
   },
 
+  async getSystemSeries(
+    startDateISO: string,
+    endDateISO: string,
+    bucket: 'minute' | 'hour' | 'day' | 'month' = 'hour'
+  ): Promise<any[]> {
+    try {
+      return await makeApiRequest(() =>
+        apiClient.get<any[]>('/monitoring/readings/system-series', {
+          params: { startDate: startDateISO, endDate: endDateISO, bucket },
+        })
+      );
+    } catch {
+      // Graceful fallback
+      return [];
+    }
+  },
+
   async getInstallationDashboard(installationId: string): Promise<any> {
     return makeApiRequest(() => apiClient.get<any>(`/monitoring/dashboard/installation/${installationId}`));
   },
@@ -19,6 +36,24 @@ export const energyApi = {
     return makeApiRequest(() =>
       apiClient.get<any[]>(`/monitoring/readings/recent/${installationId}`, { params: { limit } })
     );
+  },
+
+  async getAggregatedSeries(
+    installationId: string,
+    startDateISO: string,
+    endDateISO: string,
+    bucket: 'minute' | 'hour' | 'day' | 'month' = 'hour'
+  ): Promise<any[]> {
+    try {
+      return await makeApiRequest(() =>
+        apiClient.get<any[]>(`/monitoring/readings/series/${installationId}`, {
+          params: { startDate: startDateISO, endDate: endDateISO, bucket },
+        })
+      );
+    } catch {
+      // Graceful fallback
+      return [];
+    }
   },
 
   async getSummariesByPeriodAndDateRange(
@@ -69,4 +104,3 @@ export const energyApi = {
 };
 
 export default energyApi;
-
