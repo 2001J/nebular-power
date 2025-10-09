@@ -29,13 +29,23 @@ export const energyApi = {
   },
 
   async getInstallationDashboard(installationId: string): Promise<any> {
-    return makeApiRequest(() => apiClient.get<any>(`/monitoring/dashboard/installation/${installationId}`));
+    if (!installationId) return null as any;
+    try {
+      return await makeApiRequest(() => apiClient.get<any>(`/monitoring/dashboard/installation/${installationId}`));
+    } catch (_e) {
+      return null as any;
+    }
   },
 
   async getRecentReadings(installationId: string, limit = 10): Promise<any[]> {
-    return makeApiRequest(() =>
-      apiClient.get<any[]>(`/monitoring/readings/recent/${installationId}`, { params: { limit } })
-    );
+    if (!installationId) return [];
+    try {
+      return await makeApiRequest(() =>
+        apiClient.get<any[]>(`/monitoring/readings/recent/${installationId}`, { params: { limit } })
+      );
+    } catch {
+      return [];
+    }
   },
 
   async getAggregatedSeries(
@@ -62,11 +72,43 @@ export const energyApi = {
     startDate: string,
     endDate: string
   ): Promise<any[]> {
-    return makeApiRequest(() =>
-      apiClient.get<any[]>(`/monitoring/summaries/${installationId}/${period}`, {
-        params: { startDate, endDate },
-      })
-    );
+    // Backend expects LocalDate (yyyy-MM-dd) for summaries
+    const toDateOnly = (v: string) => {
+      if (!v) return '';
+      // Accept ISO or yyyy-MM-dd, return yyyy-MM-dd
+      const d = v.includes('T') ? v.split('T')[0] : v;
+      return d;
+    };
+    const start = toDateOnly(startDate);
+    const end = toDateOnly(endDate);
+
+    // Map UI period keys to backend
+    const periodMap: Record<string, string> = {
+      day: 'daily',
+      week: 'weekly',
+      month: 'monthly',
+      year: 'monthly',
+      daily: 'daily',
+      weekly: 'weekly',
+      monthly: 'monthly',
+    };
+    const mapped = periodMap[period] || 'daily';
+
+    try {
+      return await makeApiRequest(() =>
+        apiClient.get<any[]>(`/monitoring/summaries/${installationId}/${mapped}`, {
+          params: { startDate: start, endDate: end },
+        })
+      );
+    } catch (_e) {
+      // Fallback to aggregated series
+      try {
+        const bucket = period === 'day' ? 'hour' : period === 'week' || period === 'month' ? 'day' : 'month';
+        return await energyApi.getAggregatedSeries(installationId, startDate, endDate, bucket as any);
+      } catch {
+        return [];
+      }
+    }
   },
 
   async calculateInstallationAverageEfficiency(installationId: string): Promise<number> {
