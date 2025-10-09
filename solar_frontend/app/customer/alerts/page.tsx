@@ -13,7 +13,8 @@ import { Switch } from "@/components/ui/switch"
 import { Badge } from "@/components/ui/badge"
 import { useToast } from "@/components/ui/use-toast"
 import { useAuth } from "@/components/auth-provider"
-import { installationApi, securityApi } from "@/lib/api"
+import { installationApi } from "@/lib/api/installations"
+import { securityApi } from "@/lib/api/security"
 
 interface Alert {
   id: string;

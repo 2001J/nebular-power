@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { createContext, useContext, useEffect, useState } from "react"
+import { createContext, useContext, useEffect, useMemo, useState } from "react"
 import { useRouter, usePathname } from "next/navigation"
 import { authApi, userApi } from "@/lib/api"
 import { useToast } from "@/components/ui/use-toast"
@@ -24,7 +24,7 @@ type AuthContextType = {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
+export function AuthProvider({ children }: Readonly<{ children: React.ReactNode }>) {
   const [user, setUser] = useState<User | null>(null)
   const [token, setToken] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -51,7 +51,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         try {
           console.log("Fetching current user profile with token", storedToken.substring(0, 10) + "...");
 
-          // Add specific debug logging for this API call
+          // Add specific debug logging for this API call  
           const userData = await userApi.getCurrentUser();
           console.log("User profile successfully received:", JSON.stringify(userData));
 
@@ -104,14 +104,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Protect routes based on authentication and roles
   useEffect(() => {
-    if (isLoading) return
+  if (isLoading) return
 
     // Public routes accessible to all
-    const publicRoutes = ["/", "/login", "/register", "/forgot-password", "/reset-password", "/verify-email", "/change-password"]
-    if (publicRoutes.includes(pathname)) return
+  const publicRoutes = ["/", "/login", "/register", "/forgot-password", "/reset-password", "/verify-email", "/change-password"]
+  const currentPath = pathname ?? ""
+  if (publicRoutes.includes(currentPath)) return
 
     // If not authenticated and trying to access protected route
-    if (!user && !publicRoutes.includes(pathname)) {
+  if (!user && !publicRoutes.includes(currentPath)) {
       console.log("User not authenticated, redirecting to login")
       // Prevent redirect loops by checking the URL parameters
       const currentUrl = window.location.href;
@@ -123,9 +124,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     // Role-based route protection
-    if (user) {
+  if (user) {
       try {
-        if (pathname.startsWith("/admin") && user.role !== "ADMIN") {
+  if (currentPath.startsWith("/admin") && user.role !== "ADMIN") {
           console.log("Access denied: User is not an admin, redirecting to customer dashboard")
           toast({
             title: "Access Denied",
@@ -133,7 +134,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             variant: "destructive",
           })
           router.push("/customer")
-        } else if (pathname.startsWith("/dashboard") && user.role === "ADMIN") {
+  } else if (currentPath.startsWith("/dashboard") && user.role === "ADMIN") {
           console.log("Admin user, redirecting to admin dashboard")
           router.push("/admin")
         }
@@ -158,7 +159,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       console.log("Attempting login with email:", email)
       // Call the login API
-      const response = await authApi.login(email, password)
+  const response = await authApi.login({ email, password })
 
       // Only log non-sensitive information in production
       if (process.env.NODE_ENV === 'development') {
@@ -166,15 +167,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       // Extract the data from the response
-      const {
-        accessToken = '',  // Not 'token' but 'accessToken'
-        refreshToken = '', // Store refresh token if available
-        id = '',
-        email: userEmail = '',
-        fullName = '',
-        role = '',
-        passwordChangeRequired = false
-      } = response || {}
+      // authApi.login returns normalized LoginResponse { token, refreshToken, user, expiresIn }
+      const accessToken = response?.token ?? ''
+      const refreshToken = response?.refreshToken ?? ''
+      const userEmail = response?.user?.email ?? ''
+      const role = response?.user?.role ?? ''
+      const fullName = response?.user?.name ?? userEmail
+      const id = response?.user?.id ?? ''
+      // passwordChangeRequired is not part of normalized LoginResponse; fetch later via profile if needed
+      const passwordChangeRequired = false
 
       // Check if required fields exist
       if (!accessToken || !userEmail || !role) {
@@ -222,7 +223,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         router.push("/customer")
       }
 
-      return response
+  return
     } catch (error) {
       console.error("Login failed")
       throw error
@@ -244,7 +245,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     router.push("/login")
   }
 
-  return <AuthContext.Provider value={{ user, token, login, logout, isLoading }}>{children}</AuthContext.Provider>
+  const contextValue = useMemo(
+    () => ({ user, token, login, logout, isLoading }),
+    [user, token, isLoading]
+  )
+
+  return <AuthContext.Provider value={contextValue}>{children}</AuthContext.Provider>
 }
 
 export function useAuth() {

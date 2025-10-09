@@ -43,7 +43,7 @@ import {
   AreaChart,
   ComposedChart,
   Bar,
-} from "recharts"
+} from "@/components/ui/direct-recharts"
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -70,7 +70,9 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
-import { energyApi, installationApi, securityApi } from "@/lib/api"
+import { energyApi } from "@/lib/api/energy"
+import { installationApi } from "@/lib/api/installations"
+import { securityApi } from "@/lib/api/security"
 import { energyWebSocket } from "@/lib/energyWebSocket"
 
 interface Installation {
@@ -148,7 +150,7 @@ export default function InstallationDetailPage() {
   }, [])
 
   const [loading, setLoading] = useState(true)
-  const [timeRange, setTimeRange] = useState("week")
+  const [timeRange, setTimeRange] = useState("day")
   const [installation, setInstallation] = useState<Installation | null>(null)
   const [energyData, setEnergyData] = useState<ChartDataPoint[]>([])
   const [recentReadings, setRecentReadings] = useState<ReadingData[]>([])
@@ -264,15 +266,11 @@ export default function InstallationDetailPage() {
           // Fetch recent security events
           let recentEvents: SecurityEvent[] = []
           try {
-            const eventsResponse = await securityApi.getInstallationEvents(id) as SecurityEventResponse
+            const eventsResponse = await securityApi.getInstallationAlerts(id)
 
-            // Handle both array response and paged response
-            if (eventsResponse) {
-              if (Array.isArray(eventsResponse)) {
-                recentEvents = eventsResponse
-              } else if (eventsResponse.content && Array.isArray(eventsResponse.content)) {
-                recentEvents = eventsResponse.content
-              }
+            // The API already returns an array
+            if (Array.isArray(eventsResponse)) {
+              recentEvents = eventsResponse
             }
           } catch (eventsError) {
             console.error('Error fetching security events:', eventsError)
@@ -563,8 +561,12 @@ export default function InstallationDetailPage() {
         monthData[dayStr].count += 1
       })
 
+      // Show all days of the month, including days with zero readings
+      const now = new Date()
+      const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()
+      
       return Object.entries(monthData)
-        .filter(([_, data]) => data.count > 0)
+        .filter(([day, _]) => parseInt(day) <= daysInMonth)
         .map(([_, data]) => ({
           name: data.name,
           generation: data.generation,
@@ -1060,12 +1062,34 @@ export default function InstallationDetailPage() {
                         </linearGradient>
                       </defs>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                      <XAxis dataKey="name" />
+                      <XAxis 
+                        dataKey="name" 
+                        {...(timeRange === "month" ? {
+                          interval: 2,
+                          angle: -45,
+                          textAnchor: 'end',
+                          height: 60
+                        } : {})}
+                      />
                       <YAxis 
-                        tickFormatter={(value) => `${value.toFixed(1)}`}
+                        tickFormatter={(value) => {
+                          if (value === 0) return '0';
+                          if (value < 0.001) return value.toFixed(4);
+                          if (value < 1) return value.toFixed(3);
+                          if (value >= 1000) return `${(value / 1000).toFixed(1)}k`;
+                          return value.toFixed(1);
+                        }}
                         label={{ value: 'kW', angle: -90, position: 'insideLeft', offset: 0 }}
                       />
-                      <Tooltip formatter={(value: any) => [`${typeof value === 'number' ? value.toFixed(4) : value} kW`, "Generation"]} />
+                      <Tooltip formatter={(value: any) => {
+                        if (typeof value === 'number') {
+                          if (value === 0) return ['0 kW', 'Generation'];
+                          if (value < 0.01) return [`${value.toFixed(5)} kW`, 'Generation'];
+                          if (value < 1) return [`${value.toFixed(3)} kW`, 'Generation'];
+                          return [`${value.toFixed(2)} kW`, 'Generation'];
+                        }
+                        return [`${value} kW`, 'Generation'];
+                      }} />
                       <Area 
                         type="monotone" 
                         dataKey="generation" 
@@ -1117,13 +1141,35 @@ export default function InstallationDetailPage() {
                         </linearGradient>
                       </defs>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                      <XAxis dataKey="name" />
+                      <XAxis 
+                        dataKey="name" 
+                        {...(timeRange === "month" ? {
+                          interval: 2,
+                          angle: -45,
+                          textAnchor: 'end',
+                          height: 60
+                        } : {})}
+                      />
                       <YAxis 
-                        tickFormatter={(value) => `${value.toFixed(1)}`}
+                        tickFormatter={(value) => {
+                          if (value === 0) return '0';
+                          if (value < 0.001) return value.toFixed(4);
+                          if (value < 1) return value.toFixed(3);
+                          if (value >= 1000) return `${(value / 1000).toFixed(1)}k`;
+                          return value.toFixed(1);
+                        }}
                         label={{ value: 'kW', angle: -90, position: 'insideLeft', offset: 0 }}
                         domain={['auto', 'auto']}
                       />
-                      <Tooltip formatter={(value: any) => [`${typeof value === 'number' ? value.toFixed(4) : value} kW`, "Consumption"]} />
+                      <Tooltip formatter={(value: any) => {
+                        if (typeof value === 'number') {
+                          if (value === 0) return ['0 kW', 'Consumption'];
+                          if (value < 0.01) return [`${value.toFixed(5)} kW`, 'Consumption'];
+                          if (value < 1) return [`${value.toFixed(3)} kW`, 'Consumption'];
+                          return [`${value.toFixed(2)} kW`, 'Consumption'];
+                        }
+                        return [`${value} kW`, 'Consumption'];
+                      }} />
                       <Area 
                         type="monotone" 
                         dataKey="consumption" 
@@ -1166,25 +1212,59 @@ export default function InstallationDetailPage() {
             <Chart>
               <ChartContainer>
                 <ResponsiveContainer width="100%" height={300}>
-                  <ComposedChart data={energyData} margin={{ top: 10, right: 10, left: 10, bottom: 20 }}>
+                  <ComposedChart data={energyData} margin={{ top: 10, right: 70, left: 70, bottom: 20 }}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                    <XAxis dataKey="name" />
+                    <XAxis 
+                      dataKey="name" 
+                      {...(timeRange === "month" ? {
+                        interval: 2,
+                        angle: -45,
+                        textAnchor: 'end',
+                        height: 60
+                      } : {})}
+                    />
                     <YAxis 
                       yAxisId="left"
                       orientation="left"
-                      tickFormatter={(value) => `${value.toFixed(2)}`}
-                      label={{ value: 'Production (kW)', angle: -90, position: 'insideLeft', offset: 10 }}
+                      width={60}
+                      tickFormatter={(value) => {
+                        if (value === 0) return '0';
+                        if (value < 0.001) return value.toFixed(4);
+                        if (value < 1) return value.toFixed(3);
+                        if (value >= 1000) return `${(value / 1000).toFixed(1)}k`;
+                        return value.toFixed(2);
+                      }}
+                      label={{ value: 'Production (kW)', angle: -90, position: 'insideLeft', style: { textAnchor: 'middle' } }}
                     />
                     <YAxis 
                       yAxisId="right"
                       orientation="right"
-                      tickFormatter={(value) => `${value.toFixed(2)}`}
-                      label={{ value: 'Consumption (kW)', angle: 90, position: 'insideRight', offset: 10 }}
+                      width={60}
+                      tickFormatter={(value) => {
+                        if (value === 0) return '0';
+                        if (value < 0.001) return value.toFixed(4);
+                        if (value < 1) return value.toFixed(3);
+                        if (value >= 1000) return `${(value / 1000).toFixed(1)}k`;
+                        return value.toFixed(2);
+                      }}
+                      label={{ value: 'Consumption (kW)', angle: 90, position: 'insideRight', style: { textAnchor: 'middle' } }}
                     />
-                    <Tooltip formatter={(value: any, name: string) => {
-                      return [`${typeof value === 'number' ? value.toFixed(4) : value} kW`, name === 'generation' ? 'Production' : 'Consumption']
-                    }} />
-                    <Legend />
+                    <Tooltip 
+                      formatter={(value: any, name: string) => {
+                        const label = name === 'Production' ? 'Production' : 'Consumption';
+                        if (typeof value === 'number') {
+                          if (value === 0) return ['0 kW', label];
+                          if (value < 0.01) return [`${value.toFixed(5)} kW`, label];
+                          if (value < 1) return [`${value.toFixed(3)} kW`, label];
+                          return [`${value.toFixed(2)} kW`, label];
+                        }
+                        return [`${value} kW`, label];
+                      }} 
+                    />
+                    <Legend 
+                      wrapperStyle={{ paddingTop: '10px' }}
+                      iconType="rect"
+                    />
                     <Bar 
                       yAxisId="left"
                       dataKey="generation" 

@@ -25,10 +25,12 @@ import {
   Bar,
   BarChart,
   ReferenceLine,
-} from "recharts"
+} from "@/components/ui/direct-recharts"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Checkbox } from "@/components/ui/checkbox"
-import { energyApi, installationApi, securityApi } from "@/lib/api"
+import { energyApi } from "@/lib/api/energy"
+import { installationApi } from "@/lib/api/installations"
+import { securityApi } from "@/lib/api/security"
 import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Progress } from "@/components/ui/progress"
@@ -87,7 +89,7 @@ interface InstallationDashboard {
   }
 }
 
-  interface SystemStatus {
+interface SystemStatus {
   tamperDetected: boolean;
   lastTamperCheck: string;
   systemHealth: "GOOD" | "FAIR" | "POOR" | "UNKNOWN";
@@ -117,8 +119,6 @@ export default function DashboardPage() {
   const [installations, setInstallations] = useState<InstallationDetails[]>([])
   const [dashboardData, setDashboardData] = useState<InstallationDashboard | null>(null)
   const [energyReadings, setEnergyReadings] = useState<EnergyReading[]>([])
-  const [aggregatedSeries, setAggregatedSeries] = useState<any[]>([])
-  const [noDataMessage, setNoDataMessage] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [hasError, setHasError] = useState(false)
   const [systemStatus, setSystemStatus] = useState<SystemStatus | null>(null)
@@ -207,102 +207,147 @@ export default function DashboardPage() {
         const dashboardResponse = await energyApi.getInstallationDashboard(selectedInstallation)
 
         if (!dashboardResponse) {
-          setHasError(true)
+          // Do not bail; we can still render charts from readings or fallbacks
           toast({
             variant: "destructive",
-            title: "Data Unavailable",
-            description: "No dashboard data is available for this installation at the moment.",
+            title: "Limited Data",
+            description: "Dashboard metrics are unavailable. Showing recent readings if possible.",
           })
-          setIsLoading(false)
-          return
         }
 
         console.log("Installation dashboard data:", dashboardResponse)
         setDashboardData(dashboardResponse)
 
-        // Prefer aggregated series for accurate charts
-        let energyData: any[] = []
-        try {
-          const { start, end, bucket } = getRangeAndBucket(selectedPeriod)
-          const series = await energyApi.getAggregatedSeries(selectedInstallation, start.toISOString(), end.toISOString(), bucket)
-          if (Array.isArray(series) && series.length > 0) {
-            setAggregatedSeries(series)
-            setNoDataMessage(null)
-            energyData = series.map((pt: any) => ({
-              timestamp: pt.bucketStart,
-              powerGenerationWatts: (pt.generationKWh || 0) * 1000,
-              powerConsumptionWatts: (pt.consumptionKWh || 0) * 1000,
-            }))
-          } else if (dashboardResponse.recentReadings && dashboardResponse.recentReadings.length > 0) {
-            setAggregatedSeries([])
-            setNoDataMessage(null)
-            energyData = dashboardResponse.recentReadings
+        // Get recent energy readings and recent alerts
+        let energyData = []
+        let alertsData = []
+
+        // Try to get energy readings from the dashboard response first
+        if (dashboardResponse.recentReadings && dashboardResponse.recentReadings.length > 0) {
+          console.log(`Using ${dashboardResponse.recentReadings.length} readings from dashboard response`)
+          energyData = dashboardResponse.recentReadings
+        } else {
+          // If not available in dashboard, fetch them separately
+          console.log(`Fetching recent readings for installation ${selectedInstallation}`)
+          const readingsResponse = await energyApi.getRecentReadings(selectedInstallation, 100) // Get more readings for better charts
+
+          if (Array.isArray(readingsResponse) && readingsResponse.length > 0) {
+            console.log(`Fetched ${readingsResponse.length} separate energy readings`)
+            energyData = readingsResponse
           } else {
-            setAggregatedSeries([])
-            setNoDataMessage(`No energy data available for the selected ${selectedPeriod} period.`)
-            energyData = []
-          }
-        } catch (e) {
-          console.warn('Aggregated series fetch failed, falling back to recent readings or sample')
-          setAggregatedSeries([])
-          if (dashboardResponse.recentReadings && dashboardResponse.recentReadings.length > 0) {
-            setNoDataMessage(null)
-            energyData = dashboardResponse.recentReadings
-          } else {
-            setNoDataMessage(`No energy data available for the selected ${selectedPeriod} period.`)
-            energyData = []
+            console.warn("No energy readings available or format incorrect")
+            // Try to fetch energy summaries by period if no raw readings
+
+            // Get appropriate start and end dates
+            const today = new Date()
+            let startDate, endDate
+
+            if (selectedPeriod === 'day') {
+              startDate = new Date(today.setHours(0, 0, 0, 0)).toISOString()
+              endDate = new Date().toISOString()
+            } else if (selectedPeriod === 'week') {
+              // Get previous 7 days
+              const weekStart = new Date(today)
+              weekStart.setDate(today.getDate() - 7)
+              startDate = weekStart.toISOString()
+              endDate = new Date().toISOString()
+            } else if (selectedPeriod === 'month') {
+              // Get current month
+              const monthStart = new Date(today.getFullYear(), today.getMonth(), 1)
+              startDate = monthStart.toISOString()
+              endDate = new Date().toISOString()
+            } else {
+              // Year view - get this year
+              const yearStart = new Date(today.getFullYear(), 0, 1)
+              startDate = yearStart.toISOString()
+              endDate = new Date().toISOString()
+            }
+
+            console.log(`Attempting to fetch ${selectedPeriod} summaries from ${startDate} to ${endDate}`)
+            const summariesResponse = await energyApi.getSummariesByPeriodAndDateRange(
+              selectedInstallation, 
+              selectedPeriod, 
+              startDate, 
+              endDate
+            )
+
+            if (Array.isArray(summariesResponse) && summariesResponse.length > 0) {
+              console.log(`Received ${summariesResponse.length} energy summaries`)
+              // Use summaries as readings with appropriate fields
+              energyData = summariesResponse.map(summary => ({
+                id: summary.id,
+                installationId: summary.installationId,
+                timestamp: summary.date || summary.endDate || summary.timestamp,
+                powerGenerationWatts: summary.averageGenerationWatts || 0,
+                powerConsumptionWatts: summary.averageConsumptionWatts || 0,
+                dailyYieldKWh: summary.totalGenerationKWh || 0,
+                totalGenerationKWh: summary.totalGenerationKWh || 0,
+                totalConsumptionKWh: summary.totalConsumptionKWh || 0,
+                isSimulated: true
+              }))
+            } else {
+              console.warn(`No energy summaries available for ${selectedPeriod} period`)
+              // Generate sample data if no actual data is available
+              console.log('Generating sample data as last resort')
+              energyData = generateSampleData(selectedPeriod)
+            }
           }
         }
 
+        // Set the energy data for charts
         setEnergyReadings(energyData)
         console.log(`Set ${energyData.length} energy readings for charts`)
 
-        // Check for security and system status
-        try {
-          console.log(`Fetching security status for installation ${selectedInstallation}`)
-          const securityResponse = await securityApi.getInstallationSecurityStatus(selectedInstallation)
+        // Check for security and system status only if dashboard exists
+        if (dashboardResponse) {
+          try {
+            console.log(`Fetching security status for installation ${selectedInstallation}`)
+            const securityResponse = await securityApi.getInstallationSecurityStatus(selectedInstallation)
 
-          if (securityResponse) {
-            console.log("Security status response:", securityResponse)
+            if (securityResponse) {
+              console.log("Security status response:", securityResponse)
 
-            // Build system status from security data
-            const alerts = securityResponse.alerts || []
-            const highCriticalCount = alerts.filter((a: any) => ['CRITICAL','HIGH'].includes((a.severity || '').toUpperCase())).length
-            const efficiencyVal = (dashboardResponse.averageEfficiencyPercentage !== undefined ? dashboardResponse.averageEfficiencyPercentage : dashboardResponse.currentEfficiencyPercentage || 0)
-            const systemStatusData = {
-              tamperDetected: securityResponse.tamperDetected || dashboardResponse.installationDetails?.tamperDetected || false,
-              lastTamperCheck: securityResponse.lastCheck || dashboardResponse.installationDetails?.lastTamperCheck || new Date().toISOString(),
-              systemHealth: determineSystemHealth(
-                efficiencyVal,
-                securityResponse.tamperDetected || false,
-                alerts.length || 0,
-                highCriticalCount
-              ),
-              efficiency: efficiencyVal,
-              lastMaintenance: securityResponse.lastMaintenance || null,
-              alerts,
-              recommendations: generateRecommendations(
-                efficiencyVal,
-                securityResponse.tamperDetected || false,
-                alerts
-              )
+              // Build system status from security data
+              const systemStatusData = {
+                tamperDetected: securityResponse.tamperDetected || dashboardResponse.installationDetails?.tamperDetected || false,
+                lastTamperCheck: securityResponse.lastCheck || dashboardResponse.installationDetails?.lastTamperCheck || new Date().toISOString(),
+                systemHealth: determineSystemHealth(
+                  (dashboardResponse?.averageEfficiencyPercentage ?? dashboardResponse?.currentEfficiencyPercentage ?? 0), 
+                  securityResponse.tamperDetected || false,
+                  securityResponse.alerts?.length || 0
+                ),
+                efficiency: (dashboardResponse?.averageEfficiencyPercentage ?? dashboardResponse?.currentEfficiencyPercentage ?? 0),
+                lastMaintenance: securityResponse.lastMaintenance || null,
+                alerts: securityResponse.alerts || [],
+                recommendations: generateRecommendations(
+                  (dashboardResponse?.averageEfficiencyPercentage ?? dashboardResponse?.currentEfficiencyPercentage ?? 0),
+                  securityResponse.tamperDetected || false,
+                  securityResponse.alerts || []
+                )
+              }
+
+              setSystemStatus(systemStatusData)
             }
-
-            setSystemStatus(systemStatusData)
+          } catch (error) {
+            console.error("Error fetching security status:", error)
+            // Create minimal system status from dashboard data
+            setSystemStatus({
+              tamperDetected: dashboardResponse.installationDetails?.tamperDetected || false,
+              lastTamperCheck: dashboardResponse.installationDetails?.lastTamperCheck || new Date().toISOString(),
+              systemHealth: determineSystemHealth(
+                (dashboardResponse?.averageEfficiencyPercentage ?? dashboardResponse?.currentEfficiencyPercentage ?? 0),
+                dashboardResponse.installationDetails?.tamperDetected || false,
+                0
+              ),
+              efficiency: (dashboardResponse?.averageEfficiencyPercentage ?? dashboardResponse?.currentEfficiencyPercentage ?? 0),
+              alerts: [],
+              recommendations: generateRecommendations(
+                (dashboardResponse?.averageEfficiencyPercentage ?? dashboardResponse?.currentEfficiencyPercentage ?? 0),
+                dashboardResponse.installationDetails?.tamperDetected || false,
+                []
+              )
+            })
           }
-        } catch (error) {
-          console.error("Error fetching security status:", error)
-          // Create minimal system status from dashboard data
-          const eff = (dashboardResponse.averageEfficiencyPercentage !== undefined ? dashboardResponse.averageEfficiencyPercentage : dashboardResponse.currentEfficiencyPercentage || 0)
-          const tamp = dashboardResponse.installationDetails?.tamperDetected || false
-          setSystemStatus({
-            tamperDetected: tamp,
-            lastTamperCheck: dashboardResponse.installationDetails?.lastTamperCheck || new Date().toISOString(),
-            systemHealth: determineSystemHealth(eff, tamp, 0, 0),
-            efficiency: eff,
-            alerts: [],
-            recommendations: generateRecommendations(eff, tamp, [])
-          })
         }
       } catch (error) {
         console.error("Error fetching dashboard data:", error)
@@ -323,59 +368,39 @@ export default function DashboardPage() {
   }, [selectedInstallation, selectedPeriod, toast])
 
   // Determine system health based on efficiency and other factors
-  const determineSystemHealth = (
-    efficiency: number,
-    tamperDetected: boolean,
-    alertCount: number,
-    severeAlertCount: number
-  ): "GOOD" | "FAIR" | "POOR" | "UNKNOWN" => {
+  const determineSystemHealth = (efficiency: number, tamperDetected: boolean, alertCount: number): "GOOD" | "FAIR" | "POOR" | "UNKNOWN" => {
     if (tamperDetected) return "POOR"
-    if (severeAlertCount > 0) return "POOR"
+    if (alertCount > 3) return "POOR"
     if (alertCount > 0) return "FAIR"
-    if (efficiency >= 85) return "GOOD"
-    if (efficiency >= 70) return "FAIR"
-    if (efficiency > 0) return "POOR"
+    if (efficiency >= 90) return "GOOD"
+    if (efficiency >= 75) return "FAIR"
+    if (efficiency < 75) return "POOR"
     return "UNKNOWN"
-  }
-
-  // Friendly labels for health status
-  const getHealthLabel = (status: "GOOD" | "FAIR" | "POOR" | "UNKNOWN") => {
-    switch (status) {
-      case "GOOD": return "Optimal"
-      case "FAIR": return "Degraded"
-      case "POOR": return "Critical"
-      default: return "No Data"
-    }
   }
 
   // Generate recommendations based on system state
   const generateRecommendations = (efficiency: number, tamperDetected: boolean, alerts: SystemAlert[]): string[] => {
-    const rec: string[] = []
-
-    const severe = alerts.filter(a => (a.severity || '').toUpperCase() === 'CRITICAL' || (a.severity || '').toUpperCase() === 'HIGH')
-    const hasWarnings = alerts.length > 0 && severe.length === 0
+    const recommendations: string[] = []
 
     if (tamperDetected) {
-      rec.push("Tamper detected — secure hardware and contact support immediately.")
-    }
-    if (severe.length > 0) {
-      rec.push(`Critical alerts active (${severe.length}). Investigate inverter, wiring, and connectivity.`)
-    } else if (hasWarnings) {
-      rec.push("Resolve active warnings to restore optimal performance.")
+      recommendations.push("Contact support immediately: potential tampering detected")
     }
 
-    if (efficiency > 0 && efficiency < 50) {
-      rec.push("Performance far below expected — check for shading, soiling, or equipment faults.")
-    } else if (efficiency >= 50 && efficiency < 70) {
-      rec.push("Underperforming — consider inspection and cleaning to improve output.")
-    } else if (efficiency >= 70 && efficiency < 85) {
-      rec.push("Slightly degraded — cleaning or minor maintenance may help.")
+    if (alerts.some(a => a.severity === "CRITICAL" || a.severity === "HIGH")) {
+      recommendations.push("Address high-priority system alerts")
     }
 
-    if (rec.length === 0) {
-      rec.push("All systems normal — no action required.")
+    if (efficiency < 75) {
+      recommendations.push("Schedule a maintenance check to improve system efficiency")
+    } else if (efficiency < 90) {
+      recommendations.push("Consider panel cleaning to optimize performance")
     }
-    return rec
+
+    if (recommendations.length === 0) {
+      recommendations.push("Your system is performing well. Continue regular monitoring.")
+    }
+
+    return recommendations
   }
 
   // Handle installation change
@@ -440,32 +465,6 @@ export default function DashboardPage() {
     }
   }
 
-  // Compute start/end and bucket based on selectedPeriod
-  const getRangeAndBucket = (period: string) => {
-    const now = new Date()
-    const end = now
-    let start = new Date(now)
-    let bucket: 'minute' | 'hour' | 'day' = 'hour'
-    if (period === 'day') {
-      start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0)
-      bucket = 'hour'
-    } else if (period === 'week') {
-      const day = now.getDay()
-      const diffToMonday = (day + 6) % 7
-      start = new Date(now)
-      start.setDate(now.getDate() - diffToMonday)
-      start.setHours(0,0,0,0)
-      bucket = 'day'
-    } else if (period === 'month') {
-      start = new Date(now.getFullYear(), now.getMonth(), 1)
-      bucket = 'day'
-    } else { // year
-      start = new Date(now.getFullYear(), 0, 1)
-      bucket = 'month'
-    }
-    return { start, end, bucket }
-  }
-
   // Format energy value with appropriate units
   const formatEnergyValue = (value: number): string => {
     if (value >= 1000000) {
@@ -478,7 +477,7 @@ export default function DashboardPage() {
   }
 
   // Update the generateSampleData function for week view
-  function generateSampleData(period: string, dashboardData: InstallationDashboard): any[] {
+  function generateSampleData(period: string, dashboardData?: InstallationDashboard): any[] {
     console.log('Generating sample data for period:', period);
     const now = new Date();
     const sampleData: any[] = [];
@@ -578,21 +577,36 @@ export default function DashboardPage() {
 
   // Process data for chart display based on period
   const getProcessedChartData = () => {
-    if (!dashboardData || energyReadings.length === 0) {
+    if (energyReadings.length === 0) {
       return []
     }
 
     const chartData = []
 
+    const getGenerationKWh = (reading: any): number => {
+      if (typeof reading.energyProduced === 'number') return reading.energyProduced
+      if (typeof reading.totalGenerationKWh === 'number') return reading.totalGenerationKWh
+      if (typeof reading.dailyYieldKWh === 'number') return reading.dailyYieldKWh
+      if (typeof reading.powerGenerationWatts === 'number') return reading.powerGenerationWatts / 1000
+      return 0
+    }
+
+    const getConsumptionKWh = (reading: any): number => {
+      if (typeof reading.energyConsumed === 'number') return reading.energyConsumed
+      if (typeof reading.totalConsumptionKWh === 'number') return reading.totalConsumptionKWh
+      if (typeof reading.powerConsumptionWatts === 'number') return reading.powerConsumptionWatts / 1000
+      return 0
+    }
+
     // Get reference values from dashboard for normalization
-    const todayGeneration = dashboardData.todayGenerationKWh || 0
-    const todayConsumption = dashboardData.todayConsumptionKWh || 0
-    const weekGeneration = dashboardData.weekToDateGenerationKWh || 0
-    const weekConsumption = dashboardData.weekToDateConsumptionKWh || 0
-    const monthGeneration = dashboardData.monthToDateGenerationKWh || 0
-    const monthConsumption = dashboardData.monthToDateConsumptionKWh || 0
-    const yearGeneration = dashboardData.yearToDateGenerationKWh || 0
-    const yearConsumption = dashboardData.yearToDateConsumptionKWh || 0
+    const todayGeneration = dashboardData?.todayGenerationKWh || 0
+    const todayConsumption = dashboardData?.todayConsumptionKWh || 0
+    const weekGeneration = dashboardData?.weekToDateGenerationKWh || 0
+    const weekConsumption = dashboardData?.weekToDateConsumptionKWh || 0
+    const monthGeneration = dashboardData?.monthToDateGenerationKWh || 0
+    const monthConsumption = dashboardData?.monthToDateConsumptionKWh || 0
+    const yearGeneration = dashboardData?.yearToDateGenerationKWh || 0
+    const yearConsumption = dashboardData?.yearToDateConsumptionKWh || 0
 
     // Get the appropriate generation and consumption totals based on period
     let expectedGeneration = 0
@@ -619,11 +633,11 @@ export default function DashboardPage() {
 
     // Calculate total readings values for normalization
     const totalReadingsGeneration = energyReadings.reduce(
-      (sum, reading) => sum + (reading.powerGenerationWatts / 1000), 0
+      (sum, reading) => sum + getGenerationKWh(reading), 0
     )
 
     const totalReadingsConsumption = energyReadings.reduce(
-      (sum, reading) => sum + (reading.powerConsumptionWatts / 1000), 0
+      (sum, reading) => sum + getConsumptionKWh(reading), 0
     )
 
     // Calculate normalization factors - if readings have values and expected values exist
@@ -671,8 +685,8 @@ export default function DashboardPage() {
         const hourLabel = `${hour}:00`
 
         // Apply normalization factors
-        const normalizedGeneration = (reading.powerGenerationWatts / 1000) * generationNormalizationFactor
-        const normalizedConsumption = (reading.powerConsumptionWatts / 1000) * consumptionNormalizationFactor
+        const normalizedGeneration = getGenerationKWh(reading) * generationNormalizationFactor
+        const normalizedConsumption = getConsumptionKWh(reading) * consumptionNormalizationFactor
 
         hourlyData[hourLabel].production += normalizedGeneration
         hourlyData[hourLabel].consumption += normalizedConsumption
@@ -736,8 +750,8 @@ export default function DashboardPage() {
           dayData[dayName].consumption += (reading.totalConsumptionKWh || 0) * consumptionNormalizationFactor
         } else {
           // For hourly readings
-          dayData[dayName].production += (reading.powerGenerationWatts / 1000) * generationNormalizationFactor
-          dayData[dayName].consumption += (reading.powerConsumptionWatts / 1000) * consumptionNormalizationFactor
+          dayData[dayName].production += getGenerationKWh(reading) * generationNormalizationFactor
+          dayData[dayName].consumption += getConsumptionKWh(reading) * consumptionNormalizationFactor
         }
 
         dayData[dayName].count += 1
@@ -791,24 +805,37 @@ export default function DashboardPage() {
           monthData[dayLabel].consumption += (reading.totalConsumptionKWh || 0) * consumptionNormalizationFactor
         } else {
           // For hourly readings
-          monthData[dayLabel].production += (reading.powerGenerationWatts / 1000) * generationNormalizationFactor
-          monthData[dayLabel].consumption += (reading.powerConsumptionWatts / 1000) * consumptionNormalizationFactor
+          monthData[dayLabel].production += getGenerationKWh(reading) * generationNormalizationFactor
+          monthData[dayLabel].consumption += getConsumptionKWh(reading) * consumptionNormalizationFactor
         }
 
         monthData[dayLabel].count += 1
       })
 
-      // Convert to array and sort by day
-      Object.values(monthData).forEach(day => {
-        chartData.push({
-          time: day.time,
-          production: day.production,
-          consumption: day.consumption
-        })
-      })
+      // Show all days of the month, including days with zero readings
+      const now = new Date()
+      const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()
+      
+      // Convert to array with all days of the month
+      for (let d = 1; d <= daysInMonth; d++) {
+        const dayLabel = d.toString()
+        if (monthData[dayLabel]) {
+          chartData.push({
+            time: dayLabel,
+            production: monthData[dayLabel].production,
+            consumption: monthData[dayLabel].consumption
+          })
+        } else {
+          // Add zero entry for days without data
+          chartData.push({
+            time: dayLabel,
+            production: 0,
+            consumption: 0
+          })
+        }
+      }
 
-      // Sort by day number
-      chartData.sort((a, b) => parseInt(a.time) - parseInt(b.time))
+      // Already sorted since we loop from 1 to daysInMonth
     } else if (selectedPeriod === "year") {
       // Group by month for year
       const yearData = {}
@@ -848,8 +875,8 @@ export default function DashboardPage() {
           yearData[monthLabel].consumption += (reading.totalConsumptionKWh || 0) * consumptionNormalizationFactor
         } else {
           // For hourly readings
-          yearData[monthLabel].production += (reading.powerGenerationWatts / 1000) * generationNormalizationFactor
-          yearData[monthLabel].consumption += (reading.powerConsumptionWatts / 1000) * consumptionNormalizationFactor
+          yearData[monthLabel].production += getGenerationKWh(reading) * generationNormalizationFactor
+          yearData[monthLabel].consumption += getConsumptionKWh(reading) * consumptionNormalizationFactor
         }
 
         yearData[monthLabel].count += 1
@@ -876,47 +903,7 @@ export default function DashboardPage() {
   }
 
   // Get the processed chart data
-  const getProcessedChartDataAgg = () => {
-    const out: any[] = []
-    if (!aggregatedSeries || aggregatedSeries.length === 0) return out
-    if (selectedPeriod === 'day') {
-      aggregatedSeries.forEach((pt: any) => {
-        const ts = new Date(pt.bucketStart)
-        out.push({ time: `${ts.getHours()}:00`, production: (pt.generationKWh || 0), consumption: (pt.consumptionKWh || 0) })
-      })
-      out.sort((a, b) => parseInt(a.time) - parseInt(b.time))
-      return out
-    }
-    if (selectedPeriod === 'week') {
-      const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']
-      aggregatedSeries.forEach((pt: any) => {
-        const ts = new Date(pt.bucketStart)
-        out.push({ time: dayNames[ts.getDay()], production: pt.generationKWh || 0, consumption: pt.consumptionKWh || 0 })
-      })
-      const order: any = { Mon:1, Tue:2, Wed:3, Thu:4, Fri:5, Sat:6, Sun:7 }
-      out.sort((a, b) => (order[a.time]||0) - (order[b.time]||0))
-      return out
-    }
-    if (selectedPeriod === 'month') {
-      aggregatedSeries.forEach((pt: any) => {
-        const ts = new Date(pt.bucketStart)
-        out.push({ time: String(ts.getDate()), production: pt.generationKWh || 0, consumption: pt.consumptionKWh || 0 })
-      })
-      out.sort((a, b) => parseInt(a.time) - parseInt(b.time))
-      return out
-    }
-    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
-    aggregatedSeries.forEach((pt: any) => {
-      const ts = new Date(pt.bucketStart)
-      out.push({ time: months[ts.getMonth()], production: pt.generationKWh || 0, consumption: pt.consumptionKWh || 0 })
-    })
-    out.sort((a, b) => months.indexOf(a.time) - months.indexOf(b.time))
-    return out
-  }
-
-  const chartData = (aggregatedSeries && aggregatedSeries.length > 0)
-    ? getProcessedChartDataAgg()
-    : getProcessedChartData()
+  const chartData = getProcessedChartData()
 
   // Calculate totals for the charts
   const totalProduction = chartData.reduce((sum, item) => sum + item.production, 0)
@@ -932,7 +919,7 @@ export default function DashboardPage() {
           </div>
           <h3 className="text-lg font-medium">No Energy Data Available</h3>
           <p className="text-sm text-muted-foreground max-w-md mt-2 text-center">
-            {noDataMessage ? noDataMessage : 'There is no energy data available for the selected time period or installation.'}
+            There is no energy data available for the selected time period or installation.
           </p>
         </div>
       )
@@ -960,10 +947,22 @@ export default function DashboardPage() {
               />
               <YAxis 
                 tick={{ fontSize: 12 }}
-                label={{ value: 'Energy (kWh)', angle: -90, position: 'insideLeft' }}
+                tickFormatter={(value) => {
+                  if (value === 0) return '0';
+                  if (value < 0.001) return value.toFixed(4);
+                  if (value < 1) return value.toFixed(3);
+                  if (value >= 1000) return `${(value / 1000).toFixed(1)}k`;
+                  return value.toFixed(1);
+                }}
+                label={{ value: "Power (kW)", angle: -90, position: "insideLeft" }}
               />
               <Tooltip 
-                formatter={(value: number) => [`${value.toFixed(2)} kWh`, ""]} 
+                formatter={(value: number) => {
+                  if (value === 0) return ['0 kW', ''];
+                  if (value < 0.01) return [`${value.toFixed(5)} kW`, ''];
+                  if (value < 1) return [`${value.toFixed(3)} kW`, ''];
+                  return [`${value.toFixed(2)} kW`, ''];
+                }} 
                 labelFormatter={(label) => `${label} (Hour)`}
               />
               <Legend content={<CustomLegend />} />
@@ -1011,19 +1010,37 @@ export default function DashboardPage() {
               <XAxis 
                 dataKey="time" 
                 tick={{ fontSize: 12 }}
+                {...(selectedPeriod === 'month' ? {
+                  interval: 2,
+                  angle: -45,
+                  textAnchor: 'end',
+                  height: 60
+                } : {})}
                 label={{ 
                   value: selectedPeriod === 'week' ? "Day" : 
                          selectedPeriod === 'month' ? "Day of Month" : "Month", 
                   position: "insideBottom", 
-                  offset: -10 
+                  offset: selectedPeriod === 'month' ? -45 : -10 
                 }}
               />
               <YAxis 
                 tick={{ fontSize: 12 }}
+                tickFormatter={(value) => {
+                  if (value === 0) return '0';
+                  if (value < 0.001) return value.toFixed(4);
+                  if (value < 1) return value.toFixed(3);
+                  if (value >= 1000) return `${(value / 1000).toFixed(1)}k`;
+                  return value.toFixed(1);
+                }}
                 label={{ value: "Energy (kWh)", angle: -90, position: "insideLeft" }}
               />
               <Tooltip 
-                formatter={(value: number) => [`${value.toFixed(2)} kWh`, ""]} 
+                formatter={(value: number) => {
+                  if (value === 0) return ['0 kWh', ''];
+                  if (value < 0.01) return [`${value.toFixed(5)} kWh`, ''];
+                  if (value < 1) return [`${value.toFixed(3)} kWh`, ''];
+                  return [`${value.toFixed(2)} kWh`, ''];
+                }} 
               />
               <Legend content={<CustomLegend />} />
               {visibleSeries.production && (
@@ -1236,7 +1253,7 @@ export default function DashboardPage() {
                 </div>
                   {systemStatus && (
                     <Badge className={`${getHealthColor(systemStatus.systemHealth)}`}>
-                      {getHealthLabel(systemStatus.systemHealth)}
+                      {systemStatus.systemHealth}
                     </Badge>
                   )}
                 </div>
@@ -1255,62 +1272,22 @@ export default function DashboardPage() {
             <Card className="bg-white col-span-2">
               <CardHeader className="pb-2 flex flex-row items-center justify-between">
                 <CardTitle>Energy Production</CardTitle>
-                <div className="flex items-center gap-2">
-                  <Select 
-                    value={selectedPeriod} 
-                    onValueChange={handlePeriodChange}
-                  >
-                    <SelectTrigger className="w-[150px]">
-                      <SelectValue placeholder="Select period" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="day">Today (Hourly)</SelectItem>
-                      <SelectItem value="week">This Week (Daily)</SelectItem>
-                      <SelectItem value="month">This Month (Daily)</SelectItem>
-                      <SelectItem value="year">This Year (Monthly)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  {/* Day view toggle removed for simplicity */}
-                </div>
+                <Select 
+                  value={selectedPeriod} 
+                  onValueChange={handlePeriodChange}
+                >
+                  <SelectTrigger className="w-[150px]">
+                    <SelectValue placeholder="Select period" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="day">Today (Hourly)</SelectItem>
+                    <SelectItem value="week">This Week (Daily)</SelectItem>
+                    <SelectItem value="month">This Month (Daily)</SelectItem>
+                    <SelectItem value="year">This Year (Monthly)</SelectItem>
+                  </SelectContent>
+                </Select>
               </CardHeader>
               <CardContent className="pt-4">
-                {/* Period summary for cross-check */}
-                {(() => {
-                  if (!dashboardData) return null
-                  const isDay = selectedPeriod === 'day'
-                  if (chartData.length === 0) return null
-                  let gen = 0, con = 0
-                  if (isDay) {
-                    gen = chartData.reduce((s: number, d: any) => s + (d.production || 0), 0) / chartData.length
-                    con = chartData.reduce((s: number, d: any) => s + (d.consumption || 0), 0) / chartData.length
-                  } else {
-                    gen = chartData.reduce((s: number, d: any) => s + (d.production || 0), 0)
-                    con = chartData.reduce((s: number, d: any) => s + (d.consumption || 0), 0)
-                  }
-                  const fmt = (v: number, unit: string) => v >= 1000 && unit === 'kWh' ? `${(v/1000).toFixed(2)} MWh` : `${v.toFixed(2)} ${unit}`
-                  const dash = {
-                    day: { gen: dashboardData.todayGenerationKWh || 0, con: dashboardData.todayConsumptionKWh || 0 },
-                    week: { gen: dashboardData.weekToDateGenerationKWh || 0, con: dashboardData.weekToDateConsumptionKWh || 0 },
-                    month: { gen: dashboardData.monthToDateGenerationKWh || 0, con: dashboardData.monthToDateConsumptionKWh || 0 },
-                    year: { gen: dashboardData.yearToDateGenerationKWh || 0, con: dashboardData.yearToDateConsumptionKWh || 0 },
-                  } as any
-                  const dashTotals = dash[selectedPeriod]
-                  return (
-                    <div className="mb-3 p-2 rounded-md bg-muted text-sm flex flex-wrap gap-4 items-center justify-between">
-                      {isDay ? (
-                        <>
-                          <div>Period Totals — Generation: <span className="font-medium">{fmt(gen, 'kWh')}</span>, Consumption: <span className="font-medium">{fmt(con, 'kWh')}</span></div>
-                          <div>Today totals (dashboard) — Gen: <span className="font-medium">{fmt(dashTotals.gen, 'kWh')}</span>, Con: <span className="font-medium">{fmt(dashTotals.con, 'kWh')}</span></div>
-                        </>
-                      ) : (
-                        <>
-                          <div>Period Totals — Generation: <span className="font-medium">{fmt(gen, 'kWh')}</span>, Consumption: <span className="font-medium">{fmt(con, 'kWh')}</span></div>
-                          <div>Dashboard — Gen: <span className="font-medium">{fmt(dashTotals.gen, 'kWh')}</span>, Con: <span className="font-medium">{fmt(dashTotals.con, 'kWh')}</span></div>
-                        </>
-                      )}
-                    </div>
-                  )
-                })()}
                 <div className="h-80">
                   {isLoading ? (
                     <div className="flex justify-center items-center h-full">
@@ -1379,7 +1356,7 @@ export default function DashboardPage() {
                 <span>System Status</span>
                 {systemStatus && (
                   <Badge className={`${getHealthColor(systemStatus.systemHealth)} text-white`}>
-                    {getHealthLabel(systemStatus.systemHealth)}
+                    {systemStatus.systemHealth}
                   </Badge>
                 )}
               </CardTitle>

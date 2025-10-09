@@ -44,7 +44,7 @@ import {
 } from "@/components/ui/table"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useToast } from "@/components/ui/use-toast"
-import { energyApi } from "@/lib/api"
+import { energyApi } from "@/lib/api/energy"
 import { energyWebSocket } from "@/lib/energyWebSocket"
 
 export default function AlertsDashboardPage() {

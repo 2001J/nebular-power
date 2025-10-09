@@ -45,7 +45,8 @@ import {
   FormMessage,
 } from "@/components/ui/form"
 import { useToast } from "@/components/ui/use-toast"
-import { installationApi, customerApi } from "@/lib/api"
+import { installationApi } from "@/lib/api/installations"
+import { customerApi } from "@/lib/api/customers"
 
 // Form schema validation
 const formSchema = z.object({

@@ -56,7 +56,8 @@ import {
 } from "@/components/ui/popover"
 import { Calendar } from "@/components/ui/calendar"
 import { cn } from "@/lib/utils"
-import { serviceControlApi, serviceApi } from "@/lib/api"
+import { serviceControlApi } from "@/lib/api/serviceControl"
+import { serviceApi } from "@/lib/api/service"
 import { Progress } from "@/components/ui/progress"
 
 // Define interfaces for the data structures

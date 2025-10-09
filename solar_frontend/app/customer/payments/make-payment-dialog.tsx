@@ -22,9 +22,9 @@ import {
 } from "@/components/ui/select"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Separator } from "@/components/ui/separator"
-import { useToast } from "@/components/ui/toast"
+import { useToast } from "@/components/ui/use-toast"
 import { useAuth } from "@/components/auth-provider"
-import { paymentApi } from "@/lib/api"
+import { paymentApi } from "@/lib/api/payments"
 import { format } from "date-fns"
 
 interface Payment {

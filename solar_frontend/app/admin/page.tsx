@@ -40,7 +40,7 @@ import {
   Tooltip,
   XAxis,
   YAxis,
-} from "recharts"
+} from "@/components/ui/direct-recharts"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
@@ -65,7 +65,10 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb"
 import { useRouter } from "next/navigation"
-import { customerApi, installationApi, paymentApi, securityApi, energyApi, serviceApi } from "@/lib/api"
+import { customerApi, installationApi, paymentApi, securityApi } from "@/lib/api"
+import type { PaginatedResponse } from "@/lib/api/client"
+import { energyApi } from "@/lib/api/energy"
+import { serviceApi } from "@/lib/api/service"
 
 export default function AdminDashboardPage() {
   const { user } = useAuth()
@@ -73,40 +76,16 @@ export default function AdminDashboardPage() {
   const router = useRouter()
   const [selectedPeriod, setSelectedPeriod] = useState("week")
   const [loading, setLoading] = useState(true)
-  const getRangeAndBucket = (range: string) => {
-    const now = new Date()
-    const end = now
-    let start = new Date(now)
-    let bucket: 'minute' | 'hour' | 'day' = 'hour'
-    if (range === 'day') {
-      start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0)
-      bucket = 'hour'
-    } else if (range === 'week') {
-      const day = now.getDay()
-      const diffToMonday = (day + 6) % 7
-      start = new Date(now)
-      start.setDate(now.getDate() - diffToMonday)
-      start.setHours(0,0,0,0)
-      bucket = 'day'
-    } else if (range === 'month') {
-      start = new Date(now.getFullYear(), now.getMonth(), 1)
-      bucket = 'day'
-    } else { // year
-      start = new Date(now.getFullYear(), 0, 1)
-      bucket = 'month'
-    }
-    return { start, end, bucket }
-  }
 
   // State to store API data
-  const [installations, setInstallations] = useState([])
-  const [customers, setCustomers] = useState([])
-  const [securityAlerts, setSecurityAlerts] = useState([])
-  const [payments, setPayments] = useState([])
-  const [systemOverview, setSystemOverview] = useState(null)
-  const [energyData, setEnergyData] = useState([])
-  const [systemHealth, setSystemHealth] = useState(null)
-  const [weatherImpactData, setWeatherImpactData] = useState(null)
+  const [installations, setInstallations] = useState<any[]>([])
+  const [customers, setCustomers] = useState<any[]>([])
+  const [securityAlerts, setSecurityAlerts] = useState<any[]>([])
+  const [payments, setPayments] = useState<any>(null)
+  const [systemOverview, setSystemOverview] = useState<any>(null)
+  const [energyData, setEnergyData] = useState<Array<{ name: string; residential: number; commercial: number; industrial: number; revenue: number }>>([])
+  const [systemHealth, setSystemHealth] = useState<any>(null)
+  const [weatherImpactData, setWeatherImpactData] = useState<any>(null)
 
   // State for search and filters
   const [searchTerm, setSearchTerm] = useState("")
@@ -120,18 +99,13 @@ export default function AdminDashboardPage() {
       setLoading(true)
 
       try {
+        // Keep installations fetched in this run to avoid relying on stale state
+        let fetchedInstallations: any[] = []
         // Fetch customers data
         try {
           console.log("Fetching customers data");
-          const customersResponse = await customerApi.getAllCustomers();
-          if (customersResponse?.content) {
-            setCustomers(customersResponse.content);
-          } else if (Array.isArray(customersResponse)) {
-            setCustomers(customersResponse);
-          } else {
-            console.error("Invalid customers data format");
-            setCustomers([]);
-          }
+          const customersResponse: PaginatedResponse<any> = await customerApi.getAllCustomers();
+          setCustomers(Array.isArray(customersResponse?.content) ? customersResponse.content : []);
         } catch (error) {
           console.error("Error fetching customers:", error);
           setCustomers([]);
@@ -145,27 +119,26 @@ export default function AdminDashboardPage() {
         // Fetch installations - Make sure we always get all installations
         try {
           console.log("Fetching all installations data");
-          let installationsData = [];
 
           // First, try to get installations from getAllInstallations API
           try {
             const installationsResponse = await installationApi.getAllInstallations();
             if (installationsResponse?.content && Array.isArray(installationsResponse.content)) {
-              installationsData = installationsResponse.content;
+              fetchedInstallations = installationsResponse.content;
             } else if (Array.isArray(installationsResponse)) {
-              installationsData = installationsResponse;
+              fetchedInstallations = installationsResponse;
             }
           } catch (installError) {
             console.error("Error fetching installations directly:", installError);
           }
 
           // If we still don't have installations, try via system overview
-          if (installationsData.length === 0) {
+          if (fetchedInstallations.length === 0) {
             try {
               const overview = await energyApi.getSystemOverview();
               setSystemOverview(overview);
               if (overview?.installations && Array.isArray(overview.installations)) {
-                installationsData = overview.installations;
+                fetchedInstallations = overview.installations;
               }
             } catch (overviewError) {
               console.error("Error fetching system overview:", overviewError);
@@ -183,8 +156,8 @@ export default function AdminDashboardPage() {
           }
 
           // Set the installations regardless of where they came from
-          console.log("Setting installations:", installationsData);
-          setInstallations(installationsData);
+          console.log("Setting installations:", fetchedInstallations);
+          setInstallations(fetchedInstallations);
         } catch (error) {
           console.error("Error in installations fetch flow:", error);
           setInstallations([]);
@@ -195,67 +168,63 @@ export default function AdminDashboardPage() {
           });
         }
 
-        // Fetch energy data (aggregated series across active installations)
+        // Fetch energy data
         try {
-          console.log("Fetching aggregated energy data for dashboard");
-          const active = installations.filter((i: any) => (i.status === 'ACTIVE' || i.status === 'Active'))
-          if (active.length > 0) {
-            const { start, end, bucket } = getRangeAndBucket(selectedPeriod)
-            const typeMap: Record<string, string> = Object.fromEntries(active.map((i: any) => [String(i.id), i.type || 'RESIDENTIAL']))
-            const seriesByInstallation = await Promise.all(
-              active.slice(0, 8).map((i: any) => energyApi.getAggregatedSeries(String(i.id), start.toISOString(), end.toISOString(), bucket)
-                .then((series: any[]) => ({ id: String(i.id), series }))
-              )
-            )
-
-            // Bucket map label -> totals
-            const bucketMap: Record<string, { name: string, residential: number, commercial: number, industrial: number, revenue: number }> = {}
-            const addToBucket = (label: string, type: string, genKWh: number) => {
-              if (!bucketMap[label]) bucketMap[label] = { name: label, residential: 0, commercial: 0, industrial: 0, revenue: 0 }
-              const t = (type || 'RESIDENTIAL').toUpperCase()
-              if (t === 'COMMERCIAL') bucketMap[label].commercial += genKWh
-              else if (t === 'INDUSTRIAL') bucketMap[label].industrial += genKWh
-              else bucketMap[label].residential += genKWh
-              bucketMap[label].revenue += genKWh * 0.15
+          console.log("Fetching energy data");
+          // Use existing API methods instead of the non-existent getSystemEnergyData
+          // Find the first active installation to get data from
+          const activeInstallation = fetchedInstallations.find((i: any) => i?.status === 'ACTIVE' || i?.status === 'Active')?.id;
+          
+          if (activeInstallation) {
+            const readings = await energyApi.getRecentReadings(String(activeInstallation), 30);
+            
+            // Transform readings data to match expected chart format
+            const transformedData: Array<{ name: string; residential: number; commercial: number; industrial: number; revenue: number }> = [];
+            
+            if (Array.isArray(readings) && readings.length > 0) {
+              // Group by day for weekly view
+              const groupedByDay: Record<string, { readings: any[]; total: number; count: number }> = {};
+              readings.forEach(reading => {
+                const date = new Date(reading.timestamp);
+                const day = date.toLocaleDateString('en-US', { weekday: 'short' });
+                
+                if (!groupedByDay[day]) {
+                  groupedByDay[day] = {
+                    readings: [],
+                    total: 0,
+                    count: 0
+                  };
+                }
+                
+                groupedByDay[day].readings.push(reading);
+                if (reading.powerGenerationWatts) {
+                  groupedByDay[day].total += reading.powerGenerationWatts;
+                  groupedByDay[day].count++;
+                }
+              });
+              
+              // Convert to chart data format
+              Object.keys(groupedByDay).forEach(day => {
+                const avgReading = groupedByDay[day].count > 0 ? 
+                  groupedByDay[day].total / groupedByDay[day].count / 1000 : 0; // Convert to kWh
+                
+                transformedData.push({
+                  name: day,
+                  residential: Math.round(avgReading * 0.6), // Estimate residential portion
+                  commercial: Math.round(avgReading * 0.3), // Estimate commercial portion
+                  industrial: Math.round(avgReading * 0.1), // Estimate industrial portion
+                  revenue: Math.round(avgReading * 0.15) // Estimate revenue
+                });
+              });
             }
-
-            seriesByInstallation.forEach(({ id, series }) => {
-              const type = typeMap[id] || 'RESIDENTIAL'
-              ;(series || []).forEach((pt: any) => {
-                const ts = new Date(pt.bucketStart)
-                let label = ''
-                if (selectedPeriod === 'day') {
-                  label = `${ts.getHours()}:00`
-                } else if (selectedPeriod === 'week') {
-                  label = ts.toLocaleDateString('en-US', { weekday: 'short' })
-                } else if (selectedPeriod === 'month') {
-                  label = String(ts.getDate())
-                } else {
-                  label = ts.toLocaleDateString('en-US', { month: 'short' })
-                }
-                addToBucket(label, type, pt.generationKWh || 0)
-              })
-            })
-
-            const ordered = Object.values(bucketMap)
-              .sort((a, b) => {
-                // Try to order by interpreted date index
-                const orderMap: Record<string, number> = {
-                  Mon:1, Tue:2, Wed:3, Thu:4, Fri:5, Sat:6, Sun:7,
-                  Jan:1, Feb:2, Mar:3, Apr:4, May:5, Jun:6, Jul:7, Aug:8, Sep:9, Oct:10, Nov:11, Dec:12,
-                }
-                const ai = orderMap[a.name] ?? parseInt(a.name) ?? 0
-                const bi = orderMap[b.name] ?? parseInt(b.name) ?? 0
-                return ai - bi
-              })
-
-            setEnergyData(ordered)
+            
+            setEnergyData(transformedData.length > 0 ? transformedData : []);
           } else {
-            setEnergyData([])
+            setEnergyData([]);
           }
         } catch (error) {
-          console.error("Error fetching aggregated energy data:", error)
-          setEnergyData([])
+          console.error("Error fetching energy data:", error);
+          setEnergyData([]);
         }
 
         // Fetch weather impact data

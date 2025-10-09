@@ -59,7 +59,8 @@ import {
   PaginationPrevious,
 } from "@/components/ui/pagination"
 import { DatePickerWithRange } from "@/components/ui/date-range-picker"
-import { paymentComplianceApi, paymentApi } from "@/lib/api"
+import { paymentComplianceApi } from "@/lib/api/paymentCompliance"
+import { paymentApi } from "@/lib/api/payments"
 
 export default function PaymentReportsPage() {
   const router = useRouter()

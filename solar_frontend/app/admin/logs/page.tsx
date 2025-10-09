@@ -33,7 +33,9 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb"
-import { serviceControlApi, installationApi, securityApi } from "@/lib/api"
+import { serviceControlApi } from "@/lib/api/serviceControl"
+import { installationApi } from "@/lib/api/installations"
+import { securityApi } from "@/lib/api/security"
 
 export default function LogsPage() {
   const router = useRouter()
