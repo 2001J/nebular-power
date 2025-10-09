@@ -35,6 +35,9 @@ import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Progress } from "@/components/ui/progress"
 
+// Feature flag to control sample data fallback in charts
+const ENABLE_SAMPLE_DATA = process.env.NEXT_PUBLIC_ENABLE_SAMPLE_DATA === 'true'
+
 // Define types for our dashboard data to match the actual API response format
 interface InstallationDetails {
   id: number;
@@ -287,9 +290,13 @@ export default function DashboardPage() {
               }))
             } else {
               console.warn(`No energy summaries available for ${selectedPeriod} period`)
-              // Generate sample data if no actual data is available
-              console.log('Generating sample data as last resort')
-              energyData = generateSampleData(selectedPeriod)
+              // Optionally generate sample data; default is disabled
+              if (ENABLE_SAMPLE_DATA) {
+                console.log('Generating sample data as last resort (flag enabled)')
+                energyData = generateSampleData(selectedPeriod)
+              } else {
+                energyData = []
+              }
             }
           }
         }
