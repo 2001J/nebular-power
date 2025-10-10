@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useCallback } from "react"
 import { AlertTriangle, Bell, BellOff, Check, Clock, Filter, RefreshCw, Search, Settings, Shield, ShieldAlert, Zap } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -74,7 +74,7 @@ export default function AlertsPage() {
     return message;
   };
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     if (!user) return
 
     try {
@@ -127,7 +127,7 @@ export default function AlertsPage() {
       setLoading(false)
       setRefreshing(false)
     }
-  }
+  }, [user, toast])
 
   // Map API alert types to UI alert types
   const mapAlertTypeToUIType = (type: string): string => {
@@ -152,7 +152,7 @@ export default function AlertsPage() {
   // Load data on component mount
   useEffect(() => {
     fetchData()
-  }, [user])
+  }, [fetchData])
 
   // Filter alerts based on search term and type
   const activeAlerts = alerts.filter(alert => 

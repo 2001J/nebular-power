@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { format, parseISO, subDays } from "date-fns"
 import {
@@ -93,9 +93,9 @@ export default function SecurityAlertsPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [loading, setLoading] = useState(true)
-  const [tamperEvents, setTamperEvents] = useState([])
-  const [filteredEvents, setFilteredEvents] = useState([])
-  const [installations, setInstallations] = useState([])
+  const [tamperEvents, setTamperEvents] = useState<any[]>([])
+  const [filteredEvents, setFilteredEvents] = useState<any[]>([])
+  const [installations, setInstallations] = useState<any[]>([])
   const [dateRange, setDateRange] = useState({
     from: subDays(new Date(), 30),
     to: new Date(),
@@ -105,117 +105,119 @@ export default function SecurityAlertsPage() {
   const [status, setStatus] = useState("NEW")
   const [installation, setInstallation] = useState("all")
   const [searchTerm, setSearchTerm] = useState("")
-  const [selectedEvent, setSelectedEvent] = useState(null)
-  const [selectedInstallation, setSelectedInstallation] = useState(null)
+  const [selectedEvent, setSelectedEvent] = useState<any | null>(null)
+  const [selectedInstallation, setSelectedInstallation] = useState<any | null>(null)
   const [detailsOpen, setDetailsOpen] = useState(false)
   const [resolveDialogOpen, setResolveDialogOpen] = useState(false)
   const [resolutionNotes, setResolutionNotes] = useState("")
   const [isRefreshing, setIsRefreshing] = useState(false)
 
   // Fetch tamper events
-  useEffect(() => {
-    const fetchTamperEvents = async () => {
+  const fetchTamperEvents = useCallback(async () => {
+    try {
+      setLoading(true)
+
+      // Get all installations first for reference
+      let installationsData
       try {
-        setLoading(true)
-
-        // Get all installations first for reference
-        let installationsData
-        try {
-          installationsData = await installationApi.getAllInstallations()
-          setInstallations(installationsData.content || [])
-        } catch (error: any) {
-          console.error("Error fetching installations:", error)
-          if (error.response && error.response.status === 401) {
-            toast({
-              title: "Authentication Error",
-              description: "Your session may have expired. Please log in again.",
-              variant: "destructive",
-            })
-            // Potentially redirect to login page here
-            setInstallations([])
-            setTamperEvents([])
-            setFilteredEvents([])
-            setLoading(false)
-            setIsRefreshing(false)
-            return
-          }
+        installationsData = await installationApi.getAllInstallations()
+        setInstallations(installationsData.content || [])
+      } catch (error: any) {
+        console.error("Error fetching installations:", error)
+        if (error.response && error.response.status === 401) {
+          toast({
+            title: "Authentication Error",
+            description: "Your session may have expired. Please log in again.",
+            variant: "destructive",
+          })
+          // Potentially redirect to login page here
           setInstallations([])
+          setTamperEvents([])
+          setFilteredEvents([])
+          setLoading(false)
+          setIsRefreshing(false)
+          return
         }
-
-        // Check if there's an installation parameter in the URL
-        const urlInstallation = searchParams.get('installation')
-        if (urlInstallation) {
-          setInstallation(urlInstallation)
-        }
-
-        // Always fetch all tamper events and apply filters client-side
-        let events = []
-        try {
-          // Get all events, including resolved ones
-          const allEvents = await securityApi.getAllTamperEvents()
-          events = Array.isArray(allEvents) ? allEvents : []
-
-          // Apply filters client-side
-          // Note: We don't filter by status here, as we want to keep all events for counting purposes
-          // Status filtering will be done in the applyFilters function
-
-          // If we have a specific installation filter (not "all"), apply it
-          if (installation !== "all" && installation) {
-            events = events.filter(event => event.installationId.toString() === installation.toString())
-          }
-
-          // Apply date range filter if needed
-          if (dateRange.from || dateRange.to) {
-            events = events.filter(event => {
-              const eventDate = new Date(event.timestamp)
-              const isAfterStart = !dateRange.from || eventDate >= dateRange.from
-              const isBeforeEnd = !dateRange.to || eventDate <= dateRange.to
-              return isAfterStart && isBeforeEnd
-            })
-          }
-        } catch (error: any) {
-          console.error("Error fetching tamper events:", error)
-          if (error.response && error.response.status === 401) {
-            toast({
-              title: "Authentication Error",
-              description: "Your session may have expired. Please log in again.",
-              variant: "destructive",
-            })
-            // Potentially redirect to login page here
-          } else {
-            toast({
-              title: "Error",
-              description: "Failed to load tamper events data",
-              variant: "destructive",
-            })
-          }
-          events = []
-        }
-
-        console.log("Fetched tamper events:", events)
-        setTamperEvents(events || [])
-        applyFilters(events)
-      } catch (error) {
-        console.error("Error fetching tamper events:", error)
-        toast({
-          title: "Error",
-          description: "Failed to load tamper events data",
-          variant: "destructive",
-        })
-        setTamperEvents([])
-        setFilteredEvents([])
-      } finally {
-        setLoading(false)
-        setIsRefreshing(false)
+        setInstallations([])
       }
-    }
 
+      // Check if there's an installation parameter in the URL
+      const urlInstallation = searchParams.get('installation')
+      if (urlInstallation) {
+        setInstallation(urlInstallation)
+      }
+
+      // Always fetch all tamper events and apply filters client-side
+      let events = []
+      try {
+        // Get all events, including resolved ones
+        const allEvents = await securityApi.getAllTamperEvents()
+        events = Array.isArray(allEvents) ? allEvents : []
+
+        // Apply filters client-side
+        // If we have a specific installation filter (not "all"), apply it
+        if (installation !== "all" && installation) {
+          events = events.filter(event => event.installationId.toString() === installation.toString())
+        }
+
+        // Apply date range filter if needed
+        if (dateRange.from || dateRange.to) {
+          events = events.filter(event => {
+            const eventDate = new Date(event.timestamp)
+            const isAfterStart = !dateRange.from || eventDate >= dateRange.from
+            const isBeforeEnd = !dateRange.to || eventDate <= dateRange.to
+            return isAfterStart && isBeforeEnd
+          })
+        }
+      } catch (error: any) {
+        console.error("Error fetching tamper events:", error)
+        if (error.response && error.response.status === 401) {
+          toast({
+            title: "Authentication Error",
+            description: "Your session may have expired. Please log in again.",
+            variant: "destructive",
+          })
+          // Potentially redirect to login page here
+        } else {
+          toast({
+            title: "Error",
+            description: "Failed to load tamper events data",
+            variant: "destructive",
+          })
+        }
+        events = []
+      }
+
+  console.log("Fetched tamper events:", events)
+  setTamperEvents(events || [])
+    } catch (error) {
+      console.error("Error fetching tamper events:", error)
+      toast({
+        title: "Error",
+        description: "Failed to load tamper events data",
+        variant: "destructive",
+      })
+      setTamperEvents([])
+      setFilteredEvents([])
+    } finally {
+      setLoading(false)
+      setIsRefreshing(false)
+    }
+  }, [installation, dateRange, searchParams])
+
+  useEffect(() => {
     fetchTamperEvents()
-  }, [dateRange, status, installation, isRefreshing, searchParams])
+  }, [fetchTamperEvents])
+
+  // Get installation name by ID (memoized)
+  const getInstallationName = useCallback((installationId: any) => {
+    const found = installations.find((i: any) => i.id === installationId)
+    return found ? (found.name || `Installation #${installationId}`) : `Installation #${installationId}`
+  }, [installations])
 
   // Apply filters to tamper events
-  const applyFilters = (events = tamperEvents) => {
-    const filtered = events.filter(event => {
+  const applyFilters = useCallback((events: any[] = tamperEvents) => {
+    const filtered = events.filter((event: any) => {
       // Event type filter
       if (eventType !== "all" && event.eventType !== eventType) return false
 
@@ -241,33 +243,29 @@ export default function SecurityAlertsPage() {
     })
 
     setFilteredEvents(filtered)
-  }
+  }, [eventType, severity, status, installation, searchTerm, tamperEvents, getInstallationName])
 
   // Apply filters when filter values change
   useEffect(() => {
     applyFilters()
-  }, [eventType, severity, status, installation, searchTerm])
+  }, [applyFilters])
 
   // Refresh data
   const refreshData = () => {
     setIsRefreshing(true)
   }
 
-  // Get installation name by ID
-  const getInstallationName = (installationId) => {
-    const installation = installations.find(i => i.id === installationId)
-    return installation ? (installation.name || `Installation #${installationId}`) : `Installation #${installationId}`
-  }
+  // (moved up) getInstallationName
 
   // Handle view details
-  const viewEventDetails = async (event) => {
+  const viewEventDetails = async (event: any) => {
     try {
       // Get full event details
       const eventDetails = await securityApi.getTamperEventById(event.id)
-      const installation = installations.find(i => i.id === event.installationId)
+      const installation = installations.find((i: any) => i.id === event.installationId)
 
       setSelectedEvent(eventDetails || event)
-      setSelectedInstallation(installation)
+      setSelectedInstallation(installation || null)
       setDetailsOpen(true)
     } catch (error) {
       console.error(`Error fetching event details for event ${event.id}:`, error)
@@ -276,13 +274,13 @@ export default function SecurityAlertsPage() {
       toast({
         title: "Warning",
         description: "Could not fetch complete event details. Showing limited information.",
-        variant: "warning",
+        variant: "default",
       })
     }
   }
 
   // Acknowledge event
-  const acknowledgeEvent = async (eventId) => {
+  const acknowledgeEvent = async (eventId: any) => {
     try {
       await securityApi.acknowledgeEvent(eventId)
 
@@ -304,7 +302,7 @@ export default function SecurityAlertsPage() {
   }
 
   // Update event status
-  const updateEventStatus = async (eventId, newStatus) => {
+  const updateEventStatus = async (eventId: any, newStatus: any) => {
     try {
       await securityApi.updateEventStatus(eventId, newStatus)
 
@@ -342,7 +340,7 @@ export default function SecurityAlertsPage() {
         // We don't need resolvedAt as it will be set by the backend
       }
 
-      await securityApi.resolveEvent(selectedEvent.id, resolutionDetails)
+  await securityApi.resolveEvent((selectedEvent as any).id, resolutionDetails as any)
 
       toast({
         title: "Event Resolved",

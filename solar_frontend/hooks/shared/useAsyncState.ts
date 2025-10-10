@@ -145,7 +145,7 @@ export function usePaginatedData<T>(
     const fetchData = async () => {
       try {
         setLoading(true);
-        if (debouncedSearchTerm && !loading) {
+        if (debouncedSearchTerm) {
           setSearching(true);
         }
         setError(null);
@@ -199,7 +199,7 @@ export function usePaginatedData<T>(
     };
 
     fetchData();
-  }, [debouncedSearchTerm, pagination.currentPage, pagination.pageSize, fetchFunction, showToastOnError]);
+  }, [debouncedSearchTerm, pagination.currentPage, pagination.pageSize, fetchFunction, showToastOnError, toast]);
 
   const setPage = useCallback((page: number) => {
     setPagination(prev => ({ ...prev, currentPage: page }));

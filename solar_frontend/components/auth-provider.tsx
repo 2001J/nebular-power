@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { createContext, useContext, useEffect, useMemo, useState } from "react"
+import { createContext, useContext, useEffect, useMemo, useState, useCallback } from "react"
 import { useRouter, usePathname } from "next/navigation"
 import { authApi, userApi } from "@/lib/api"
 import { useToast } from "@/components/ui/use-toast"
@@ -154,7 +154,7 @@ export function AuthProvider({ children }: Readonly<{ children: React.ReactNode 
     }
   }, [user, pathname, isLoading, router, toast])
 
-  const login = async (email: string, password: string, remember = false) => {
+  const login = useCallback(async (email: string, password: string, remember = false) => {
     setIsLoading(true)
     try {
       console.log("Attempting login with email:", email)
@@ -230,9 +230,9 @@ export function AuthProvider({ children }: Readonly<{ children: React.ReactNode 
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [router])
 
-  const logout = () => {
+  const logout = useCallback(() => {
     setToken(null)
     setUser(null)
     // Clear all auth tokens
@@ -243,12 +243,9 @@ export function AuthProvider({ children }: Readonly<{ children: React.ReactNode 
 
     // Redirect to login
     router.push("/login")
-  }
+  }, [router])
 
-  const contextValue = useMemo(
-    () => ({ user, token, login, logout, isLoading }),
-    [user, token, isLoading]
-  )
+  const contextValue = useMemo(() => ({ user, token, login, logout, isLoading }), [user, token, isLoading, login, logout])
 
   return <AuthContext.Provider value={contextValue}>{children}</AuthContext.Provider>
 }

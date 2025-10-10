@@ -227,27 +227,7 @@ export default function AdminDashboardPage() {
           setEnergyData([]);
         }
 
-        // Fetch weather impact data
-        try {
-          console.log("Fetching weather impact data");
-          // Instead of using the non-existent getWeatherImpact function,
-          // we'll calculate weather impact from recent readings if possible
-          
-          // If we have system overview data, we can use it for mock weather impact
-          if (systemOverview) {
-            const mockWeatherData = {
-              sunnyDayImpact: 25,
-              cloudyDayImpact: -18,
-              optimalTemperatureRange: "70-75°F"
-            };
-            setWeatherImpactData(mockWeatherData);
-          } else {
-            setWeatherImpactData(null);
-          }
-        } catch (error) {
-          console.error("Error calculating weather impact data:", error);
-          setWeatherImpactData(null);
-        }
+        // Weather impact is derived from overview in a separate effect
 
         // Fetch security alerts
         try {
@@ -345,6 +325,25 @@ export default function AdminDashboardPage() {
 
     fetchDashboardData();
   }, [user, toast, selectedPeriod])
+
+  // Derive weather impact from system overview without refetching everything
+  useEffect(() => {
+    try {
+      if (systemOverview) {
+        const mockWeatherData = {
+          sunnyDayImpact: 25,
+          cloudyDayImpact: -18,
+          optimalTemperatureRange: "70-75°F",
+        };
+        setWeatherImpactData(mockWeatherData);
+      } else {
+        setWeatherImpactData(null);
+      }
+    } catch (error) {
+      console.error("Error calculating weather impact data:", error);
+      setWeatherImpactData(null);
+    }
+  }, [systemOverview])
 
   // Handle customer search
   const handleSearch = (e) => {

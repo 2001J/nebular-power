@@ -125,10 +125,10 @@ export default function LoanDetailsPage({ params }: { params: LoanParams }) {
               // and retain customer information
               try {
                 // Try to fetch payments separately
-                await fetchPaymentsForLoan(matchingPlan.id, matchingPlan.installationId);
+                const fetchedPayments = await fetchPaymentsForLoan(matchingPlan.id, matchingPlan.installationId);
                 
                 // Now that we have payments, determine the correct status
-                const correctStatus = determineLoanStatus(enhancedPlan, payments);
+                const correctStatus = determineLoanStatus(enhancedPlan, fetchedPayments);
                 
                 // Apply further customer info enhancements and set next payment date
                 const fullyEnhancedPlan = enhanceCustomerInfo(
@@ -137,10 +137,10 @@ export default function LoanDetailsPage({ params }: { params: LoanParams }) {
                     status: correctStatus,
                     nextPaymentDate: determineNextPaymentDate(
                       { ...enhancedPlan, status: correctStatus },
-                      payments
+                      fetchedPayments
                     )
                   }, 
-                  payments
+                  fetchedPayments
                 );
                 
                 setLoan(fullyEnhancedPlan);
@@ -255,20 +255,20 @@ export default function LoanDetailsPage({ params }: { params: LoanParams }) {
             
             // Try to fetch payments separately if they're not included
             if (!paymentData.payments || paymentData.payments.length === 0) {
-              await fetchPaymentsForLoan(paymentData.id, paymentData.installationId);
+              const fetchedPayments = await fetchPaymentsForLoan(paymentData.id, paymentData.installationId);
               
               // Now determine the correct status with the fetched payments
-              const correctStatus = determineLoanStatus(enhancedPlan, payments);
+              const correctStatus = determineLoanStatus(enhancedPlan, fetchedPayments);
               const fullyEnhancedPlan = enhanceCustomerInfo(
                 { 
                   ...enhancedPlan, 
                   status: correctStatus,
                   nextPaymentDate: determineNextPaymentDate(
                     { ...enhancedPlan, status: correctStatus },
-                    payments
+                    fetchedPayments
                   )
                 }, 
-                payments
+                fetchedPayments
               );
               
               setLoan(fullyEnhancedPlan);
@@ -346,7 +346,7 @@ export default function LoanDetailsPage({ params }: { params: LoanParams }) {
             if (filteredPayments.length > 0) {
               setPayments(filteredPayments);
               setLoadingPayments(false);
-              return;
+              return filteredPayments;
             }
           }
           
@@ -361,7 +361,7 @@ export default function LoanDetailsPage({ params }: { params: LoanParams }) {
             if (filteredPayments.length > 0) {
               setPayments(filteredPayments);
               setLoadingPayments(false);
-              return;
+              return filteredPayments;
             }
           }
         }
@@ -370,12 +370,15 @@ export default function LoanDetailsPage({ params }: { params: LoanParams }) {
         const planPayments = await paymentComplianceApi.getPaymentPlanReport(loanId, new Date().getTime());
         if (planPayments && planPayments.payments && planPayments.payments.length > 0) {
           setPayments(planPayments.payments);
+          return planPayments.payments;
         } else {
           console.log("No payments found for this loan through any method");
           setPayments([]);
+          return [];
         }
       } catch (paymentsError) {
         console.error("Error fetching payments:", paymentsError);
+        return [];
       } finally {
         setLoadingPayments(false);
       }

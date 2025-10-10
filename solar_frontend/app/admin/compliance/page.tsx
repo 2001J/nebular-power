@@ -1,6 +1,7 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
+import type { DateRange } from "react-day-picker"
 import {
   BarChart,
   CheckCircle2,
@@ -57,7 +58,7 @@ import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbP
 
 export default function CompliancePage() {
   const [activeTab, setActiveTab] = useState("security")
-  const [dateRange, setDateRange] = useState({
+  const [dateRange, setDateRange] = useState<DateRange>({
     from: subDays(new Date(), 30),
     to: new Date(),
   })
@@ -66,7 +67,7 @@ export default function CompliancePage() {
   const [reportType, setReportType] = useState("monthly")
 
   // Data states
-  const [securityData, setSecurityData] = useState([])
+  const [securityData, setSecurityData] = useState<any[]>([])
   const [paymentData, setPaymentData] = useState({
     totalPaymentsDue: 0,
     paidOnTime: 0,
@@ -75,15 +76,10 @@ export default function CompliancePage() {
     complianceRate: 0,
     details: []
   })
-  const [installationData, setInstallationData] = useState([])
-  const [activityLogs, setActivityLogs] = useState([])
+  const [installationData, setInstallationData] = useState<any[]>([])
+  const [activityLogs, setActivityLogs] = useState<any[]>([])
 
-  // Load data when component mounts or date range changes
-  useEffect(() => {
-    fetchReportData()
-  }, [dateRange, activeTab])
-
-  const fetchReportData = async () => {
+  const fetchReportData = useCallback(async () => {
     setIsLoading(true)
 
     try {
@@ -98,9 +94,9 @@ export default function CompliancePage() {
           // Ensure securityData is always an array
           if (Array.isArray(reportData)) {
             setSecurityData(reportData)
-          } else if (reportData && reportData.content && Array.isArray(reportData.content)) {
+          } else if (reportData?.content && Array.isArray((reportData as any).content)) {
             // Handle paginated response
-            setSecurityData(reportData.content)
+            setSecurityData((reportData as any).content)
           } else {
             console.error("Expected array for security data, got:", reportData)
             setSecurityData([])
@@ -125,9 +121,9 @@ export default function CompliancePage() {
           // Ensure installationData is always an array
           if (Array.isArray(reportData)) {
             setInstallationData(reportData)
-          } else if (reportData && reportData.content && Array.isArray(reportData.content)) {
+          } else if (reportData?.content && Array.isArray((reportData as any).content)) {
             // Handle paginated response
-            setInstallationData(reportData.content)
+            setInstallationData((reportData as any).content)
           } else {
             console.error("Expected array for installation data, got:", reportData)
             setInstallationData([])
@@ -137,9 +133,9 @@ export default function CompliancePage() {
           // Ensure we always set an array for activity logs
           if (Array.isArray(reportData)) {
             setActivityLogs(reportData)
-          } else if (reportData && reportData.content && Array.isArray(reportData.content)) {
+          } else if (reportData?.content && Array.isArray((reportData as any).content)) {
             // Handle paginated response
-            setActivityLogs(reportData.content)
+            setActivityLogs((reportData as any).content)
           } else {
             console.error("Expected array for activity logs, got:", reportData)
             setActivityLogs([])
@@ -184,9 +180,14 @@ export default function CompliancePage() {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [dateRange, activeTab])
 
-  const handleGenerateReport = async () => {
+  // Load data when component mounts or date range changes
+  useEffect(() => {
+    fetchReportData()
+  }, [fetchReportData])
+
+  const handleGenerateReport = useCallback(async () => {
     setIsLoading(true)
 
     try {
@@ -218,7 +219,7 @@ export default function CompliancePage() {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [activeTab, dateRange])
 
   return (
     <div className="space-y-6">
@@ -255,10 +256,10 @@ export default function CompliancePage() {
         <div className="flex-1">
           <DatePickerWithRange
             date={dateRange}
-            setDate={(newDateRange) => {
+            setDate={(newDateRange: DateRange) => {
               setDateRange(newDateRange);
               // Avoid API calls for incomplete date ranges
-              if (newDateRange.from && newDateRange.to) {
+              if (newDateRange?.from && newDateRange?.to) {
                 fetchReportData();
               }
             }}

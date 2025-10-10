@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { format } from "date-fns"
 import {
@@ -56,18 +56,8 @@ export default function LogsPage() {
   const [exporting, setExporting] = useState(false)
   const [initialLoadDone, setInitialLoadDone] = useState(false)
 
-  // Add a direct initial fetch when component mounts
-  useEffect(() => {
-    // This effect runs once on component mount to ensure logs are loaded
-    if (!initialLoadDone) {
-      console.log("🔄 Running initial logs fetch on component mount");
-      fetchLogsData();
-      setInitialLoadDone(true);
-    }
-  }, []);
-
   // Function to fetch logs data that can be called anywhere
-  const fetchLogsData = async () => {
+  const fetchLogsData = useCallback(async () => {
     try {
       console.log("📊 Fetching logs data with:", { timeRange, logType, page, pageSize });
       setLoading(true);
@@ -192,7 +182,17 @@ export default function LogsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [timeRange, logType, page, pageSize]);
+
+  // Add a direct initial fetch when component mounts
+  useEffect(() => {
+    // This effect runs once on component mount to ensure logs are loaded
+    if (!initialLoadDone) {
+      console.log("🔄 Running initial logs fetch on component mount");
+      fetchLogsData();
+      setInitialLoadDone(true);
+    }
+  }, [initialLoadDone, fetchLogsData]);
 
   // Load installation data for filtering
   useEffect(() => {
@@ -213,7 +213,7 @@ export default function LogsPage() {
     console.log("🔄 Dependencies changed for log fetch. Triggering fetch with:", 
       { timeRange, logType, page, pageSize, sortField, sortDirection });
     fetchLogsData();
-  }, [timeRange, logType, page, pageSize, sortField, sortDirection])
+  }, [timeRange, logType, page, pageSize, sortField, sortDirection, fetchLogsData])
 
   // Handle refreshing logs
   const handleRefreshLogs = () => {
@@ -233,7 +233,7 @@ export default function LogsPage() {
   }
 
   // Handle fetching security logs
-  const handleFetchSecurityLogs = async () => {
+  const handleFetchSecurityLogs = useCallback(async () => {
     try {
       setLoading(true);
 
@@ -512,7 +512,7 @@ export default function LogsPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [logType, timeRange, installations])
 
   // Handle tab change
   const handleTabChange = (value) => {
@@ -538,7 +538,7 @@ export default function LogsPage() {
       console.log("🔄 Security logs filter changed, auto-refreshing...");
       handleFetchSecurityLogs();
     }
-  }, [logType, timeRange, activeTab, initialLoadDone]);
+  }, [logType, timeRange, activeTab, initialLoadDone, handleFetchSecurityLogs]);
 
   // Filter logs based on search term
   const filteredLogs = activeTab === "operational" 

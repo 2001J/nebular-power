@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import React from "react"
 import {
@@ -44,8 +44,8 @@ export default function LoanPaymentsPage({ params }: { params: PaymentParams }) 
   const [refreshing, setRefreshing] = useState(false)
   const [showOnlyPaid, setShowOnlyPaid] = useState(true)
 
-  // Function to fetch payments
-  const fetchPayments = async (installationId, timestamp) => {
+  // Function to fetch payments (memoized)
+  const fetchPayments = useCallback(async (installationId, timestamp) => {
     try {
       // First try direct payment history report approach
       // Create date range - use a wide range to get all payments
@@ -105,7 +105,7 @@ export default function LoanPaymentsPage({ params }: { params: PaymentParams }) 
       console.error("Error fetching payments:", error);
       return [];
     }
-  };
+  }, [loanId]);
 
   // Refresh function to force reload of payment data
   const refreshPaymentData = async () => {
@@ -196,7 +196,7 @@ export default function LoanPaymentsPage({ params }: { params: PaymentParams }) 
     }
     
     fetchLoanPayments()
-  }, [loanId])
+  }, [loanId, fetchPayments])
 
   // Format status badge display
   const getStatusBadge = (status: string) => {

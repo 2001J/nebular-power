@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import React, { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { format, parseISO, subDays } from "date-fns"
 import {
@@ -127,6 +127,96 @@ export default function TamperResponsesPage() {
   const [responseDetailsOpen, setResponseDetailsOpen] = useState(false)
   const [activeTab, setActiveTab] = useState("events")
 
+  // Get installation name by ID (memoized)
+  const getInstallationName = useCallback((installationId) => {
+    const inst = installations.find(i => i.id === installationId)
+    return inst ? (inst.name || `Installation #${installationId}`) : `Installation #${installationId}`
+  }, [installations])
+
+  // Generate mock events for fallback (memoized)
+  const generateMockEvents = useCallback((count) => {
+    const eventTypes = ["PHYSICAL_MOVEMENT", "VOLTAGE_FLUCTUATION", "CONNECTION_INTERRUPTION", "LOCATION_CHANGE"]
+    const severities = ["HIGH", "MEDIUM", "LOW"]
+    const statuses = ["OPEN", "ACKNOWLEDGED", "IN_PROGRESS"]
+    const mockEvents = []
+
+    for (let i = 0; i < count; i++) {
+      const randomInstallation = installations.length > 0
+        ? installations[Math.floor(Math.random() * installations.length)]
+        : { id: `INST-${i + 100}`, name: `Demo Installation ${i + 1}` }
+
+      mockEvents.push({
+        id: `EVT-${Date.now()}-${i}`,
+        timestamp: new Date(Date.now() - Math.floor(Math.random() * 30 * 24 * 60 * 60 * 1000)).toISOString(),
+        eventType: eventTypes[Math.floor(Math.random() * eventTypes.length)],
+        severity: severities[Math.floor(Math.random() * severities.length)],
+        status: statuses[Math.floor(Math.random() * statuses.length)],
+        description: `Mock tamper event for demonstration purposes.`,
+        installationId: randomInstallation.id,
+        installationName: randomInstallation.name,
+        confidenceScore: Math.random().toFixed(2)
+      })
+    }
+
+    return mockEvents
+  }, [installations])
+
+  // Generate mock responses for fallback (memoized)
+  const generateMockResponses = useCallback((eventsArray, count) => {
+    const responseTypes = ["NOTIFICATION", "MANUAL_INTERVENTION", "AUTOMATIC_SHUTDOWN", "REPORT_GENERATION"]
+    const responseStatuses = ["COMPLETED", "PENDING", "FAILED"]
+    const mockResponses = []
+
+    for (let i = 0; i < count; i++) {
+      const randomEvent = eventsArray.length > 0
+        ? eventsArray[Math.floor(Math.random() * eventsArray.length)]
+        : { id: `EVT-MOCK-${i}`, installationId: `INST-${i + 100}` }
+
+      mockResponses.push({
+        id: `RESP-${Date.now()}-${i}`,
+        eventId: randomEvent.id,
+        timestamp: new Date(Date.now() - Math.floor(Math.random() * 30 * 24 * 60 * 60 * 1000)).toISOString(),
+        responseType: responseTypes[Math.floor(Math.random() * responseTypes.length)],
+        status: responseStatuses[Math.floor(Math.random() * responseStatuses.length)],
+        description: `Mock response action for tamper event.`,
+        actionTaken: `Simulated response action ${i + 1}.`,
+        createdBy: Math.random() > 0.5 ? "system" : "admin",
+        installationId: randomEvent.installationId
+      })
+    }
+
+    return mockResponses
+  }, [])
+
+  // Apply filters to responses (memoized)
+  const applyFilters = useCallback((responsesData = responses) => {
+    const filtered = responsesData.filter(response => {
+      // Response type filter
+      if (responseType !== "all" && response.responseType !== responseType) return false
+
+      // Installation filter
+      if (installation !== "all" && response.installationId !== installation) return false
+
+      // Search term filter
+      if (searchTerm && searchTerm.length > 0) {
+        const searchLower = searchTerm.toLowerCase()
+        const matchesDescription = response.description?.toLowerCase().includes(searchLower)
+        const matchesAction = response.actionTaken?.toLowerCase().includes(searchLower)
+        const matchesEventId = response.eventId?.toLowerCase().includes(searchLower)
+        const matchesInstallation = getInstallationName(response.installationId)?.toLowerCase().includes(searchLower)
+
+        if (!matchesDescription && !matchesAction && !matchesEventId && !matchesInstallation) return false
+      }
+
+      return true
+    })
+
+    // Sort by timestamp, newest first
+    filtered.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+
+    setFilteredResponses(filtered)
+  }, [responses, responseType, installation, searchTerm, getInstallationName])
+
   // Fetch tamper events and responses
   useEffect(() => {
     const fetchData = async () => {
@@ -209,7 +299,7 @@ export default function TamperResponsesPage() {
     }
 
     fetchData()
-  }, [dateRange, responseType, installation, isRefreshing])
+  }, [dateRange, responseType, installation, isRefreshing, applyFilters, generateMockEvents, generateMockResponses])
 
   // Fetch responses for selected event
   useEffect(() => {
@@ -230,9 +320,10 @@ export default function TamperResponsesPage() {
     }
 
     fetchEventResponses()
-  }, [selectedEvent])
+  }, [selectedEvent, generateMockResponses])
 
-  // Generate mock events for fallback
+  /*
+  // Generate mock events for fallback (moved up and memoized)
   const generateMockEvents = (count) => {
     const eventTypes = ["PHYSICAL_MOVEMENT", "VOLTAGE_FLUCTUATION", "CONNECTION_INTERRUPTION", "LOCATION_CHANGE"]
     const severities = ["HIGH", "MEDIUM", "LOW"]
@@ -260,7 +351,7 @@ export default function TamperResponsesPage() {
     return mockEvents
   }
 
-  // Generate mock responses for fallback
+  // Generate mock responses for fallback (moved up and memoized)
   const generateMockResponses = (eventsArray, count) => {
     const responseTypes = ["NOTIFICATION", "MANUAL_INTERVENTION", "AUTOMATIC_SHUTDOWN", "REPORT_GENERATION"]
     const responseStatuses = ["COMPLETED", "PENDING", "FAILED"]
@@ -287,7 +378,7 @@ export default function TamperResponsesPage() {
     return mockResponses
   }
 
-  // Apply filters to responses
+  // Apply filters to responses (moved up and memoized)
   const applyFilters = (responsesData = responses) => {
     const filtered = responsesData.filter(response => {
       // Response type filter
@@ -319,18 +410,19 @@ export default function TamperResponsesPage() {
   // Apply filters when filter values change
   useEffect(() => {
     applyFilters()
-  }, [searchTerm])
+  }, [searchTerm, applyFilters])
 
   // Refresh data
   const refreshData = () => {
     setIsRefreshing(true)
   }
 
-  // Get installation name by ID
+  // Get installation name by ID (moved up and memoized)
   const getInstallationName = (installationId) => {
     const installation = installations.find(i => i.id === installationId)
     return installation ? (installation.name || `Installation #${installationId}`) : `Installation #${installationId}`
   }
+  */
 
   // Get event by ID
   const getEventById = (eventId) => {

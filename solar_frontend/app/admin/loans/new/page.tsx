@@ -161,6 +161,9 @@ export default function NewLoanPage() {
     }
   });
 
+  // Watch customerId changes once per render
+  const watchedCustomerId = form.watch("customerId");
+
   // Load global payment settings on component mount
   useEffect(() => {
     const fetchGlobalSettings = async () => {
@@ -271,7 +274,7 @@ export default function NewLoanPage() {
       }
     };
 
-    const customerId = form.watch("customerId");
+    const customerId = watchedCustomerId;
     console.log("Customer ID changed to:", customerId);
 
     if (customerId) {
@@ -284,7 +287,7 @@ export default function NewLoanPage() {
       setInstallations([]);
       setSelectedCustomer(null);
     }
-  }, [form.watch("customerId"), customers]);
+  }, [watchedCustomerId, customers]);
 
   // Handle form submission
   const onSubmit = async (data) => {

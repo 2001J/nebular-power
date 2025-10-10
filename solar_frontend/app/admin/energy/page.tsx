@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import {
   BarChart3,
@@ -94,14 +94,564 @@ export default function EnergyMonitoringPage() {
   const [averageEfficiency, setAverageEfficiency] = useState(0)
 
   // Handle time range change with proper type
-  const handleTimeRangeChange = (value: string) => {
+  const handleTimeRangeChange = useCallback((value: string) => {
+    // Changing timeRange triggers the useEffect that calls fetchEnergyData
     setTimeRange(value);
-    // Trigger data fetch when time range changes
-    fetchEnergyData();
-  };
+  }, [])
+
+  /*
+  // Create basic chart data when real readings aren't available
+  const createBasicChartData = (systemResponse: any, timeRangeType: string) => {
+    let basicChartData: Array<{
+      name: string;
+      total: number;
+      residential: number;
+      commercial: number;
+      industrial: number;
+      consumption: number;
+    }> = [];
+
+    // Handle null systemResponse to prevent TypeError
+    if (!systemResponse) {
+      console.warn('System response is null, generating empty chart data');
+
+      // Create empty chart structure based on time range
+      if (timeRangeType === 'day') {
+        // Return 24 empty hour slots for a day
+        for (let hour = 0; hour < 24; hour++) {
+          basicChartData.push({
+            name: `${hour}:00`,
+            total: 0,
+            residential: 0,
+            commercial: 0,
+            industrial: 0,
+            consumption: 0
+          });
+        }
+      } else if (timeRangeType === 'week') {
+        // Return 7 empty day slots
+        const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+        for (let day = 0; day < 7; day++) {
+          basicChartData.push({
+            name: dayNames[day],
+            total: 0,
+            residential: 0,
+            commercial: 0,
+            industrial: 0,
+            consumption: 0
+          });
+        }
+      } else if (timeRangeType === 'month') {
+        // Return ~30 empty day slots for a month
+        for (let day = 1; day <= 30; day++) {
+          basicChartData.push({
+            name: `${day}`,
+            total: 0,
+            residential: 0,
+            commercial: 0,
+            industrial: 0,
+            consumption: 0
+          });
+        }
+      } else { // year
+        // Return 12 empty month slots for a year
+        const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        for (let month = 0; month < 12; month++) {
+          basicChartData.push({
+            name: monthNames[month],
+            total: 0,
+            residential: 0,
+            commercial: 0,
+            industrial: 0,
+            consumption: 0
+          });
+        }
+      }
+
+      return basicChartData;
+    }
+
+    // Continue with the existing function for non-null system response
+    // Get exact values from the system overview
+    const todayTotal = systemResponse.todayTotalGenerationKWh || 0;
+    const weekTotal = systemResponse.weekToDateGenerationKWh || 0;
+    const monthTotal = systemResponse.monthToDateGenerationKWh || 0;
+    const yearTotal = systemResponse.yearToDateGenerationKWh || 0;
+
+    // Use actual data regardless of size - this is a real system
+    const isVerySmallToday = todayTotal < 0.001;
+    const isVerySmallWeek = weekTotal < 0.001;
+    const isVerySmallMonth = monthTotal < 0.001;
+    const isVerySmallYear = yearTotal < 0.001;
+
+    // Get consumption totals if available, or estimate them
+    const todayConsumption = systemResponse.todayTotalConsumptionKWh || todayTotal * 0.7;
+    const weekConsumption = systemResponse.weekToDateConsumptionKWh || weekTotal * 0.7;
+    const monthConsumption = systemResponse.monthToDateConsumptionKWh || monthTotal * 0.7;
+    const yearConsumption = systemResponse.yearToDateConsumptionKWh || yearTotal * 0.7;
+
+    console.log('Chart data metrics:', {
+      timeRangeType,
+      todayTotal,
+      weekTotal,
+      monthTotal,
+      yearTotal,
+      isVerySmallToday,
+      isVerySmallWeek,
+      isVerySmallMonth,
+      isVerySmallYear
+    });
+
+    if (timeRangeType === 'day') {
+      // Generate realistic hourly data with solar curve pattern
+      for (let hour = 0; hour < 24; hour++) {
+        let productionFactor = 0;
+        let consumptionFactor = 0.3; // Base load
+        
+        // Solar production curve (bell curve peaking at noon)
+        if (hour >= 6 && hour <= 18) {
+          const hoursFromNoon = Math.abs(hour - 12);
+          productionFactor = Math.max(0, 1 - (hoursFromNoon / 6) * 0.8);
+        }
+        
+        // Simulate realistic total values scaled to daily total
+        const total = todayTotal * (productionFactor / 10);
+        const consumption = todayConsumption * (Math.max(consumptionFactor, productionFactor * 0.6) / 10);
+
+        // Distribute between categories based on typical ratios
+        basicChartData.push({
+          name: `${hour}:00`,
+          total: total,
+          residential: total * 0.5,
+          commercial: total * 0.35,
+          industrial: total * 0.15,
+          consumption: consumption
+        });
+      }
+    } else if (timeRangeType === 'week') {
+      const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+      const base = weekTotal / 7;
+      const baseConsumption = weekConsumption / 7;
+      for (let day = 0; day < 7; day++) {
+        // Slight variation per day
+        const variation = 1 + (Math.sin(day) * 0.1);
+        const total = base * variation;
+        const consumption = baseConsumption * variation;
+        basicChartData.push({
+          name: dayNames[day],
+          total: total,
+          residential: total * 0.5,
+          commercial: total * 0.35,
+          industrial: total * 0.15,
+          consumption: consumption
+        });
+      }
+    } else if (timeRangeType === 'month') {
+      const now = new Date();
+      const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+      const base = monthTotal / daysInMonth;
+      const baseConsumption = monthConsumption / daysInMonth;
+      for (let day = 1; day <= daysInMonth; day++) {
+        // Slight variation across the month
+        const variation = 1 + (Math.sin(day / 5) * 0.05);
+        const total = base * variation;
+        const consumption = baseConsumption * variation;
+        basicChartData.push({
+          name: `${day}`,
+          total: total,
+          residential: total * 0.5,
+          commercial: total * 0.35,
+          industrial: total * 0.15,
+          consumption: consumption
+        });
+      }
+    } else { // year
+      const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      const base = yearTotal / 12;
+      const baseConsumption = yearConsumption / 12;
+      for (let month = 0; month < 12; month++) {
+        // Seasonal variation: higher in summer months
+        const seasonalFactor = 1 + (Math.sin((month - 1) / 2) * 0.15);
+        const total = base * seasonalFactor;
+        const consumption = baseConsumption * seasonalFactor;
+        basicChartData.push({
+          name: monthNames[month],
+          total: total,
+          residential: total * 0.5,
+          commercial: total * 0.35,
+          industrial: total * 0.15,
+          consumption: consumption
+        });
+      }
+    }
+
+    return basicChartData;
+  }
+*/
+
+  // Transform raw installation readings into chart data (memoized)
+  const transformReadingsToChartData = useCallback((
+    readings: any[],
+    timeRangeType: string,
+    overviewData?: any
+  ) => {
+    if (!readings || readings.length === 0) return []
+
+    // Sort readings by timestamp in ascending order
+    const sortedReadings = [...readings].sort((a, b) => 
+      new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+    )
+
+    const getGenerationKWh = (reading: any): number => {
+      if (typeof reading.energyProduced === 'number') return reading.energyProduced
+      if (typeof reading.totalGenerationKWh === 'number') return reading.totalGenerationKWh
+      if (typeof reading.dailyYieldKWh === 'number') return reading.dailyYieldKWh
+      if (typeof reading.powerGenerationWatts === 'number') return reading.powerGenerationWatts / 1000
+      return 0
+    }
+
+    const getConsumptionKWh = (reading: any): number => {
+      if (typeof reading.energyConsumed === 'number') return reading.energyConsumed
+      if (typeof reading.totalConsumptionKWh === 'number') return reading.totalConsumptionKWh
+      if (typeof reading.dailyConsumptionKWh === 'number') return reading.dailyConsumptionKWh
+      if (typeof reading.powerConsumptionWatts === 'number') return reading.powerConsumptionWatts / 1000
+      return 0
+    }
+
+    // Always use provided overview data
+    const overview = overviewData
+
+    if (!overview) {
+      console.warn('overviewData is null in transformReadingsToChartData, using empty chart structure');
+      // Return empty data with the correct structure for each time range
+      return createBasicChartData(null, timeRangeType);
+    }
+
+    // Get exact values from the system overview to use as reference
+    const todayTotal = overview.todayTotalGenerationKWh || 0;
+    const weekTotal = overview.weekToDateGenerationKWh || 0;
+    const monthTotal = overview.monthToDateGenerationKWh || 0;
+    const yearTotal = overview.yearToDateGenerationKWh || 0;
+
+    // Get consumption totals for normalization
+    const todayConsumption = overview.todayTotalConsumptionKWh || 0;
+    const weekConsumption = overview.weekToDateConsumptionKWh || 0;
+    const monthConsumption = overview.monthToDateConsumptionKWh || 0;
+    const yearConsumption = overview.yearToDateConsumptionKWh || 0;
+
+    // For very small values (below threshold), treat them as zero to prevent misleading visualizations 
+    // BUT ONLY FOR PRODUCTION - we still want to show consumption data even with tiny production
+    const isVerySmallToday = todayTotal < 0.001 && todayConsumption < 0.001;
+    const isVerySmallWeek = weekTotal < 0.001 && weekConsumption < 0.001;
+    const isVerySmallMonth = monthTotal < 0.001 && monthConsumption < 0.001;
+    const isVerySmallYear = yearTotal < 0.001 && yearConsumption < 0.001;
+
+    // Determine if we should show zero values based on timeRange
+    // Only if BOTH production AND consumption are very small
+    const shouldUseZeroValues = 
+      (timeRangeType === 'day' && isVerySmallToday) ||
+      (timeRangeType === 'week' && isVerySmallWeek) ||
+      (timeRangeType === 'month' && isVerySmallMonth) ||
+      (timeRangeType === 'year' && isVerySmallYear);
+
+    console.log(`Energy metrics for ${timeRangeType}:`, {
+      timeRangeType,
+      todayTotal, 
+      weekTotal,
+      monthTotal,
+      yearTotal,
+      todayConsumption,
+      weekConsumption,
+      monthConsumption,
+      yearConsumption,
+      isVerySmallToday,
+      isVerySmallWeek,
+      isVerySmallMonth, 
+      isVerySmallYear,
+    })
+
+    // Calculate normalization factors to make the chart roughly match the overview totals
+    const totalGeneration = sortedReadings.reduce((sum, reading) => sum + getGenerationKWh(reading), 0)
+    const totalConsumption = sortedReadings.reduce((sum, reading) => sum + getConsumptionKWh(reading), 0)
+
+    const productionNormalizationFactor = totalGeneration > 0 && (timeRangeType === 'day' ? todayTotal > 0 : timeRangeType === 'week' ? weekTotal > 0 : timeRangeType === 'month' ? monthTotal > 0 : yearTotal > 0)
+      ? (timeRangeType === 'day' ? todayTotal / totalGeneration : timeRangeType === 'week' ? weekTotal / totalGeneration : timeRangeType === 'month' ? monthTotal / totalGeneration : yearTotal / totalGeneration)
+      : 1
+    const consumptionNormalizationFactor = totalConsumption > 0 && (timeRangeType === 'day' ? todayConsumption > 0 : timeRangeType === 'week' ? weekConsumption > 0 : timeRangeType === 'month' ? monthConsumption > 0 : yearConsumption > 0)
+      ? (timeRangeType === 'day' ? todayConsumption / totalConsumption : timeRangeType === 'week' ? weekConsumption / totalConsumption : timeRangeType === 'month' ? monthConsumption / totalConsumption : yearConsumption / totalConsumption)
+      : 1
+
+    const installationReadings = {}
+
+    sortedReadings.forEach(reading => {
+      const installationId = reading.installationId || 'unknown'
+
+      if (!installationReadings[installationId]) {
+        installationReadings[installationId] = []
+      }
+
+      installationReadings[installationId].push(reading)
+    })
+
+    // Process each time range based on proper timestamps from individual installations
+    if (timeRangeType === 'day') {
+      // Group by hour for day view with timestamps
+      const hourlyData = {}
+
+      // Initialize all hours to ensure complete data
+      for (let h = 0; h < 24; h++) {
+        const hourLabel = `${h}:00`
+        hourlyData[hourLabel] = {
+          name: hourLabel,
+          total: 0,
+          residential: 0,
+          commercial: 0,
+          industrial: 0,
+          consumption: 0,
+          count: 0
+        }
+      }
+
+      // Process readings from each installation
+      Object.values(installationReadings).forEach(instReadings => {
+        instReadings.forEach(reading => {
+          if (!reading.timestamp) return
+
+          const date = new Date(reading.timestamp)
+          const hour = date.getHours()
+          const hourLabel = `${hour}:00`
+
+          // Add values - normalize to match the summary total
+          const generationKWh = getGenerationKWh(reading) * productionNormalizationFactor
+          hourlyData[hourLabel].total += generationKWh
+
+          // Categorize by installation type
+          const type = reading.installationType?.toUpperCase() || 'RESIDENTIAL'
+          if (type === 'RESIDENTIAL') {
+            hourlyData[hourLabel].residential += generationKWh
+          } else if (type === 'COMMERCIAL') {
+            hourlyData[hourLabel].commercial += generationKWh
+          } else if (type === 'INDUSTRIAL') {
+            hourlyData[hourLabel].industrial += generationKWh
+          } else {
+            // Default to residential if unknown
+            hourlyData[hourLabel].residential += generationKWh
+          }
+
+          // Normalize consumption data using the consumption factor
+          hourlyData[hourLabel].consumption += getConsumptionKWh(reading) * consumptionNormalizationFactor
+          hourlyData[hourLabel].count += 1
+        })
+      })
+
+      // Calculate hourly averages and return sorted by hour
+      return Object.values(hourlyData).map(hour => {
+        const result = { ...hour }
+        delete result.count
+        return result
+      }).sort((a, b) => {
+        // Sort by hour
+        return parseInt((a as any).name.split(':')[0]) - parseInt((b as any).name.split(':')[0])
+      })
+    } else if (timeRangeType === 'week') {
+      // Group by day for week view
+      const dailyData = {}
+      const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+
+      // Initialize all days to ensure complete data
+      dayNames.forEach(day => {
+        dailyData[day] = {
+          name: day,
+          total: 0,
+          residential: 0,
+          commercial: 0,
+          industrial: 0,
+          consumption: 0,
+          count: 0
+        }
+      })
+
+      // Process readings from each installation
+      Object.values(installationReadings).forEach(instReadings => {
+        instReadings.forEach(reading => {
+          if (!reading.timestamp) return
+
+          const date = new Date(reading.timestamp)
+          const day = date.getDay() // 0-6, Sunday is 0
+          const dayLabel = dayNames[day]
+
+          // Add values - normalize to match the summary total
+          const generationKWh = getGenerationKWh(reading) * productionNormalizationFactor
+          dailyData[dayLabel].total += generationKWh
+
+          // Categorize by installation type
+          const type = reading.installationType?.toUpperCase() || 'RESIDENTIAL'
+          if (type === 'RESIDENTIAL') {
+            dailyData[dayLabel].residential += generationKWh
+          } else if (type === 'COMMERCIAL') {
+            dailyData[dayLabel].commercial += generationKWh
+          } else if (type === 'INDUSTRIAL') {
+            dailyData[dayLabel].industrial += generationKWh
+          } else {
+            // Default to residential if unknown
+            dailyData[dayLabel].residential += generationKWh
+          }
+
+          // Normalize consumption data using the consumption factor
+          dailyData[dayLabel].consumption += getConsumptionKWh(reading) * consumptionNormalizationFactor
+          dailyData[dayLabel].count += 1
+        })
+      })
+
+      // Rearrange days to start with Monday
+      const orderedDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+
+      // Return data in proper order
+      return orderedDays.map(day => {
+        const result = { ...dailyData[day] }
+        delete (result as any).count
+        return result
+      })
+    } else if (timeRangeType === 'month') {
+      // Group by day for month view
+      const monthData = {}
+
+      // Initialize all days to ensure complete data (assuming 31 days for completeness)
+      for (let d = 1; d <= 31; d++) {
+        const dayLabel = d.toString()
+        monthData[dayLabel] = {
+          name: dayLabel,
+          total: 0,
+          residential: 0,
+          commercial: 0,
+          industrial: 0,
+          consumption: 0,
+          count: 0
+        }
+      }
+
+      // Process readings from each installation
+      Object.values(installationReadings).forEach(instReadings => {
+        instReadings.forEach(reading => {
+          if (!reading.timestamp) return
+
+          const date = new Date(reading.timestamp)
+          const day = date.getDate()
+          const dayLabel = day.toString()
+
+          // Add values - normalize to match the summary total
+          const generationKWh = getGenerationKWh(reading) * productionNormalizationFactor
+          monthData[dayLabel].total += generationKWh
+
+          // Categorize by installation type
+          const type = reading.installationType?.toUpperCase() || 'RESIDENTIAL'
+          if (type === 'RESIDENTIAL') {
+            monthData[dayLabel].residential += generationKWh
+          } else if (type === 'COMMERCIAL') {
+            monthData[dayLabel].commercial += generationKWh
+          } else if (type === 'INDUSTRIAL') {
+            monthData[dayLabel].industrial += generationKWh
+          } else {
+            // Default to residential if unknown
+            monthData[dayLabel].residential += generationKWh
+          }
+
+          // Normalize consumption data using the consumption factor
+          monthData[dayLabel].consumption += getConsumptionKWh(reading) * consumptionNormalizationFactor
+          monthData[dayLabel].count += 1
+        })
+      })
+
+      // Calculate averages and sort by day
+      // Show all days of the month, including days with zero readings
+      // Only filter out days beyond the current month's actual days
+      const now = new Date()
+      const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()
+      
+      return Object.values(monthData)
+        .filter((day: any) => parseInt((day as any).name) <= daysInMonth)  // Only show actual days of this month
+        .map((dayData: any) => {
+          const result = { ...dayData }
+          delete (result as any).count
+          return result
+        })
+        .sort((a: any, b: any) => parseInt((a as any).name) - parseInt((b as any).name))
+    } else {
+      // Group by month for year view
+      const yearData = {}
+      const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+      // Initialize all months to ensure complete data
+      monthNames.forEach(month => {
+        yearData[month] = {
+          name: month,
+          total: 0,
+          residential: 0,
+          commercial: 0,
+          industrial: 0,
+          consumption: 0,
+          count: 0
+        }
+      })
+
+      // Process readings from each installation
+      Object.values(installationReadings).forEach(instReadings => {
+        instReadings.forEach(reading => {
+          if (!reading.timestamp) return
+
+          const date = new Date(reading.timestamp)
+          const month = date.getMonth()
+          const monthLabel = monthNames[month]
+
+          // Add values - normalize to match the summary total
+          const generationKWh = getGenerationKWh(reading) * productionNormalizationFactor
+          yearData[monthLabel].total += generationKWh
+
+          // Categorize by installation type
+          const type = reading.installationType?.toUpperCase() || 'RESIDENTIAL'
+          if (type === 'RESIDENTIAL') {
+            yearData[monthLabel].residential += generationKWh
+          } else if (type === 'COMMERCIAL') {
+            yearData[monthLabel].commercial += generationKWh
+          } else if (type === 'INDUSTRIAL') {
+            yearData[monthLabel].industrial += generationKWh
+          } else {
+            // Default to residential if unknown
+            yearData[monthLabel].residential += generationKWh
+          }
+
+          // Normalize consumption data using the consumption factor
+          yearData[monthLabel].consumption += getConsumptionKWh(reading) * consumptionNormalizationFactor
+          yearData[monthLabel].count += 1
+        })
+      })
+
+      // Return data in proper month order
+      return monthNames.map(month => {
+        const result = { ...yearData[month] }
+        delete (result as any).count
+        return result
+      })
+    }
+  }, [])
+
+  // Helper function to process recent readings directly from system overview
+  const processRecentReadings = useCallback((readings, timeRangeType, overviewData) => {
+    // Map API readings to consistent format while preserving original units (kWh)
+    const formattedReadings = readings.map(reading => ({
+      timestamp: reading.timestamp,
+      energyProduced: reading.energyProduced ?? null,
+      energyConsumed: reading.energyConsumed ?? null,
+      installationId: reading.installationId,
+      installationType: reading.installationType || 'RESIDENTIAL'
+    }))
+
+    // Use the transformed readings function with our expected totals
+    return transformReadingsToChartData(formattedReadings, timeRangeType, overviewData)
+  }, [transformReadingsToChartData])
 
   // Load energy data
-  const fetchEnergyData = async () => {
+  const fetchEnergyData = useCallback(async () => {
     try {
       setLoading(true)
 
@@ -218,28 +768,13 @@ export default function EnergyMonitoringPage() {
     } finally {
       setLoading(false)
     }
-  }
-
-  // Helper function to process recent readings directly from system overview
-  const processRecentReadings = (readings, timeRangeType, overviewData) => {
-    // Map API readings to consistent format while preserving original units (kWh)
-    const formattedReadings = readings.map(reading => ({
-      timestamp: reading.timestamp,
-      energyProduced: reading.energyProduced ?? null,
-      energyConsumed: reading.energyConsumed ?? null,
-      installationId: reading.installationId,
-      installationType: reading.installationType || 'RESIDENTIAL'
-    }))
-
-    // Use the transformed readings function with our expected totals
-    return transformReadingsToChartData(formattedReadings, timeRangeType, overviewData)
-  }
+  }, [timeRange, toast, processRecentReadings, transformReadingsToChartData])
 
   // Auto-fetch data when component mounts or timeRange changes
   useEffect(() => {
     console.log("🔄 Initial data fetch for energy monitoring with timeRange:", timeRange);
     fetchEnergyData();
-  }, [timeRange]);
+  }, [timeRange, fetchEnergyData]);
 
   // Additional useEffect for initialization
   useEffect(() => {
@@ -261,6 +796,7 @@ export default function EnergyMonitoringPage() {
     }
   }
 
+  /*
   // Transform raw installation readings into chart data
   const transformReadingsToChartData = (
     readings: any[],
@@ -644,6 +1180,7 @@ export default function EnergyMonitoringPage() {
       })
     }
   }
+*/
 
   // Create basic chart data when real readings aren't available
   const createBasicChartData = (systemResponse: any, timeRangeType: string) => {

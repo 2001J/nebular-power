@@ -202,7 +202,7 @@ export default function DashboardPage() {
     if (user) {
       fetchInstallations()
     }
-  }, [user, toast])
+  }, [user, toast, selectedInstallation])
 
   // Fetch dashboard data when installation is selected
   useEffect(() => {

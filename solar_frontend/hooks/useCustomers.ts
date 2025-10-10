@@ -69,7 +69,7 @@ export function useCustomers(options?: { searchDebounceMs?: number }): UseCustom
       }
       return await customerApi.getAllCustomers(page, pageSize);
     },
-    [user?.role]
+    [user]
   );
 
   const paginatedData = usePaginatedData<Customer>(fetchCustomers, {
@@ -173,7 +173,7 @@ export function useCustomers(options?: { searchDebounceMs?: number }): UseCustom
       // Add payment filter logic here if needed
       return true;
     });
-  }, [paginatedData.data, statusFilter, paymentFilter]);
+  }, [paginatedData.data, statusFilter]);
 
   return {
     customers: filteredCustomers,
