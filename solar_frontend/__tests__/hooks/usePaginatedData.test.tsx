@@ -1,10 +1,10 @@
-import React from 'react';
+// no default React import needed with automatic JSX runtime
 import { describe, expect, test, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
-import { act } from 'react-dom/test-utils';
+import { act } from 'react';
 import { usePaginatedData } from '@/hooks/shared/useAsyncState';
 
-function Wrapper({ fetcher }: { fetcher: any }) {
+function Wrapper({ fetcher }: Readonly<{ fetcher: any }>) {
   const state = usePaginatedData<any>(fetcher, { pageSize: 5, searchDebounceMs: 100 });
   return (
     <div>

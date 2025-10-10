@@ -23,22 +23,13 @@ export default defineConfig({
         'lib/api.legacy.bak.ts',
         'components/ui/**',
         'app/**',
+        // No longer excluding chart helpers; they now have tests
         // Low-value helpers and fixtures
         'lib/mockData.ts',
         'lib/logsApiTest.ts',
-        // Untested API modules (to be covered later)
-        'lib/api/compliance.ts',
-        'lib/api/customers.ts',
-        'lib/api/service.ts',
-        'lib/api/tamperDetection.ts',
+        // Types only (no runtime logic)
         'lib/api/types.ts',
-        'lib/api/user.ts',
-        // Temporarily exclude low-coverage API modules until tests are expanded
-        'lib/api/auth.ts',
-        'lib/api/installations.ts',
-        'lib/api/paymentCompliance.ts',
-        'lib/api/security.ts',
-        'lib/api/serviceControl.ts',
+        // No API modules excluded here; we now cover them with tests
         // Hooks wrappers or integration-heavy hooks (to be covered later)
         'hooks/index.ts',
         'hooks/auth.ts',
@@ -56,10 +47,10 @@ export default defineConfig({
         'components/shared/LoadingStates.tsx',
       ],
       thresholds: {
-        lines: 70,
-        functions: 65,
-        branches: 60,
-        statements: 70,
+        lines: 78,
+        functions: 75,
+        branches: 65,
+        statements: 78,
       },
     },
   },

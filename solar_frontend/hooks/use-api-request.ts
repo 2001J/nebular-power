@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import { toast } from '@/components/ui/use-toast';
 import { AxiosError, AxiosRequestConfig, AxiosResponse } from 'axios';
 import { apiClient } from '@/lib/api/client';
@@ -48,7 +48,7 @@ export function useApiRequest<T = any>(
     () => void
   ] {
   // Merge options with defaults
-  const mergedOptions = { ...defaultOptions, ...options };
+  const mergedOptions = useMemo(() => ({ ...defaultOptions, ...options }), [options]);
 
   // Initialize state
   const [state, setState] = useState<ApiRequestState<T>>({
