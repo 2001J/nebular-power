@@ -126,17 +126,25 @@ export default function DashboardPage() {
   const [hasError, setHasError] = useState(false)
   const [systemStatus, setSystemStatus] = useState<SystemStatus | null>(null)
 
-  // Theme-aware chart colors
+  // Theme-aware chart colors based on CSS variables for consistency
   const chartColors = {
-    grid: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)',
-    referenceLine: theme === 'dark' ? '#ffffff' : '#000000',
+    grid: 'hsl(var(--border))',
+    referenceLine: 'hsl(var(--muted-foreground))',
     production: {
-      stroke: '#16a34a',
-      fill: theme === 'dark' ? 'rgba(22, 163, 74, 0.5)' : 'rgba(22, 163, 74, 0.3)'
+      stroke: 'hsl(var(--chart-1))',
+      fill: 'hsl(var(--chart-1) / 0.35)'
     },
     consumption: {
-      stroke: '#ef4444',
-      fill: theme === 'dark' ? 'rgba(239, 68, 68, 0.5)' : 'rgba(239, 68, 68, 0.3)'
+      stroke: 'hsl(var(--chart-2))',
+      fill: 'hsl(var(--chart-2) / 0.35)'
+    },
+    axis: {
+      tick: 'hsl(var(--muted-foreground))'
+    },
+    tooltip: {
+      bg: 'hsl(var(--popover))',
+      fg: 'hsl(var(--popover-foreground))',
+      border: 'hsl(var(--border))'
     }
   }
 
@@ -948,12 +956,16 @@ export default function DashboardPage() {
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={chartColors.grid} />
               <XAxis 
                 dataKey="time" 
-                tick={{ fontSize: 12 }}
+                tick={{ fontSize: 12, fill: chartColors.axis.tick }}
+                axisLine={{ stroke: chartColors.grid }}
+                tickLine={{ stroke: chartColors.grid }}
                 tickFormatter={(time) => time.split(':')[0]}
-                label={{ value: "Hour", position: "insideBottom", offset: -10 }}
+                label={{ value: "Hour", position: "insideBottom", offset: -10, fill: chartColors.axis.tick }}
               />
               <YAxis 
-                tick={{ fontSize: 12 }}
+                tick={{ fontSize: 12, fill: chartColors.axis.tick }}
+                axisLine={{ stroke: chartColors.grid }}
+                tickLine={{ stroke: chartColors.grid }}
                 tickFormatter={(value) => {
                   if (value === 0) return '0';
                   if (value < 0.001) return value.toFixed(4);
@@ -961,7 +973,7 @@ export default function DashboardPage() {
                   if (value >= 1000) return `${(value / 1000).toFixed(1)}k`;
                   return value.toFixed(1);
                 }}
-                label={{ value: "Power (kW)", angle: -90, position: "insideLeft" }}
+                label={{ value: "Power (kW)", angle: -90, position: "insideLeft", fill: chartColors.axis.tick }}
               />
               <Tooltip 
                 formatter={(value: number) => {
@@ -971,6 +983,8 @@ export default function DashboardPage() {
                   return [`${value.toFixed(2)} kW`, ''];
                 }} 
                 labelFormatter={(label) => `${label} (Hour)`}
+                contentStyle={{ background: chartColors.tooltip.bg, border: `1px solid ${chartColors.tooltip.border}`, borderRadius: 8, color: chartColors.tooltip.fg }}
+                labelStyle={{ color: chartColors.axis.tick }}
               />
               <Legend content={<CustomLegend />} />
               {visibleSeries.production && (
@@ -980,8 +994,7 @@ export default function DashboardPage() {
                   name="Generation"
                   stackId="1"
                   stroke={chartColors.production.stroke}
-                  fill={chartColors.production.stroke}
-                  fillOpacity={theme === 'dark' ? 0.5 : 0.3}
+                  fill={chartColors.production.fill}
                 />
               )}
               {visibleSeries.consumption && (
@@ -991,8 +1004,7 @@ export default function DashboardPage() {
                   name="Consumption"
                   stackId="2"
                   stroke={chartColors.consumption.stroke}
-                  fill={chartColors.consumption.stroke}
-                  fillOpacity={theme === 'dark' ? 0.5 : 0.3}
+                  fill={chartColors.consumption.fill}
                 />
               )}
             </AreaChart>
@@ -1016,22 +1028,27 @@ export default function DashboardPage() {
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={chartColors.grid} />
               <XAxis 
                 dataKey="time" 
-                tick={{ fontSize: 12 }}
+                tick={{ fontSize: 12, fill: chartColors.axis.tick }}
+                axisLine={{ stroke: chartColors.grid }}
+                tickLine={{ stroke: chartColors.grid }}
                 {...(selectedPeriod === 'month' ? {
                   interval: 2,
                   angle: -45,
                   textAnchor: 'end',
                   height: 60
                 } : {})}
-                label={{ 
-                  value: selectedPeriod === 'week' ? "Day" : 
-                         selectedPeriod === 'month' ? "Day of Month" : "Month", 
+              label={{ 
+                 value: selectedPeriod === 'week' ? "Day" : 
+                        selectedPeriod === 'month' ? "Day of Month" : "Month", 
                   position: "insideBottom", 
-                  offset: selectedPeriod === 'month' ? -45 : -10 
+                  offset: selectedPeriod === 'month' ? -45 : -10,
+                  fill: chartColors.axis.tick 
                 }}
               />
               <YAxis 
-                tick={{ fontSize: 12 }}
+                tick={{ fontSize: 12, fill: chartColors.axis.tick }}
+                axisLine={{ stroke: chartColors.grid }}
+                tickLine={{ stroke: chartColors.grid }}
                 tickFormatter={(value) => {
                   if (value === 0) return '0';
                   if (value < 0.001) return value.toFixed(4);
@@ -1039,7 +1056,7 @@ export default function DashboardPage() {
                   if (value >= 1000) return `${(value / 1000).toFixed(1)}k`;
                   return value.toFixed(1);
                 }}
-                label={{ value: "Energy (kWh)", angle: -90, position: "insideLeft" }}
+                label={{ value: "Energy (kWh)", angle: -90, position: "insideLeft", fill: chartColors.axis.tick }}
               />
               <Tooltip 
                 formatter={(value: number) => {
@@ -1048,13 +1065,15 @@ export default function DashboardPage() {
                   if (value < 1) return [`${value.toFixed(3)} kWh`, ''];
                   return [`${value.toFixed(2)} kWh`, ''];
                 }} 
+                contentStyle={{ background: chartColors.tooltip.bg, border: `1px solid ${chartColors.tooltip.border}`, borderRadius: 8, color: chartColors.tooltip.fg }}
+                labelStyle={{ color: chartColors.axis.tick }}
               />
               <Legend content={<CustomLegend />} />
               {visibleSeries.production && (
                 <Bar
                   dataKey="production"
                   name="Generation"
-                  fill={chartColors.production.stroke}
+                  fill={chartColors.production.fill}
                   radius={[4, 4, 0, 0]}
                 />
               )}
@@ -1062,7 +1081,7 @@ export default function DashboardPage() {
                 <Bar
                   dataKey="consumption"
                   name="Consumption"
-                  fill={chartColors.consumption.stroke}
+                  fill={chartColors.consumption.fill}
                   radius={[4, 4, 0, 0]}
                 />
               )}
