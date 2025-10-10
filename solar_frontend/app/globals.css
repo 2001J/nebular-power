@@ -67,8 +67,9 @@
     --popover: 222.2 47.4% 8%;
     --popover-foreground: 210 40% 96%;
 
-    --primary: 217.2 91.2% 59.8%;
-    --primary-foreground: 222.2 47.4% 11.2%;
+    /* Teal accent in dark mode */
+    --primary: 173 58% 45%;
+    --primary-foreground: 210 40% 98%;
 
     --secondary: 222.2 15% 14%;
     --secondary-foreground: 210 40% 96%;
@@ -84,7 +85,7 @@
 
     --border: 222.2 18% 16%;
     --input: 222.2 18% 16%;
-    --ring: 224.3 76.3% 48%;
+    --ring: 173 58% 45%;
 
     /* Sidebar variables */
     --sidebar-background: 240 5.9% 10%;
