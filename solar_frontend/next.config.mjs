@@ -1,16 +1,3 @@
-import { createRequire } from 'node:module'
-const require = createRequire(import.meta.url)
-
-// Patch Node's deprecated util._extend during dev to silence warnings from transitive deps
-try {
-  if (process.env.NODE_ENV !== 'production') {
-    const util = require('util')
-    if (typeof util._extend === 'function') {
-      util._extend = Object.assign
-    }
-  }
-} catch {}
-
 let userConfig = undefined
 try {
   userConfig = await import('./v0-user-next.config')
