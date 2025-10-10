@@ -87,8 +87,8 @@ function ResetPasswordContent() {
     try {
       setIsSubmitting(true)
       
-      // Call the API to reset the password with all required fields
-      await authApi.resetPasswordConfirm(token, newPassword, confirmPassword, email)
+      // Call the API to reset the password
+      await authApi.resetPassword(token, newPassword)
       
       // Show success message
       setIsComplete(true)

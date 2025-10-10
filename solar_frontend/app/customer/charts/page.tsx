@@ -59,8 +59,13 @@ interface EnergyReading {
   powerGenerationWatts: number;
   powerConsumptionWatts: number;
   timestamp: string;
+  // Some backends return 'date' instead of 'timestamp'
+  date?: string;
   dailyYieldKWh?: number;
   totalYieldKWh?: number;
+  // Summary fields when API returns aggregated rows
+  totalGenerationKWh?: number;
+  totalConsumptionKWh?: number;
   isSimulated: boolean;
 }
 
@@ -230,8 +235,8 @@ export default function DashboardPage() {
         setDashboardData(dashboardResponse)
 
         // Get recent energy readings and recent alerts
-        let energyData = []
-        let alertsData = []
+        let energyData: any[] = []
+        let alertsData: any[] = []
 
         // Try to get energy readings from the dashboard response first
         if (dashboardResponse.recentReadings && dashboardResponse.recentReadings.length > 0) {
@@ -596,7 +601,7 @@ export default function DashboardPage() {
       return []
     }
 
-    const chartData = []
+    const chartData: { time: string; production: number; consumption: number }[] = []
 
     const getGenerationKWh = (reading: any): number => {
       if (typeof reading.energyProduced === 'number') return reading.energyProduced
@@ -678,7 +683,7 @@ export default function DashboardPage() {
 
     if (selectedPeriod === "day") {
       // Group hourly data
-      const hourlyData = {}
+      const hourlyData: Record<string, { time: string; production: number; consumption: number; count: number }> = {}
 
       // Initialize all hours
       for (let hour = 0; hour < 24; hour++) {
@@ -785,7 +790,7 @@ export default function DashboardPage() {
       })
     } else if (selectedPeriod === "month") {
       // Group by day for month
-      const monthData = {}
+      const monthData: Record<string, { time: string; production: number; consumption: number; count: number; actualDate: Date | null }> = {}
 
       // Process readings
       energyReadings.forEach(reading => {
@@ -853,7 +858,7 @@ export default function DashboardPage() {
       // Already sorted since we loop from 1 to daysInMonth
     } else if (selectedPeriod === "year") {
       // Group by month for year
-      const yearData = {}
+      const yearData: Record<string, { time: string; production: number; consumption: number; count: number; monthIndex: number }> = {}
       const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
       // Initialize all months
@@ -1210,9 +1215,9 @@ export default function DashboardPage() {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center">
                     <Sun className="h-5 w-5 text-orange-500 mr-2" />
-                    <div className="text-2xl font-bold">{dashboardData?.currentPowerGenerationWatts ? (dashboardData.currentPowerGenerationWatts / 1000).toFixed(2) : '0.00'} kW</div>
+                  <div className="text-2xl font-bold">{((dashboardData?.currentPowerGenerationWatts ?? 0) / 1000).toFixed(2)} kW</div>
                 </div>
-                  {dashboardData?.currentPowerGenerationWatts > 0 && 
+                  {(dashboardData?.currentPowerGenerationWatts ?? 0) > 0 && 
                     <ArrowUp className="h-4 w-4 text-green-500" />
                   }
                 </div>
@@ -1233,14 +1238,14 @@ export default function DashboardPage() {
                   <div className="text-2xl font-bold">
                     {dashboardData?.todayGenerationKWh?.toFixed(2) || '0.00'} kWh
                 </div>
-                  {dashboardData?.todayGenerationKWh > 0 && 
+                  {(dashboardData?.todayGenerationKWh ?? 0) > 0 && 
                     <ArrowUp className="h-4 w-4 text-green-500" />
                   }
                 </div>
                 <Progress 
                   className="h-2 mt-2" 
-                  value={dashboardData?.installedCapacityKW > 0 ? 
-                    Math.min(100, (dashboardData?.todayGenerationKWh / (dashboardData?.installedCapacityKW * 4)) * 100) : 0} 
+                  value={(dashboardData?.installationDetails?.installedCapacityKW ?? 0) > 0 ? 
+                    Math.min(100, ((dashboardData?.todayGenerationKWh ?? 0) / (((dashboardData?.installationDetails?.installedCapacityKW ?? 0) * 4))) * 100) : 0} 
                 />
               </CardContent>
             </Card>
@@ -1254,7 +1259,7 @@ export default function DashboardPage() {
                   <div className="text-2xl font-bold">
                   {dashboardData?.monthToDateGenerationKWh?.toFixed(2) || '0.00'} kWh
                 </div>
-                  {dashboardData?.monthToDateGenerationKWh > 0 && 
+                  {(dashboardData?.monthToDateGenerationKWh ?? 0) > 0 && 
                     <ArrowUp className="h-4 w-4 text-green-500" />
                   }
                 </div>

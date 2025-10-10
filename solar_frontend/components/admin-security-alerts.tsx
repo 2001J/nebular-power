@@ -2,13 +2,25 @@
 
 import { useState, useEffect } from "react"
 import { ShieldAlert, AlertTriangle, Zap, User, RefreshCw } from "lucide-react"
+import type { LucideIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { securityApi } from "@/lib/api/security"
 import { format, parseISO } from "date-fns"
 import { Badge } from "@/components/ui/badge"
 
+type UIAlertType = 'critical' | 'warning' | 'info'
+interface AlertItem {
+  id: string
+  type: UIAlertType
+  eventType: string
+  message: string
+  timestamp: string
+  location: string
+  icon: LucideIcon
+}
+
 export function AdminSecurityAlerts() {
-  const [alerts, setAlerts] = useState([])
+  const [alerts, setAlerts] = useState<AlertItem[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -18,7 +30,7 @@ export function AdminSecurityAlerts() {
         const data = await securityApi.getTamperEvents()
         if (Array.isArray(data) && data.length > 0) {
           // Map API data to our UI format
-          const formattedAlerts = data.map(alert => ({
+          const formattedAlerts: AlertItem[] = data.map((alert: any) => ({
             id: alert.id || alert.alertId,
             type: mapAlertTypeToUIType(alert.severity || alert.eventType),
             eventType: alert.eventType || alert.tamperType || alert.type || "Unknown Alert Type",
@@ -43,18 +55,19 @@ export function AdminSecurityAlerts() {
   }, [])
 
   // Map API alert types to UI alert types
-  const mapAlertTypeToUIType = (type) => {
+  const mapAlertTypeToUIType = (type?: string): UIAlertType => {
     const criticalTypes = ["HIGH", "CRITICAL", "PHYSICAL_INTRUSION", "PHYSICAL_MOVEMENT", "CONNECTION_MANIPULATION", "PHYSICAL_TAMPER"]
     const warningTypes = ["MEDIUM", "WARNING", "VOLTAGE_FLUCTUATION", "ORIENTATION_CHANGE", "LOCATION_CHANGE", "VOLTAGE_TAMPER"]
+    const key = (type ?? '').toUpperCase()
 
-    if (criticalTypes.includes(type?.toUpperCase())) return "critical"
-    if (warningTypes.includes(type?.toUpperCase())) return "warning"
+    if (criticalTypes.includes(key)) return "critical"
+    if (warningTypes.includes(key)) return "warning"
     return "info"
   }
 
   // Get icon based on alert type
-  const getIconForAlertType = (type) => {
-    const typeUpper = type?.toUpperCase()
+  const getIconForAlertType = (type?: string): LucideIcon => {
+    const typeUpper = (type ?? '').toUpperCase()
 
     if (typeUpper === "PHYSICAL_INTRUSION" || typeUpper === "PHYSICAL_MOVEMENT" || typeUpper === "HIGH" || typeUpper === "PHYSICAL_TAMPER") 
       return ShieldAlert
@@ -68,7 +81,7 @@ export function AdminSecurityAlerts() {
   }
 
   // Format alert type for display
-  const formatAlertType = (eventType) => {
+  const formatAlertType = (eventType?: string) => {
     if (!eventType) return "Unknown";
     
     // Replace underscores with spaces and capitalize each word
@@ -80,7 +93,7 @@ export function AdminSecurityAlerts() {
   }
 
   // Get alert badge based on type
-  const getAlertBadge = (type) => {
+  const getAlertBadge = (type: UIAlertType) => {
     if (type === "critical") {
       return <Badge variant="destructive">Critical</Badge>;
     }
@@ -93,7 +106,7 @@ export function AdminSecurityAlerts() {
   }
 
   // Format date for display
-  const formatDate = (dateString) => {
+  const formatDate = (dateString?: string) => {
     if (!dateString) return "Unknown time"
     try {
       return format(parseISO(dateString), "MMM d, h:mm a")

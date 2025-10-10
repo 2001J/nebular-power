@@ -85,6 +85,7 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb"
 import { DatePickerWithRange } from "@/components/ui/date-range-picker"
+import { DateRange } from "react-day-picker"
 import { toast } from "@/components/ui/use-toast"
 import { securityApi } from "@/lib/api/security"
 import { installationApi } from "@/lib/api/installations"
@@ -96,7 +97,7 @@ export default function SecurityAlertsPage() {
   const [tamperEvents, setTamperEvents] = useState<any[]>([])
   const [filteredEvents, setFilteredEvents] = useState<any[]>([])
   const [installations, setInstallations] = useState<any[]>([])
-  const [dateRange, setDateRange] = useState({
+  const [dateRange, setDateRange] = useState<DateRange | undefined>({
     from: subDays(new Date(), 30),
     to: new Date(),
   })
@@ -142,13 +143,13 @@ export default function SecurityAlertsPage() {
       }
 
       // Check if there's an installation parameter in the URL
-      const urlInstallation = searchParams.get('installation')
+      const urlInstallation = searchParams?.get('installation')
       if (urlInstallation) {
         setInstallation(urlInstallation)
       }
 
       // Always fetch all tamper events and apply filters client-side
-      let events = []
+      let events: any[] = []
       try {
         // Get all events, including resolved ones
         const allEvents = await securityApi.getAllTamperEvents()
@@ -161,11 +162,11 @@ export default function SecurityAlertsPage() {
         }
 
         // Apply date range filter if needed
-        if (dateRange.from || dateRange.to) {
+        if (dateRange?.from || dateRange?.to) {
           events = events.filter(event => {
             const eventDate = new Date(event.timestamp)
-            const isAfterStart = !dateRange.from || eventDate >= dateRange.from
-            const isBeforeEnd = !dateRange.to || eventDate <= dateRange.to
+            const isAfterStart = !dateRange?.from || eventDate >= dateRange.from
+            const isBeforeEnd = !dateRange?.to || eventDate <= dateRange.to
             return isAfterStart && isBeforeEnd
           })
         }

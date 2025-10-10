@@ -87,7 +87,7 @@ export function ServiceStatusTable({
   
   // Generate page numbers to display
   const getPageNumbers = () => {
-    const pages = [];
+    const pages: number[] = [];
     const maxPageButtons = 5;
     
     if (totalPages <= maxPageButtons) {
@@ -308,7 +308,7 @@ export function ServiceStatusTable({
               <PaginationItem>
                 <PaginationPrevious 
                   onClick={() => onChangePage(Math.max(0, page - 1))} 
-                  disabled={page === 0}
+                  aria-disabled={page === 0}
                 />
               </PaginationItem>
               
@@ -330,7 +330,7 @@ export function ServiceStatusTable({
               <PaginationItem>
                 <PaginationNext 
                   onClick={() => onChangePage(Math.min(totalPages - 1, page + 1))} 
-                  disabled={page >= totalPages - 1}
+                  aria-disabled={page >= totalPages - 1}
                 />
               </PaginationItem>
             </PaginationContent>

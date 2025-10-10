@@ -232,15 +232,9 @@ export default function AdminDashboardPage() {
         // Fetch security alerts
         try {
           console.log("Fetching security alerts");
-          const alertsResponse = await securityApi.getTamperEvents();
-          if (Array.isArray(alertsResponse)) {
-            setSecurityAlerts(alertsResponse);
-          } else if (alertsResponse?.content && Array.isArray(alertsResponse.content)) {
-            setSecurityAlerts(alertsResponse.content);
-          } else {
-            console.error("Invalid security alerts format");
-            setSecurityAlerts([]);
-          }
+          const alertsResponse: any = await securityApi.getTamperEvents();
+          // Wrapper already normalizes to array; set directly
+          setSecurityAlerts(Array.isArray(alertsResponse) ? alertsResponse : []);
         } catch (error) {
           console.error("Error fetching security alerts:", error);
           setSecurityAlerts([]);
@@ -375,8 +369,8 @@ export default function AdminDashboardPage() {
     : [];
 
   // Calculate overdue payments data
-  let overduePayments = [];
-  let overduePaymentRanges = {};
+  let overduePayments: any[] = [];
+  let overduePaymentRanges: Record<string, number> = {};
   
   // Check if payments has content array (new structure) or is an array itself (old structure)
   if (payments && payments.content && Array.isArray(payments.content)) {

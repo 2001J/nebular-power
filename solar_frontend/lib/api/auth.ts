@@ -48,6 +48,28 @@ export const authApi = {
   },
 
   /**
+   * Set initial password after email verification (legacy helper)
+   * Falls back to reset-password flow on backends that support it.
+   */
+  async changeInitialPassword(email: string, newPassword: string, confirmPassword: string) {
+    // Prefer a dedicated endpoint if available
+    try {
+      return await makeApiRequest(() =>
+        apiClient.post('/api/auth/change-initial-password', { email, newPassword, confirmPassword })
+      )
+    } catch (e) {
+      // As a fallback, attempt reset-password-like flow if a token is present in storage
+      const token = typeof window !== 'undefined' ? (sessionStorage.getItem('passwordResetToken') || '') : ''
+      if (token) {
+        return makeApiRequest(() =>
+          apiClient.post('/api/auth/reset-password', { token, newPassword })
+        )
+      }
+      throw e
+    }
+  },
+
+  /**
    * Register a new user account
    */
   async register(userData: RegisterRequest): Promise<ApiResponse<User>> {
@@ -115,6 +137,15 @@ export const authApi = {
         token,
         newPassword
       })
+    );
+  },
+
+  /**
+   * Resend verification email
+   */
+  async resendVerification(email: string): Promise<ApiResponse<{ message: string }>> {
+    return makeApiRequest(() =>
+      apiClient.post<ApiResponse<{ message: string }>>('/api/auth/resend-verification', { email })
     );
   },
 

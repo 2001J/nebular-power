@@ -54,7 +54,7 @@ export function useApiRequest<T = any>(
   const [state, setState] = useState<ApiRequestState<T>>({
     data: null,
     error: null,
-    isLoading: mergedOptions.executeOnMount,
+    isLoading: !!mergedOptions.executeOnMount,
     isSuccess: false,
     isError: false,
   });
@@ -171,7 +171,7 @@ export function useApiRequest<T = any>(
             !axiosError.code?.includes('ERR_NETWORK') &&
             !axiosError.message?.includes('Network Error')) {
             const status = axiosError.response?.status;
-            const errorMessage = axiosError.response?.data?.message || axiosError.message || 'An error occurred';
+            const errorMessage = (axiosError.response?.data as any)?.message || axiosError.message || 'An error occurred';
 
             toast({
               title: status ? `Error (${status})` : "Error",

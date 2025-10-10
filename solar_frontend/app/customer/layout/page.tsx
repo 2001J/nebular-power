@@ -226,7 +226,7 @@ export default function LayoutPage() {
                       </div>
 
                       {/* Render all components */}
-                      {currentSite.layout.map((component) => renderComponent(component))}
+                      {currentSite.layout.map((component: any) => renderComponent(component))}
                     </div>
                   </div>
 
@@ -273,7 +273,7 @@ export default function LayoutPage() {
                         </tr>
                       </thead>
                       <tbody className="bg-white divide-y divide-gray-200">
-                        {currentSite.layout.map((component) => (
+                        {currentSite.layout.map((component: any) => (
                           <tr key={component.id}>
                             <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                               {component.id}

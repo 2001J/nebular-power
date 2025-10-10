@@ -71,8 +71,8 @@ export default function LoanManagementPage() {
   const [sortDirection, setSortDirection] = useState("asc")
   const [loading, setLoading] = useState(true)
   const [loans, setLoans] = useState<Loan[]>([])
-  const [paymentPlans, setPaymentPlans] = useState([])
-  const [upcomingPayments, setUpcomingPayments] = useState([])
+  const [paymentPlans, setPaymentPlans] = useState<any[]>([])
+  const [upcomingPayments, setUpcomingPayments] = useState<any[]>([])
 
   // Fetch data
   useEffect(() => {
@@ -83,12 +83,12 @@ export default function LoanManagementPage() {
         // Fetch payment plans to use as loans - include all statuses
         try {
           // Create an array to store all loans
-          let allLoans = [];
+          let allLoans: Loan[] = [];
 
           // Fetch active payment plans
           const activePlans = await paymentComplianceApi.getPaymentPlansByStatusReport("ACTIVE");
           if (activePlans && Array.isArray(activePlans)) {
-            const activeLoans = activePlans.map(plan => ({
+            const activeLoans: Loan[] = activePlans.map((plan: any) => ({
               id: plan.id,
               customer: plan.customerName || `Customer #${plan.customerId || "Unknown"}`,
               customerId: plan.customerId,
@@ -108,7 +108,7 @@ export default function LoanManagementPage() {
           // Fetch completed/paid payment plans
           const completedPlans = await paymentComplianceApi.getPaymentPlansByStatusReport("COMPLETED");
           if (completedPlans && Array.isArray(completedPlans)) {
-            const completedLoans = completedPlans.map(plan => ({
+            const completedLoans: Loan[] = completedPlans.map((plan: any) => ({
               id: plan.id,
               customer: plan.customerName || `Customer #${plan.customerId || "Unknown"}`,
               customerId: plan.customerId,
@@ -142,7 +142,7 @@ export default function LoanManagementPage() {
         toast({
           title: "No Loan Data Available",
           description: "No payment plans were found. The system will display loans when payment plans are created.",
-          variant: "warning",
+          variant: "default",
         });
       } catch (error) {
         console.error("Error in fetchData:", error);
@@ -213,7 +213,7 @@ export default function LoanManagementPage() {
       setLoading(true);
       
       // Create an array to store all loans
-      let allLoans = [];
+      let allLoans: Loan[] = [];
       
       // Get timestamp to prevent caching
       const timestamp = new Date().getTime();
@@ -221,9 +221,9 @@ export default function LoanManagementPage() {
       // Fetch active payment plans
       try {
         // Add timestamp to prevent caching
-        const activePlans = await paymentComplianceApi.getPaymentPlansByStatusReport("ACTIVE", null, null, timestamp);
+        const activePlans = await paymentComplianceApi.getPaymentPlansByStatusReport("ACTIVE");
         if (activePlans && Array.isArray(activePlans)) {
-          const activeLoans = activePlans.map(plan => ({
+          const activeLoans: Loan[] = activePlans.map((plan: any) => ({
             id: plan.id,
             customer: plan.customerName || `Customer #${plan.customerId || "Unknown"}`,
             customerId: plan.customerId,
@@ -241,9 +241,9 @@ export default function LoanManagementPage() {
         }
         
         // Fetch completed/paid payment plans
-        const completedPlans = await paymentComplianceApi.getPaymentPlansByStatusReport("COMPLETED", null, null, timestamp);
+        const completedPlans = await paymentComplianceApi.getPaymentPlansByStatusReport("COMPLETED");
         if (completedPlans && Array.isArray(completedPlans)) {
-          const completedLoans = completedPlans.map(plan => ({
+          const completedLoans: Loan[] = completedPlans.map((plan: any) => ({
             id: plan.id,
             customer: plan.customerName || `Customer #${plan.customerId || "Unknown"}`,
             customerId: plan.customerId,
@@ -271,7 +271,6 @@ export default function LoanManagementPage() {
           toast({
             title: "No Loans Found",
             description: "No payment plans were found",
-            variant: "warning",
           });
         }
       } catch (error) {

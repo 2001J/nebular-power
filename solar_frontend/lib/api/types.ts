@@ -72,12 +72,18 @@ export interface Customer {
   id: string;
   email: string;
   fullName: string;
+  name?: string;
   phoneNumber?: string;
-  status: 'active' | 'inactive' | 'suspended';
+  // Backend uses several status variants; keep this flexible
+  status: string;
   role?: string;
   createdAt: string;
   updatedAt?: string;
   joinDate?: string;
+  // Optional fields used in UI
+  address?: string;
+  emailVerified?: boolean;
+  lastLogin?: string;
 }
 
 export interface CustomerCreateRequest {
@@ -102,6 +108,13 @@ export interface EnergyReading {
   timestamp: string;
   batteryLevel?: number;
   gridPowerWatts?: number;
+  // Optional fields used by dashboards/charts
+  date?: string;
+  installationType?: string;
+  energyProduced?: number;
+  energyConsumed?: number;
+  totalGenerationKWh?: number;
+  totalConsumptionKWh?: number;
 }
 
 export interface EnergyData {

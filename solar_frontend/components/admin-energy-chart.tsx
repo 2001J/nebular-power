@@ -324,7 +324,7 @@ export function AdminEnergyChart({ type = "production" }: AdminEnergyChartProps)
                 </tr>
               </thead>
               <tbody>
-                {systemOverview.recentlyActiveInstallations.map((installation) => (
+                {systemOverview.recentlyActiveInstallations.map((installation: any) => (
                   <tr key={installation.id} className="border-b hover:bg-muted/50">
                     <td className="py-2 px-3">{installation.name}</td>
                     <td className="py-2 px-3">{installation.username}</td>

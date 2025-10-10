@@ -62,7 +62,7 @@ const formSchema = z.object({
 export default function NewInstallationPage() {
   const router = useRouter()
   const { toast } = useToast()
-  const [customers, setCustomers] = useState([])
+  const [customers, setCustomers] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(false)
 
   // Set up form with validation

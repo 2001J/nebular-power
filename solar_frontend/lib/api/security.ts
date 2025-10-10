@@ -8,6 +8,64 @@ export const securityApi = {
     return Array.isArray(data) ? data : data?.content ?? [];
   },
 
+  // Convenience wrappers used by some pages
+  async getSecurityAuditLogs(page = 0, size = 50): Promise<any> {
+    return securityApi.getAdminAuditLogs(page, size)
+  },
+
+  async getSecurityLogsForInstallation(installationId: string, page = 0, size = 50): Promise<any[]> {
+    try {
+      const end = new Date()
+      const start = new Date()
+      start.setMonth(start.getMonth() - 1)
+      const res = await securityApi.getLogsByTimeRange(
+        installationId,
+        start.toISOString(),
+        end.toISOString(),
+        page,
+        size
+      )
+      if (Array.isArray(res)) return res
+      return res?.content ?? []
+    } catch {
+      return []
+    }
+  },
+
+  async getSecurityLogsByActivityType(installationId: string | "all", activityType: string, page = 0, size = 100): Promise<any[]> {
+    try {
+      // Use admin audit logs and filter by activity type; optionally filter by installationId if provided
+      const res = await securityApi.getAdminAuditLogs(page, size, activityType)
+      let items = Array.isArray(res) ? res : res?.content ?? []
+      if (installationId !== "all") {
+        items = items.filter((i: any) => i.installationId?.toString() === installationId.toString())
+      }
+      return items
+    } catch {
+      return []
+    }
+  },
+
+  async getSecurityLogsByTimeRange(installationId: string, startTime?: string, endTime?: string, page = 0, size = 50): Promise<any[]> {
+    try {
+      // If no time range is provided, default to last 30 days
+      let start = startTime
+      let end = endTime
+      if (!start || !end) {
+        const endDate = new Date()
+        const startDate = new Date()
+        startDate.setMonth(startDate.getMonth() - 1)
+        start = start ?? startDate.toISOString()
+        end = end ?? endDate.toISOString()
+      }
+      const res = await securityApi.getLogsByTimeRange(installationId, start, end, page, size)
+      if (Array.isArray(res)) return res
+      return res?.content ?? []
+    } catch {
+      return []
+    }
+  },
+
   async getUnresolvedEvents(): Promise<any[]> {
     // Get unresolved tamper events
     const res = await makeApiRequest<any>(() => apiClient.get('/api/security/admin/alerts'));
@@ -35,6 +93,8 @@ export const securityApi = {
     if (activityType) params.activityType = activityType;
     return makeApiRequest(() => apiClient.get('/api/security/admin/audit', { params }));
   },
+
+  // Note: getUserSecurityLogs is not implemented on backend; callers should avoid using it
 
   async getLogsByTimeRange(
     installationId: string,
@@ -92,6 +152,58 @@ export const securityApi = {
         status: 'UNKNOWN',
       };
     }
+  },
+
+  // Tamper response utilities (best-effort wrappers; backend support may vary)
+  async getResponsesByInstallation(installationId: string): Promise<any[]> {
+    try {
+      const res = await makeApiRequest<any>(() =>
+        apiClient.get(`/api/security/admin/installations/${installationId}/responses`)
+      )
+      return Array.isArray(res) ? res : res?.content ?? []
+    } catch {
+      return []
+    }
+  },
+
+  async getResponsesByTimeRange(startTime: string, endTime: string): Promise<any[]> {
+    try {
+      const res = await makeApiRequest<any>(() =>
+        apiClient.get(`/api/security/admin/responses/time-range`, { params: { startTime, endTime } })
+      )
+      return Array.isArray(res) ? res : res?.content ?? []
+    } catch {
+      return []
+    }
+  },
+
+  async getResponsesByEventId(eventId: string): Promise<any[]> {
+    try {
+      const res = await makeApiRequest<any>(() =>
+        apiClient.get(`/api/security/admin/events/${eventId}/responses`)
+      )
+      return Array.isArray(res) ? res : res?.content ?? []
+    } catch {
+      return []
+    }
+  },
+
+  async createTamperResponse(eventId: string, payload: any): Promise<any> {
+    return makeApiRequest(() =>
+      apiClient.post(`/api/security/admin/events/${eventId}/responses`, payload)
+    )
+  },
+
+  async sendNotification(eventId: string, payload: any): Promise<any> {
+    return makeApiRequest(() =>
+      apiClient.post(`/api/security/admin/events/${eventId}/notify`, payload)
+    )
+  },
+
+  async executeAutoResponse(eventId: string, payload: any): Promise<any> {
+    return makeApiRequest(() =>
+      apiClient.post(`/api/security/admin/events/${eventId}/auto-response`, payload)
+    )
   },
 };
 

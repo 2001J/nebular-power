@@ -15,7 +15,8 @@ function asArray<T>(data: any): T[] {
 }
 
 async function buildInstallationCompliance(startDate?: string, endDate?: string) {
-  const response = await installationApi.getAllInstallations({ page: 0, size: 100, startDate, endDate });
+  // getAllInstallations does not accept date filters in params; fetch and filter client-side if needed
+  const response = await installationApi.getAllInstallations({ page: 0, size: 100 });
   const installations = asArray<any>(response);
 
   if (installations.length === 0) return [] as any[];

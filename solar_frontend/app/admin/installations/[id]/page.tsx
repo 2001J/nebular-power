@@ -308,7 +308,7 @@ export default function InstallationDetailPage() {
     }
 
     // Set up WebSocket connection
-    let wsConnection = null
+    let wsConnection: { close: () => void; isConnected: () => boolean } | null = null
 
     try {
       wsConnection = energyWebSocket.createInstallationMonitor(
@@ -368,7 +368,7 @@ export default function InstallationDetailPage() {
     const now = new Date()
     const end = now
     let start = new Date(now)
-    let bucket: 'minute' | 'hour' | 'day' = 'hour'
+    let bucket: 'minute' | 'hour' | 'day' | 'month' = 'hour'
     if (range === 'day') {
       start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0)
       bucket = 'hour'
@@ -1328,7 +1328,7 @@ export default function InstallationDetailPage() {
                       <TableCell>{formatDate(event.timestamp)}</TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
-                          {getEventTypeIcon(event.type || event.eventType)}
+                          {getEventTypeIcon((event.type || event.eventType) ?? '')}
                           <span>{(event.type || event.eventType)?.replace("_", " ")}</span>
                         </div>
                       </TableCell>

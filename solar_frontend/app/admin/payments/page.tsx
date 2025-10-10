@@ -364,7 +364,7 @@ export default function AdminPaymentsPage() {
       }
 
       // Call API to record payment
-      await paymentComplianceApi.recordManualPayment(selectedPayment.customerId, paymentData)
+      await paymentComplianceApi.recordManualPayment(String(selectedPayment.customerId), paymentData)
 
       // Show success message
       toast({
@@ -546,7 +546,7 @@ export default function AdminPaymentsPage() {
   // Validate grace period config before saving
   const validateGracePeriodConfig = () => {
     let isValid = true;
-    const errors = [];
+    const errors: string[] = [];
 
     // Convert string inputs to numbers for validation
     const gracePeriodDays = parseInt(updatedGracePeriodConfig.numberOfDays?.toString() || '7');
@@ -619,7 +619,7 @@ export default function AdminPaymentsPage() {
   // Validate reminder config before saving
   const validateReminderConfig = () => {
     let isValid = true;
-    const errors = [];
+    const errors: string[] = [];
 
     // Convert string inputs to numbers for validation
     const firstDays = parseInt(updatedReminderConfig.firstReminderDays?.toString() || '1');

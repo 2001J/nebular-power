@@ -52,6 +52,7 @@ import {
 import { useToast } from "@/components/ui/use-toast"
 import { useAuth } from "@/components/auth-provider"
 import { customerApi } from "@/lib/api/customers"
+import type { Customer, PaginatedResponse } from "@/lib/api/types"
 import { debounce } from "lodash"
 import { Pagination, PaginationContent, PaginationEllipsis, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination"
 
@@ -59,16 +60,16 @@ export default function CustomersPage() {
   const { user } = useAuth()
   const { toast } = useToast()
   const router = useRouter()
-  const [customers, setCustomers] = useState([])
+  const [customers, setCustomers] = useState<Customer[]>([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
+  const [error, setError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState("")
   const [searching, setSearching] = useState(false)
   const [statusFilter, setStatusFilter] = useState("all")
   const [paymentFilter, setPaymentFilter] = useState("all")
   const [sortField, setSortField] = useState("fullName")
   const [sortDirection, setSortDirection] = useState("asc")
-  const [selectedCustomer, setSelectedCustomer] = useState(null)
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null)
   const [showConfirmDialog, setShowConfirmDialog] = useState(false)
   const [confirmAction, setConfirmAction] = useState({ type: "", customerId: "" })
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
@@ -140,12 +141,12 @@ export default function CustomersPage() {
   }, [user, toast, debouncedSearchTerm, pagination.currentPage, pagination.pageSize])
 
   // Handle page change
-  const handlePageChange = (page) => {
+  const handlePageChange = (page: number) => {
     setPagination({ ...pagination, currentPage: page })
   }
 
   // Filter customers by status
-  const filteredCustomers = customers.filter(customer => {
+  const filteredCustomers = customers.filter((customer: Customer) => {
     if (statusFilter === "all") return true
     return customer.status === statusFilter
   })
@@ -192,7 +193,7 @@ export default function CustomersPage() {
   }
 
   // Handle customer deletion confirmation
-  const confirmDeleteCustomer = (customer) => {
+  const confirmDeleteCustomer = (customer: Customer) => {
     setSelectedCustomer(customer)
     setShowDeleteDialog(true)
   }
@@ -220,7 +221,7 @@ export default function CustomersPage() {
       toast({
         variant: "destructive",
         title: "Error deactivating customer",
-        description: error.response?.data?.message || "Failed to deactivate customer. Please try again.",
+        description: (error as any)?.response?.data?.message || "Failed to deactivate customer. Please try again.",
       })
     } finally {
       setLoading(false)
@@ -228,7 +229,7 @@ export default function CustomersPage() {
   }
 
   // Handle sort
-  const handleSort = (field) => {
+  const handleSort = (field: string) => {
     if (sortField === field) {
       setSortDirection(sortDirection === "asc" ? "desc" : "asc")
     } else {
@@ -307,7 +308,7 @@ export default function CustomersPage() {
 
             // Check for any changes between current and new customers
             let hasChanges = false;
-            let verifiedCustomers = [];
+            let verifiedCustomers: Customer[] = [];
 
             for (const newCustomer of response.content) {
               // Store customers that have been newly verified
@@ -410,7 +411,7 @@ export default function CustomersPage() {
       toast({
         variant: "destructive",
         title: "Error",
-        description: error.response?.data?.message || "Failed to perform action. Please try again.",
+        description: (error as any)?.response?.data?.message || "Failed to perform action. Please try again.",
       })
     } finally {
       setLoading(false)
@@ -418,13 +419,13 @@ export default function CustomersPage() {
   }
 
   // Open confirm dialog
-  const openConfirmDialog = (type, customerId) => {
+  const openConfirmDialog = (type: string, customerId: string) => {
     setConfirmAction({ type, customerId })
     setShowConfirmDialog(true)
   }
 
   // Handle viewing customer details
-  const handleViewCustomer = (customerId) => {
+  const handleViewCustomer = (customerId: string) => {
     router.push(`/admin/customers/${customerId}`)
   }
 

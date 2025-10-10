@@ -49,7 +49,7 @@ import { toast } from "@/components/ui/use-toast"
 import { cn } from "@/lib/utils"
 import { format } from "date-fns"
 import { paymentComplianceApi } from "@/lib/api/paymentCompliance"
-import { useForm } from "react-hook-form"
+import { useForm, type Resolver } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 
@@ -66,17 +66,10 @@ const loanFormSchema = z.object({
   installationId: z.coerce.number(),
   name: z.string().optional(),
   description: z.string().optional(),
-  installmentAmount: z.coerce.number({
-    required_error: "Monthly payment amount is required",
-    invalid_type_error: "Monthly payment amount must be a number",
-  }).positive("Installment amount must be positive"),
+  installmentAmount: z.coerce.number().positive("Installment amount must be positive"),
   frequency: z.string().min(1, "Payment frequency is required"),
-  startDate: z.date({
-    required_error: "Start date is required",
-  }),
-  endDate: z.date({
-    required_error: "End date is required",
-  }),
+  startDate: z.date(),
+  endDate: z.date(),
   totalAmount: z.coerce.number().positive("Total amount must be positive"),
   interestRate: z.coerce.number().min(0, "Interest rate cannot be negative").default(0),
   lateFeeAmount: z.coerce.number().min(0).default(0),
@@ -124,15 +117,14 @@ interface PaymentPlan {
 
 export default function EditLoanPage({ params }: { params: EditLoanParams }) {
   const router = useRouter()
-  const unwrappedParams = React.use(params)
-  const loanId = unwrappedParams.id
+  const loanId = params.id
   const [loan, setLoan] = useState<PaymentPlan | null>(null)
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
 
   // Set up form with validation
   const form = useForm<LoanFormValues>({
-    resolver: zodResolver(loanFormSchema),
+    resolver: zodResolver(loanFormSchema) as unknown as Resolver<LoanFormValues>,
     defaultValues: {
       installationId: 0,
       name: "",
@@ -217,7 +209,7 @@ export default function EditLoanPage({ params }: { params: EditLoanParams }) {
       // Format the data for the API
       const formattedData = {
         ...data,
-        id: parseInt(unwrappedParams.id),
+        id: parseInt(loanId),
         startDate: format(data.startDate, "yyyy-MM-dd"),
         endDate: format(data.endDate, "yyyy-MM-dd"),
       }
@@ -231,16 +223,12 @@ export default function EditLoanPage({ params }: { params: EditLoanParams }) {
 
       console.log("Submitting loan update:", {
         installationId,
-        planId: parseInt(unwrappedParams.id),
+        planId: parseInt(loanId),
         loanData: formattedData
       });
 
       // Update the payment plan
-      await paymentComplianceApi.updatePaymentPlan(
-        loan.customerId, // This should be the user ID associated with the installation
-        parseInt(unwrappedParams.id), // planId
-        formattedData // planData
-      )
+      await paymentComplianceApi.updatePaymentPlan(loanId, formattedData)
 
       toast({
         title: "Success",
@@ -297,7 +285,7 @@ export default function EditLoanPage({ params }: { params: EditLoanParams }) {
           </BreadcrumbItem>
           <BreadcrumbSeparator />
           <BreadcrumbItem>
-            <BreadcrumbLink href={`/admin/loans/${unwrappedParams.id}`}>Loan #{unwrappedParams.id}</BreadcrumbLink>
+            <BreadcrumbLink href={`/admin/loans/${loanId}`}>Loan #{loanId}</BreadcrumbLink>
           </BreadcrumbItem>
           <BreadcrumbSeparator />
           <BreadcrumbItem>
@@ -681,7 +669,7 @@ export default function EditLoanPage({ params }: { params: EditLoanParams }) {
                 type="button"
                 variant="outline"
                 className="w-full sm:w-auto"
-                onClick={() => router.push(`/admin/loans/${unwrappedParams.id}`)}
+                onClick={() => router.push(`/admin/loans/${loanId}`)}
                 disabled={submitting}
               >
                 Cancel

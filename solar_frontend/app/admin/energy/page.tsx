@@ -381,7 +381,8 @@ export default function EnergyMonitoringPage() {
       ? (timeRangeType === 'day' ? todayConsumption / totalConsumption : timeRangeType === 'week' ? weekConsumption / totalConsumption : timeRangeType === 'month' ? monthConsumption / totalConsumption : yearConsumption / totalConsumption)
       : 1
 
-    const installationReadings = {}
+    type Bucket = { name: string; total: number; residential: number; commercial: number; industrial: number; consumption: number; count?: number }
+    const installationReadings: Record<string, any[]> = {}
 
     sortedReadings.forEach(reading => {
       const installationId = reading.installationId || 'unknown'
@@ -396,7 +397,7 @@ export default function EnergyMonitoringPage() {
     // Process each time range based on proper timestamps from individual installations
     if (timeRangeType === 'day') {
       // Group by hour for day view with timestamps
-      const hourlyData = {}
+      const hourlyData: Record<string, Bucket> = {}
 
       // Initialize all hours to ensure complete data
       for (let h = 0; h < 24; h++) {
@@ -413,8 +414,8 @@ export default function EnergyMonitoringPage() {
       }
 
       // Process readings from each installation
-      Object.values(installationReadings).forEach(instReadings => {
-        instReadings.forEach(reading => {
+      Object.values(installationReadings).forEach((instReadings: any[]) => {
+        instReadings.forEach((reading: any) => {
           if (!reading.timestamp) return
 
           const date = new Date(reading.timestamp)
@@ -423,30 +424,30 @@ export default function EnergyMonitoringPage() {
 
           // Add values - normalize to match the summary total
           const generationKWh = getGenerationKWh(reading) * productionNormalizationFactor
-          hourlyData[hourLabel].total += generationKWh
+          const bucket = hourlyData[hourLabel]!
+          bucket.total += generationKWh
 
           // Categorize by installation type
           const type = reading.installationType?.toUpperCase() || 'RESIDENTIAL'
           if (type === 'RESIDENTIAL') {
-            hourlyData[hourLabel].residential += generationKWh
+            bucket.residential += generationKWh
           } else if (type === 'COMMERCIAL') {
-            hourlyData[hourLabel].commercial += generationKWh
+            bucket.commercial += generationKWh
           } else if (type === 'INDUSTRIAL') {
-            hourlyData[hourLabel].industrial += generationKWh
+            bucket.industrial += generationKWh
           } else {
-            // Default to residential if unknown
-            hourlyData[hourLabel].residential += generationKWh
+            bucket.residential += generationKWh
           }
 
           // Normalize consumption data using the consumption factor
-          hourlyData[hourLabel].consumption += getConsumptionKWh(reading) * consumptionNormalizationFactor
-          hourlyData[hourLabel].count += 1
+          bucket.consumption += getConsumptionKWh(reading) * consumptionNormalizationFactor
+          bucket.count = (bucket.count ?? 0) + 1
         })
       })
 
       // Calculate hourly averages and return sorted by hour
-      return Object.values(hourlyData).map(hour => {
-        const result = { ...hour }
+      return Object.values(hourlyData).map((hour: Bucket) => {
+        const result: any = { ...hour }
         delete result.count
         return result
       }).sort((a, b) => {
@@ -455,7 +456,7 @@ export default function EnergyMonitoringPage() {
       })
     } else if (timeRangeType === 'week') {
       // Group by day for week view
-      const dailyData = {}
+      const dailyData: Record<string, Bucket> = {}
       const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
       // Initialize all days to ensure complete data
@@ -472,8 +473,8 @@ export default function EnergyMonitoringPage() {
       })
 
       // Process readings from each installation
-      Object.values(installationReadings).forEach(instReadings => {
-        instReadings.forEach(reading => {
+      Object.values(installationReadings).forEach((instReadings: any[]) => {
+        instReadings.forEach((reading: any) => {
           if (!reading.timestamp) return
 
           const date = new Date(reading.timestamp)
@@ -482,24 +483,24 @@ export default function EnergyMonitoringPage() {
 
           // Add values - normalize to match the summary total
           const generationKWh = getGenerationKWh(reading) * productionNormalizationFactor
-          dailyData[dayLabel].total += generationKWh
+          const bucket = dailyData[dayLabel]!
+          bucket.total += generationKWh
 
           // Categorize by installation type
           const type = reading.installationType?.toUpperCase() || 'RESIDENTIAL'
           if (type === 'RESIDENTIAL') {
-            dailyData[dayLabel].residential += generationKWh
+            bucket.residential += generationKWh
           } else if (type === 'COMMERCIAL') {
-            dailyData[dayLabel].commercial += generationKWh
+            bucket.commercial += generationKWh
           } else if (type === 'INDUSTRIAL') {
-            dailyData[dayLabel].industrial += generationKWh
+            bucket.industrial += generationKWh
           } else {
-            // Default to residential if unknown
-            dailyData[dayLabel].residential += generationKWh
+            bucket.residential += generationKWh
           }
 
           // Normalize consumption data using the consumption factor
-          dailyData[dayLabel].consumption += getConsumptionKWh(reading) * consumptionNormalizationFactor
-          dailyData[dayLabel].count += 1
+          bucket.consumption += getConsumptionKWh(reading) * consumptionNormalizationFactor
+          bucket.count = (bucket.count ?? 0) + 1
         })
       })
 
@@ -514,7 +515,7 @@ export default function EnergyMonitoringPage() {
       })
     } else if (timeRangeType === 'month') {
       // Group by day for month view
-      const monthData = {}
+      const monthData: Record<string, Bucket> = {}
 
       // Initialize all days to ensure complete data (assuming 31 days for completeness)
       for (let d = 1; d <= 31; d++) {
@@ -531,8 +532,8 @@ export default function EnergyMonitoringPage() {
       }
 
       // Process readings from each installation
-      Object.values(installationReadings).forEach(instReadings => {
-        instReadings.forEach(reading => {
+      Object.values(installationReadings).forEach((instReadings: any[]) => {
+        instReadings.forEach((reading: any) => {
           if (!reading.timestamp) return
 
           const date = new Date(reading.timestamp)
@@ -541,24 +542,24 @@ export default function EnergyMonitoringPage() {
 
           // Add values - normalize to match the summary total
           const generationKWh = getGenerationKWh(reading) * productionNormalizationFactor
-          monthData[dayLabel].total += generationKWh
+          const bucket = monthData[dayLabel]!
+          bucket.total += generationKWh
 
           // Categorize by installation type
           const type = reading.installationType?.toUpperCase() || 'RESIDENTIAL'
           if (type === 'RESIDENTIAL') {
-            monthData[dayLabel].residential += generationKWh
+            bucket.residential += generationKWh
           } else if (type === 'COMMERCIAL') {
-            monthData[dayLabel].commercial += generationKWh
+            bucket.commercial += generationKWh
           } else if (type === 'INDUSTRIAL') {
-            monthData[dayLabel].industrial += generationKWh
+            bucket.industrial += generationKWh
           } else {
-            // Default to residential if unknown
-            monthData[dayLabel].residential += generationKWh
+            bucket.residential += generationKWh
           }
 
           // Normalize consumption data using the consumption factor
-          monthData[dayLabel].consumption += getConsumptionKWh(reading) * consumptionNormalizationFactor
-          monthData[dayLabel].count += 1
+          bucket.consumption += getConsumptionKWh(reading) * consumptionNormalizationFactor
+          bucket.count = (bucket.count ?? 0) + 1
         })
       })
 
@@ -578,7 +579,7 @@ export default function EnergyMonitoringPage() {
         .sort((a: any, b: any) => parseInt((a as any).name) - parseInt((b as any).name))
     } else {
       // Group by month for year view
-      const yearData = {}
+      const yearData: Record<string, Bucket> = {}
       const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
       // Initialize all months to ensure complete data
@@ -595,8 +596,8 @@ export default function EnergyMonitoringPage() {
       })
 
       // Process readings from each installation
-      Object.values(installationReadings).forEach(instReadings => {
-        instReadings.forEach(reading => {
+      Object.values(installationReadings).forEach((instReadings: any[]) => {
+        instReadings.forEach((reading: any) => {
           if (!reading.timestamp) return
 
           const date = new Date(reading.timestamp)
@@ -605,24 +606,24 @@ export default function EnergyMonitoringPage() {
 
           // Add values - normalize to match the summary total
           const generationKWh = getGenerationKWh(reading) * productionNormalizationFactor
-          yearData[monthLabel].total += generationKWh
+          const bucket = yearData[monthLabel]!
+          bucket.total += generationKWh
 
           // Categorize by installation type
           const type = reading.installationType?.toUpperCase() || 'RESIDENTIAL'
           if (type === 'RESIDENTIAL') {
-            yearData[monthLabel].residential += generationKWh
+            bucket.residential += generationKWh
           } else if (type === 'COMMERCIAL') {
-            yearData[monthLabel].commercial += generationKWh
+            bucket.commercial += generationKWh
           } else if (type === 'INDUSTRIAL') {
-            yearData[monthLabel].industrial += generationKWh
+            bucket.industrial += generationKWh
           } else {
-            // Default to residential if unknown
-            yearData[monthLabel].residential += generationKWh
+            bucket.residential += generationKWh
           }
 
           // Normalize consumption data using the consumption factor
-          yearData[monthLabel].consumption += getConsumptionKWh(reading) * consumptionNormalizationFactor
-          yearData[monthLabel].count += 1
+          bucket.consumption += getConsumptionKWh(reading) * consumptionNormalizationFactor
+          bucket.count = (bucket.count ?? 0) + 1
         })
       })
 
@@ -927,7 +928,8 @@ export default function EnergyMonitoringPage() {
     });
 
     // Group readings by installation first
-    const installationReadings = {}
+    type Bucket = { name: string; total: number; residential: number; commercial: number; industrial: number; consumption: number; count?: number }
+    const installationReadings: Record<string, any[]> = {}
 
     sortedReadings.forEach(reading => {
       const installationId = reading.installationId || 'unknown'
@@ -942,7 +944,7 @@ export default function EnergyMonitoringPage() {
     // Process each time range based on proper timestamps from individual installations
     if (timeRangeType === 'day') {
       // Group by hour for day view with timestamps
-      const hourlyData = {}
+      const hourlyData: Record<string, Bucket> = {}
 
       // Initialize all hours to ensure complete data
       for (let h = 0; h < 24; h++) {
@@ -959,8 +961,8 @@ export default function EnergyMonitoringPage() {
       }
 
       // Process readings from each installation
-      Object.values(installationReadings).forEach(instReadings => {
-        instReadings.forEach(reading => {
+      Object.values(installationReadings).forEach((instReadings: any[]) => {
+        instReadings.forEach((reading: any) => {
           if (!reading.timestamp) return
 
           const date = new Date(reading.timestamp)
@@ -969,30 +971,30 @@ export default function EnergyMonitoringPage() {
 
           // Add values - normalize to match the summary total
           const generationKWh = getGenerationKWh(reading) * productionNormalizationFactor
-          hourlyData[hourLabel].total += generationKWh
+          const bucket = hourlyData[hourLabel]!
+          bucket.total += generationKWh
 
           // Categorize by installation type
           const type = reading.installationType?.toUpperCase() || 'RESIDENTIAL'
           if (type === 'RESIDENTIAL') {
-            hourlyData[hourLabel].residential += generationKWh
+            bucket.residential += generationKWh
           } else if (type === 'COMMERCIAL') {
-            hourlyData[hourLabel].commercial += generationKWh
+            bucket.commercial += generationKWh
           } else if (type === 'INDUSTRIAL') {
-            hourlyData[hourLabel].industrial += generationKWh
+            bucket.industrial += generationKWh
           } else {
-            // Default to residential if unknown
-            hourlyData[hourLabel].residential += generationKWh
+            bucket.residential += generationKWh
           }
 
           // Normalize consumption data using the consumption factor
-          hourlyData[hourLabel].consumption += getConsumptionKWh(reading) * consumptionNormalizationFactor
-          hourlyData[hourLabel].count += 1
+          bucket.consumption += getConsumptionKWh(reading) * consumptionNormalizationFactor
+          bucket.count = (bucket.count ?? 0) + 1
         })
       })
 
       // Calculate hourly averages and return sorted by hour
-      return Object.values(hourlyData).map(hour => {
-        const result = { ...hour }
+      return Object.values(hourlyData).map((hour: Bucket) => {
+        const result: any = { ...hour }
         delete result.count
         return result
       }).sort((a, b) => {
@@ -1001,7 +1003,7 @@ export default function EnergyMonitoringPage() {
       })
     } else if (timeRangeType === 'week') {
       // Group by day for week view
-      const dailyData = {}
+      const dailyData: Record<string, Bucket> = {}
       const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
       // Initialize all days to ensure complete data
@@ -1018,8 +1020,8 @@ export default function EnergyMonitoringPage() {
       })
 
       // Process readings from each installation
-      Object.values(installationReadings).forEach(instReadings => {
-        instReadings.forEach(reading => {
+      Object.values(installationReadings).forEach((instReadings: any[]) => {
+        instReadings.forEach((reading: any) => {
           if (!reading.timestamp) return
 
           const date = new Date(reading.timestamp)
@@ -1028,24 +1030,24 @@ export default function EnergyMonitoringPage() {
 
           // Add values - normalize to match the summary total
           const generationKWh = getGenerationKWh(reading) * productionNormalizationFactor
-          dailyData[dayLabel].total += generationKWh
+          const bucketD = dailyData[dayLabel]!
+          bucketD.total += generationKWh
 
           // Categorize by installation type
           const type = reading.installationType?.toUpperCase() || 'RESIDENTIAL'
           if (type === 'RESIDENTIAL') {
-            dailyData[dayLabel].residential += generationKWh
+            bucketD.residential += generationKWh
           } else if (type === 'COMMERCIAL') {
-            dailyData[dayLabel].commercial += generationKWh
+            bucketD.commercial += generationKWh
           } else if (type === 'INDUSTRIAL') {
-            dailyData[dayLabel].industrial += generationKWh
+            bucketD.industrial += generationKWh
           } else {
-            // Default to residential if unknown
-            dailyData[dayLabel].residential += generationKWh
+            bucketD.residential += generationKWh
           }
 
           // Normalize consumption data using the consumption factor
-          dailyData[dayLabel].consumption += getConsumptionKWh(reading) * consumptionNormalizationFactor
-          dailyData[dayLabel].count += 1
+          bucketD.consumption += getConsumptionKWh(reading) * consumptionNormalizationFactor
+          bucketD.count = (bucketD.count ?? 0) + 1
         })
       })
 
@@ -1060,7 +1062,7 @@ export default function EnergyMonitoringPage() {
       })
     } else if (timeRangeType === 'month') {
       // Group by day for month view
-      const monthData = {}
+      const monthData: Record<string, Bucket> = {}
 
       // Initialize all days to ensure complete data (assuming 31 days for completeness)
       for (let d = 1; d <= 31; d++) {
@@ -1077,8 +1079,8 @@ export default function EnergyMonitoringPage() {
       }
 
       // Process readings from each installation
-      Object.values(installationReadings).forEach(instReadings => {
-        instReadings.forEach(reading => {
+      Object.values(installationReadings).forEach((instReadings: any[]) => {
+        instReadings.forEach((reading: any) => {
           if (!reading.timestamp) return
 
           const date = new Date(reading.timestamp)
@@ -1087,24 +1089,24 @@ export default function EnergyMonitoringPage() {
 
           // Add values - normalize to match the summary total
           const generationKWh = getGenerationKWh(reading) * productionNormalizationFactor
-          monthData[dayLabel].total += generationKWh
+          const bucketM = monthData[dayLabel]!
+          bucketM.total += generationKWh
 
           // Categorize by installation type
           const type = reading.installationType?.toUpperCase() || 'RESIDENTIAL'
           if (type === 'RESIDENTIAL') {
-            monthData[dayLabel].residential += generationKWh
+            bucketM.residential += generationKWh
           } else if (type === 'COMMERCIAL') {
-            monthData[dayLabel].commercial += generationKWh
+            bucketM.commercial += generationKWh
           } else if (type === 'INDUSTRIAL') {
-            monthData[dayLabel].industrial += generationKWh
+            bucketM.industrial += generationKWh
           } else {
-            // Default to residential if unknown
-            monthData[dayLabel].residential += generationKWh
+            bucketM.residential += generationKWh
           }
 
           // Normalize consumption data using the consumption factor
-          monthData[dayLabel].consumption += getConsumptionKWh(reading) * consumptionNormalizationFactor
-          monthData[dayLabel].count += 1
+          bucketM.consumption += getConsumptionKWh(reading) * consumptionNormalizationFactor
+          bucketM.count = (bucketM.count ?? 0) + 1
         })
       })
 
@@ -1124,7 +1126,7 @@ export default function EnergyMonitoringPage() {
         .sort((a: any, b: any) => parseInt(a.name) - parseInt(b.name))
     } else {
       // Group by month for year view
-      const yearData = {}
+      const yearData: Record<string, Bucket> = {}
       const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
       // Initialize all months to ensure complete data
@@ -1141,8 +1143,8 @@ export default function EnergyMonitoringPage() {
       })
 
       // Process readings from each installation
-      Object.values(installationReadings).forEach(instReadings => {
-        instReadings.forEach(reading => {
+      Object.values(installationReadings).forEach((instReadings: any[]) => {
+        instReadings.forEach((reading: any) => {
           if (!reading.timestamp) return
 
           const date = new Date(reading.timestamp)
@@ -1151,24 +1153,24 @@ export default function EnergyMonitoringPage() {
 
           // Add values - normalize to match the summary total
           const generationKWh = getGenerationKWh(reading) * productionNormalizationFactor
-          yearData[monthLabel].total += generationKWh
+          const bucketY = yearData[monthLabel]!
+          bucketY.total += generationKWh
 
           // Categorize by installation type
           const type = reading.installationType?.toUpperCase() || 'RESIDENTIAL'
           if (type === 'RESIDENTIAL') {
-            yearData[monthLabel].residential += generationKWh
+            bucketY.residential += generationKWh
           } else if (type === 'COMMERCIAL') {
-            yearData[monthLabel].commercial += generationKWh
+            bucketY.commercial += generationKWh
           } else if (type === 'INDUSTRIAL') {
-            yearData[monthLabel].industrial += generationKWh
+            bucketY.industrial += generationKWh
           } else {
-            // Default to residential if unknown
-            yearData[monthLabel].residential += generationKWh
+            bucketY.residential += generationKWh
           }
 
           // Normalize consumption data using the consumption factor
-          yearData[monthLabel].consumption += getConsumptionKWh(reading) * consumptionNormalizationFactor
-          yearData[monthLabel].count += 1
+          bucketY.consumption += getConsumptionKWh(reading) * consumptionNormalizationFactor
+          bucketY.count = (bucketY.count ?? 0) + 1
         })
       })
 

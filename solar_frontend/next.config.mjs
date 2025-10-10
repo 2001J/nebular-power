@@ -14,7 +14,7 @@ const nextConfig = {
     dirs: ['app', 'components', 'hooks', 'lib', 'pages', 'types', '__tests__'],
   },
   typescript: {
-    ignoreBuildErrors: true,
+    ignoreBuildErrors: false,
   },
   images: {
     unoptimized: true,

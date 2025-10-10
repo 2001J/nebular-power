@@ -123,10 +123,11 @@ export default function EditCustomerPage({ params }: { params: { id: string } })
       router.push(`/admin/customers/${customerId}`)
     } catch (error) {
       console.error("Error updating customer:", error)
+      const err = error as { response?: { data?: { message?: string } } }
       toast({
         variant: "destructive",
         title: "Error updating customer",
-        description: error.response?.data?.message || "An unexpected error occurred.",
+        description: err.response?.data?.message || "An unexpected error occurred.",
       })
     } finally {
       setSaving(false)

@@ -256,12 +256,16 @@ export default function CompliancePage() {
         <div className="flex-1">
           <DatePickerWithRange
             date={dateRange}
-            setDate={(newDateRange: DateRange) => {
-              setDateRange(newDateRange);
-              // Avoid API calls for incomplete date ranges
-              if (newDateRange?.from && newDateRange?.to) {
-                fetchReportData();
-              }
+            setDate={(value) => {
+              setDateRange(prev => {
+                const next = typeof value === 'function' 
+                  ? (value as (prevState: DateRange) => DateRange)(prev)
+                  : value as DateRange
+                if (next?.from && next?.to) {
+                  void fetchReportData()
+                }
+                return next
+              })
             }}
           />
         </div>

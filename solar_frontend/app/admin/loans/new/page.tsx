@@ -66,29 +66,13 @@ const paymentFrequencies = [
 
 // Form schema with validation
 const loanFormSchema = z.object({
-  customerId: z.string({
-    required_error: "Please select a customer",
-  }),
-  installationId: z.string({
-    required_error: "Please select an installation",
-  }),
-  totalAmount: z.coerce.number({
-    required_error: "Total loan amount is required",
-    invalid_type_error: "Total loan amount must be a number",
-  }).positive("Total amount must be positive"),
-  installmentAmount: z.coerce.number({
-    required_error: "Monthly payment amount is required",
-    invalid_type_error: "Monthly payment amount must be a number",
-  }).positive("Installment amount must be positive"),
-  frequency: z.string({
-    required_error: "Payment frequency is required",
-  }),
-  startDate: z.date({
-    required_error: "Start date is required",
-  }),
-  endDate: z.date({
-    required_error: "End date is required",
-  }),
+  customerId: z.string().min(1, "Please select a customer"),
+  installationId: z.string().min(1, "Please select an installation"),
+  totalAmount: z.coerce.number().positive("Total amount must be positive"),
+  installmentAmount: z.coerce.number().positive("Installment amount must be positive"),
+  frequency: z.string().min(1, "Payment frequency is required"),
+  startDate: z.date(),
+  endDate: z.date(),
   interestRate: z.coerce.number().optional(),
   downPayment: z.coerce.number().optional(),
   lateFeeAmount: z.coerce.number().optional(),
@@ -126,12 +110,12 @@ function getNumberOfPayments(startDate, endDate, frequency) {
 
 export default function NewLoanPage() {
   const router = useRouter();
-  const [customers, setCustomers] = useState([]);
-  const [installations, setInstallations] = useState([]);
+  const [customers, setCustomers] = useState<any[]>([]);
+  const [installations, setInstallations] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadingCustomers, setLoadingCustomers] = useState(true);
   const [loadingInstallations, setLoadingInstallations] = useState(false);
-  const [selectedCustomer, setSelectedCustomer] = useState(null);
+  const [selectedCustomer, setSelectedCustomer] = useState<any | null>(null);
   const [globalPaymentSettings, setGlobalPaymentSettings] = useState({
     gracePeriodDays: 7, // Default fallback value
     lateFeePercentage: 0,
@@ -241,7 +225,7 @@ export default function NewLoanPage() {
 
   // Load installations when customer changes
   useEffect(() => {
-    const fetchInstallations = async (customerId) => {
+    const fetchInstallations = async (customerId: string) => {
       if (!customerId) {
         setInstallations([]);
         return;
@@ -443,9 +427,9 @@ export default function NewLoanPage() {
                               ? "First select a customer"
                               : loadingInstallations
                                 ? "Loading installations..."
-                                : field.value
-                                  ? installations.find(i => i.id === field.value)?.name || `Installation #${field.value}`
-                                  : "Select an installation"
+                          : field.value
+                            ? installations.find(i => String(i.id) === String(field.value))?.name || `Installation #${field.value}`
+                              : "Select an installation"
                             }
                           </SelectValue>
                         </SelectTrigger>
@@ -456,8 +440,8 @@ export default function NewLoanPage() {
                             {form.watch("customerId") ? "No active installations found" : "Select a customer first"}
                           </SelectItem>
                         ) : (
-                          installations.map((installation) => (
-                            <SelectItem key={installation.id} value={installation.id}>
+                          installations.map((installation: any) => (
+                            <SelectItem key={installation.id} value={String(installation.id)}>
                               {installation.name || `Installation #${installation.id}`} - {installation.type || "Solar"}
                             </SelectItem>
                           ))
@@ -491,7 +475,7 @@ export default function NewLoanPage() {
                             type="number" 
                             step="0.01" 
                             placeholder="0.00" 
-                            value={field.value || 0}
+                            value={Number(field.value ?? 0)}
                             onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
                             className="pl-9" 
                           />
@@ -516,7 +500,7 @@ export default function NewLoanPage() {
                             type="number" 
                             step="0.01" 
                             placeholder="0.00" 
-                            value={field.value || 0}
+                            value={Number(field.value ?? 0)}
                             onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
                             className="pl-9" 
                           />
@@ -569,7 +553,7 @@ export default function NewLoanPage() {
                           type="number" 
                           step="0.01" 
                           placeholder="0.00" 
-                          value={field.value || 0}
+                          value={Number(field.value ?? 0)}
                           onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
                         />
                       </FormControl>
@@ -691,7 +675,7 @@ export default function NewLoanPage() {
                             type="number" 
                             step="0.01" 
                             placeholder="0.00" 
-                            value={field.value || 0}
+                            value={Number(field.value ?? 0)}
                             onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
                             className="pl-9" 
                           />
@@ -742,7 +726,7 @@ export default function NewLoanPage() {
                               type="number"
                               step="0.01"
                               placeholder={loadingSettings ? "Loading..." : `Global default: $${globalPaymentSettings.lateFeeFixedAmount}`}
-                              value={field.value || 0}
+                              value={Number(field.value ?? 0)}
                               onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
                               className="pl-9"
                             />
@@ -768,7 +752,7 @@ export default function NewLoanPage() {
                         <FormControl>
                           <Input
                             type="number"
-                            value={field.value || 0}
+                            value={Number(field.value ?? 0)}
                             onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
                             placeholder={loadingSettings ? "Loading..." : `Global default: ${globalPaymentSettings.gracePeriodDays}`}
                           />

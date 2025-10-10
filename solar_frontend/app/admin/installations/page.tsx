@@ -44,7 +44,7 @@ export default function InstallationsPage() {
   const [typeFilter, setTypeFilter] = useState("all")
   const [searchTerm, setSearchTerm] = useState("")
   const [loading, setLoading] = useState(true)
-  const [installations, setInstallations] = useState([])
+  const [installations, setInstallations] = useState<any[]>([])
   const [systemStats, setSystemStats] = useState({
     totalInstallations: 0,
     totalCapacity: 0,
@@ -58,9 +58,9 @@ export default function InstallationsPage() {
       setLoading(true)
       try {
         // Prepare filter parameters
-        const params = {
+        let params: Parameters<typeof installationApi.getAllInstallations>[0] = {
           page: 0,
-          size: 100
+          size: 100,
         }
 
         if (statusFilter !== "all") {
@@ -125,7 +125,7 @@ export default function InstallationsPage() {
   }, [statusFilter, typeFilter, searchTerm, toast])
 
   // Navigate to installation details
-  const navigateToInstallationDetails = (id) => {
+  const navigateToInstallationDetails = (id: string | number) => {
     router.push(`/admin/installations/${id}`)
   }
 
@@ -178,7 +178,7 @@ export default function InstallationsPage() {
   }
 
   // Format capacity display
-  const formatCapacity = (capacity) => {
+  const formatCapacity = (capacity: any) => {
     if (!capacity && capacity !== 0) return "N/A"
 
     const numericCapacity = parseFloat(capacity.toString().replace("kW", "").trim())

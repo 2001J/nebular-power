@@ -15,18 +15,25 @@ vi.mock('@/lib/api/client', () => {
   };
 });
 import { apiClient as apiClientMock } from '@/lib/api/client';
+// Cast to any to access vitest mock helpers in a type-safe way for TS
+const api = apiClientMock as unknown as {
+  get: ReturnType<typeof vi.fn>;
+  post: ReturnType<typeof vi.fn>;
+  put: ReturnType<typeof vi.fn>;
+  delete: ReturnType<typeof vi.fn>;
+};
 
 describe('serviceControlApi', () => {
   beforeEach(() => {
     makeApiRequestMock.mockReset();
     makeApiRequestMock.mockImplementation((fn: any) => fn());
-    Object.values(apiClientMock as any).forEach((fn: any) => fn.mockReset?.());
+    Object.values(api as any).forEach((fn: any) => fn.mockReset?.());
   });
 
   test('updateServiceStatus normalizes payload and validates status', async () => {
-    apiClientMock.put.mockResolvedValueOnce({ data: { ok: true } });
+    api.put.mockResolvedValueOnce({ data: { ok: true } });
     const result = await serviceControlApi.updateServiceStatus('1', { status: 'active', statusReason: 'x' });
-    expect(apiClientMock.put).toHaveBeenCalledWith('/api/service/status/1', {
+    expect(api.put).toHaveBeenCalledWith('/api/service/status/1', {
       status: 'ACTIVE',
       statusReason: 'x',
       updatedBy: 'SYSTEM',
@@ -37,17 +44,17 @@ describe('serviceControlApi', () => {
   });
 
   test('getLogsByTimeRange maps params to start/end', async () => {
-    apiClientMock.get.mockResolvedValueOnce({ data: [] });
+    api.get.mockResolvedValueOnce({ data: [] });
     await serviceControlApi.getLogsByTimeRange('2024-01-01', '2024-01-02');
-    expect(apiClientMock.get).toHaveBeenCalledWith('/api/service/logs/time-range', {
+    expect(api.get).toHaveBeenCalledWith('/api/service/logs/time-range', {
       params: { start: '2024-01-01', end: '2024-01-02', page: 0, size: 20 },
     });
   });
 
   test('scheduleStatusChange sends query parameters', async () => {
-    apiClientMock.post.mockResolvedValueOnce({ data: { scheduled: true } });
+    api.post.mockResolvedValueOnce({ data: { scheduled: true } });
     const res = await serviceControlApi.scheduleStatusChange('2', 'ACTIVE', 'reason', '2024-01-01T00:00:00Z');
-    expect(apiClientMock.post).toHaveBeenCalledWith('/api/service/status/2/schedule', null, {
+    expect(api.post).toHaveBeenCalledWith('/api/service/status/2/schedule', null, {
       params: {
         targetStatus: 'ACTIVE',
         reason: 'reason',

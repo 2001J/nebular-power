@@ -59,6 +59,7 @@ import {
   PaginationPrevious,
 } from "@/components/ui/pagination"
 import { DatePickerWithRange } from "@/components/ui/date-range-picker"
+import { DateRange } from "react-day-picker"
 import { paymentComplianceApi } from "@/lib/api/paymentCompliance"
 import { paymentApi } from "@/lib/api/payments"
 
@@ -70,7 +71,7 @@ export default function PaymentReportsPage() {
   const [reportData, setReportData] = useState<any>(null)
 
   // Date range for reports
-  const [dateRange, setDateRange] = useState({
+  const [dateRange, setDateRange] = useState<DateRange | undefined>({
     from: subDays(new Date(), 30),
     to: new Date(),
   })
@@ -82,10 +83,10 @@ export default function PaymentReportsPage() {
 
       let data
       // Format dates as ISO strings but only use the date part (YYYY-MM-DD)
-      const startDate = dateRange.from 
+      const startDate = dateRange?.from 
         ? dateRange.from.toISOString().split('T')[0] 
         : undefined;
-      const endDate = dateRange.to 
+      const endDate = dateRange?.to 
         ? dateRange.to.toISOString().split('T')[0]
         : undefined;
 
@@ -156,8 +157,8 @@ export default function PaymentReportsPage() {
       case "compliance":
         mockData = {
           reportType: "Payment Compliance Report",
-          startDate: dateRange.from?.toISOString(),
-          endDate: dateRange.to?.toISOString(),
+          startDate: dateRange?.from?.toISOString(),
+          endDate: dateRange?.to?.toISOString(),
           totalPaymentsDue: 0,
           paidOnTime: 0,
           paidLate: 0,
@@ -168,15 +169,15 @@ export default function PaymentReportsPage() {
         toast({
           title: "API Data Unavailable",
           description: "Using placeholder data for compliance report. API data is currently unavailable.",
-          variant: "warning",
+          variant: "default",
         })
         break
 
       case "revenue":
         mockData = {
           reportType: "Revenue Report",
-          startDate: dateRange.from?.toISOString(),
-          endDate: dateRange.to?.toISOString(),
+          startDate: dateRange?.from?.toISOString(),
+          endDate: dateRange?.to?.toISOString(),
           totalRevenue: 0,
           expectedRevenue: 0,
           collectionRate: 0,
@@ -185,7 +186,7 @@ export default function PaymentReportsPage() {
         toast({
           title: "API Data Unavailable",
           description: "Using placeholder data for revenue report. API data is currently unavailable.",
-          variant: "warning",
+          variant: "default",
         })
         break
 
@@ -195,7 +196,7 @@ export default function PaymentReportsPage() {
         toast({
           title: "No Payments Data",
           description: `No ${reportType} payments data available from the API.`,
-          variant: "warning",
+          variant: "default",
         })
         break
 
@@ -204,7 +205,7 @@ export default function PaymentReportsPage() {
         toast({
           title: "API Unavailable",
           description: "The report data could not be loaded from the server.",
-          variant: "warning",
+          variant: "default",
         })
     }
 

@@ -55,10 +55,10 @@ import { ServiceStatusTable } from "./components/ServiceStatusTable"
 
 export default function ServicePage() {
   const [activeTab, setActiveTab] = useState("statuses")
-  const [installations, setInstallations] = useState([])
-  const [statuses, setStatuses] = useState([])
-  const [commands, setCommands] = useState([])
-  const [selectedInstallation, setSelectedInstallation] = useState(null)
+  const [installations, setInstallations] = useState<any[]>([])
+  const [statuses, setStatuses] = useState<any[]>([])
+  const [commands, setCommands] = useState<any[]>([])
+  const [selectedInstallation, setSelectedInstallation] = useState<any | null>(null)
   const [loading, setLoading] = useState(true)
   const [commandsLoading, setCommandsLoading] = useState(true)
   const [updateStatusDialogOpen, setUpdateStatusDialogOpen] = useState(false)
@@ -117,10 +117,10 @@ export default function ServicePage() {
 
   // Add new states for scheduled changes and status history
   const [scheduleLoading, setScheduleLoading] = useState(false)
-  const [scheduledChanges, setScheduledChanges] = useState([])
-  const [statusHistory, setStatusHistory] = useState([])
+  const [scheduledChanges, setScheduledChanges] = useState<any[]>([])
+  const [statusHistory, setStatusHistory] = useState<any[]>([])
   const [historyLoading, setHistoryLoading] = useState(false)
-  const [selectedHistoryInstallation, setSelectedHistoryInstallation] = useState(null)
+  const [selectedHistoryInstallation, setSelectedHistoryInstallation] = useState<any | null>(null)
 
   // Use this improved function to fetch statuses with pagination (memoized)
   const fetchPaginatedStatuses = useCallback(async (sourceInstallations?: any[]) => {
@@ -244,7 +244,7 @@ export default function ServicePage() {
         return
       }
 
-      let commandsData = []
+      let commandsData: any[] = []
 
       if (commandStatusFilter !== "all") {
         // Fetch commands by status
@@ -690,7 +690,7 @@ export default function ServicePage() {
       }
 
       // Parse the params string into an object if it's provided
-      let params = {}
+      let params: any = {}
       if (commandFormData.params && commandFormData.params.trim() !== '') {
         try {
           params = JSON.parse(commandFormData.params)
@@ -896,7 +896,7 @@ export default function ServicePage() {
       setScheduleLoading(true)
       
       // Get all installations with scheduled changes
-      const scheduledInstallations = []
+      const scheduledInstallations: any[] = []
       
       // Process in batches to prevent overwhelming the server
       const batchSize = 10
@@ -1004,7 +1004,7 @@ export default function ServicePage() {
                 <Button 
                   variant="outline" 
                   size="sm" 
-                  onClick={fetchPaginatedStatuses}
+                  onClick={() => fetchPaginatedStatuses()}
                 >
                   <RefreshCw className="h-4 w-4 mr-2" />
                   Refresh
@@ -1543,7 +1543,7 @@ export default function ServicePage() {
                       <Calendar
                         mode="single"
                         selected={maintenanceFormData.startDate}
-                        onSelect={(date) => setMaintenanceFormData(prev => ({ ...prev, startDate: date }))}
+                        onSelect={(date) => setMaintenanceFormData(prev => ({ ...prev, startDate: date ?? prev.startDate }))}
                         initialFocus
                       />
                     </PopoverContent>
@@ -1573,7 +1573,7 @@ export default function ServicePage() {
                       <Calendar
                         mode="single"
                         selected={maintenanceFormData.endDate}
-                        onSelect={(date) => setMaintenanceFormData(prev => ({ ...prev, endDate: date }))}
+                        onSelect={(date) => setMaintenanceFormData(prev => ({ ...prev, endDate: date ?? prev.endDate }))}
                         initialFocus
                       />
                     </PopoverContent>
@@ -1741,7 +1741,7 @@ export default function ServicePage() {
                   <Calendar
                     mode="single"
                     selected={scheduleFormData.scheduledTime}
-                    onSelect={(date) => setScheduleFormData(prev => ({ ...prev, scheduledTime: date }))}
+                    onSelect={(date) => setScheduleFormData(prev => ({ ...prev, scheduledTime: date ?? prev.scheduledTime }))}
                     initialFocus
                   />
                 </PopoverContent>

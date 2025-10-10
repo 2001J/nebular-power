@@ -10,6 +10,7 @@ import { Switch } from "@/components/ui/switch"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { userApi, authApi } from "@/lib/api"
+import type { UserProfile, ActivityLogEntry, PaginatedResponse } from "@/lib/api/types"
 import { useToast } from "@/components/ui/use-toast"
 import { Skeleton } from "@/components/ui/skeleton"
 import Link from "next/link"
@@ -17,33 +18,12 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Badge } from "@/components/ui/badge"
 
 // Define types for profile data
-interface ProfileData {
-  id: string;
-  email: string;
-  fullName: string;
-  phoneNumber: string;
-  role: string;
-  status: string;
-  emailVerified: boolean;
-  lastLogin: string;
-  createdAt: string;
-  installationDate?: string;
-  installationType?: string;
-}
-
-interface ActivityLog {
-  id: string;
-  activity: string;
-  details: string;
-  timestamp: string;
-  activityType: string;
-  ipAddress: string;
-}
+// Use shared API types instead of redefining
 
 export default function ProfilePage() {
   const { user, token } = useAuth()
   const { toast } = useToast()
-  const [profileData, setProfileData] = useState<ProfileData | null>(null)
+  const [profileData, setProfileData] = useState<UserProfile | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isEditing, setIsEditing] = useState(false)
   const [editData, setEditData] = useState({
@@ -55,7 +35,7 @@ export default function ProfilePage() {
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [isChangingPassword, setIsChangingPassword] = useState(false)
-  const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([])
+  const [activityLogs, setActivityLogs] = useState<ActivityLogEntry[]>([])
   const [activityLoading, setActivityLoading] = useState(true)
   const [isLoadingMore, setIsLoadingMore] = useState(false)
   const [currentPage, setCurrentPage] = useState(0)
@@ -145,7 +125,6 @@ export default function ProfilePage() {
         fullName: editData.fullName,
         email: editData.email,
         phoneNumber: editData.phoneNumber,
-        currentPassword: editData.email !== profileData?.email ? currentPassword : undefined
       })
 
       setProfileData(updatedProfile)
@@ -217,7 +196,7 @@ export default function ProfilePage() {
       }
 
       // Call API to change password with email
-      await authApi.changePassword(currentPassword, newPassword, userEmail)
+      await authApi.changePassword(currentPassword, newPassword)
       
       // Reset form
       setCurrentPassword('')
@@ -255,16 +234,6 @@ export default function ProfilePage() {
       
       const response = await userApi.getActivityLogs(0, activityLogs.length || 5)
       
-      if (response.error) {
-        console.error("Error refreshing activity logs:", response.errorMessage)
-        toast({
-          title: "Warning",
-          description: "Could not refresh activity logs. Please try again later.",
-          variant: "destructive"
-        })
-        return
-      }
-      
       if (response && response.content) {
         setActivityLogs(response.content)
         setTotalPages(response.totalPages || 1)
@@ -298,16 +267,6 @@ export default function ProfilePage() {
       console.log(`Loading more activity logs (page ${nextPage})`)
       
       const response = await userApi.getActivityLogs(nextPage, 5)
-      
-      if (response.error) {
-        console.error("Error loading more activity logs:", response.errorMessage)
-        toast({
-          title: "Warning",
-          description: "Could not load more activity logs. Please try again later.",
-          variant: "destructive"
-        })
-        return
-      }
       
       if (response && response.content && response.content.length > 0) {
         // Filter out duplicates (in case of overlapping pagination)
@@ -369,7 +328,7 @@ export default function ProfilePage() {
       console.log("Requesting password reset for email (partially masked):", 
         resetPasswordEmail.substring(0, 3) + "..." + resetPasswordEmail.substring(resetPasswordEmail.indexOf('@')))
       
-      await authApi.resetPasswordRequest(resetPasswordEmail)
+      await authApi.requestPasswordReset(resetPasswordEmail)
       
       setIsResetPasswordOpen(false)
       toast({
@@ -463,7 +422,7 @@ export default function ProfilePage() {
               <div className="relative mb-2">
                 <Avatar className="h-24 w-24">
                   <AvatarImage src="/placeholder-user.jpg" alt={user.name} />
-                  <AvatarFallback>{isLoading ? '...' : profileData?.fullName.charAt(0) || user.name.charAt(0)}</AvatarFallback>
+                  <AvatarFallback>{isLoading ? '...' : profileData?.fullName?.charAt(0) || user.name.charAt(0)}</AvatarFallback>
                 </Avatar>
                 <button className="absolute bottom-0 right-0 h-8 w-8 rounded-full bg-primary flex items-center justify-center">
                   <Pencil className="h-4 w-4 text-white" />
@@ -799,7 +758,7 @@ export default function ProfilePage() {
                       {activityLogs.map((log) => (
                         <div key={log.id} className="border-b pb-3 last:border-b-0 last:pb-0">
                           <div className="flex justify-between">
-                            <span className="font-medium">{log.activity}</span>
+                            <span className="font-medium">{log.description || log.activityType}</span>
                             <span className="text-sm text-muted-foreground">
                               {formatDate(log.timestamp)}
                             </span>
@@ -882,4 +841,3 @@ export default function ProfilePage() {
     </div>
   )
 }
-
