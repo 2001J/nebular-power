@@ -1,6 +1,6 @@
-# Solar Energy Monitoring and Financing System - User Documentation
+# Solar Energy Monitoring and Control System – User Docs
 
-Welcome to the user documentation for the Solar Energy Monitoring and Financing System. This documentation is designed to help you understand and use the system effectively.
+Welcome to the user documentation. This guide explains what the system does, how to get started, and where to find the key features available to customers and admins.
 
 ## Table of Contents
 
@@ -25,12 +25,10 @@ Welcome to the user documentation for the Solar Energy Monitoring and Financing 
    - Verification
 
 5. [User Guide](./user_guide.md)
-   - Dashboard Overview
-   - Energy Monitoring
-   - Financial Management
-   - User Management
-   - Reports and Analytics
-   - Settings and Configuration
+   - Customer Portal: Energy, Payments, Alerts
+   - Admin Portal: Compliance Analytics, Security Logs, Service Operations
+   - Reports and Exports
+   - Settings and Profile
 
 6. [Troubleshooting and FAQs](./troubleshooting.md)
    - Common Issues
@@ -39,6 +37,6 @@ Welcome to the user documentation for the Solar Energy Monitoring and Financing 
 
 ## How to Use This Documentation
 
-This documentation is organized to help you find information quickly. If you're new to the system, we recommend starting with the Introduction and then proceeding to the Installation Guide. If you're looking for specific information about using the system, refer to the User Guide section.
+If you're new to the system, start with the Introduction and the Installation Guide (local/staging use). For day‑to‑day actions, see the User Guide sections for customer or admin tasks.
 
 For any issues or questions not covered in this documentation, please refer to the Troubleshooting and FAQs section or contact our support team.

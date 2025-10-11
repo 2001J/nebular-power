@@ -68,10 +68,10 @@ The system implements several design patterns to address common challenges:
 
 - **Backend**: Java 21, Spring Boot 3.3.4, Spring Security, Spring Data JPA
 - **Database**: PostgreSQL 14 (production), H2 (development/testing)
-- **Frontend**: React.js, Next.js, Material-UI
+- **Frontend**: React.js, Next.js (App Router), Tailwind + shadcn/ui
 - **API Documentation**: OpenAPI/Swagger
 - **Authentication**: JWT (JSON Web Tokens)
-- **Testing**: JUnit 5, Mockito, TestContainers
+- **Testing**: JUnit 5, Mockito, Spring Boot Test
 - **Build Tool**: Maven
 - **Deployment**: Docker, Kubernetes (optional)
 

@@ -1,46 +1,31 @@
-# Solar Energy Monitoring and Financing System Documentation
+# Solar Energy Monitoring and Control System
 
-## Abstract
-The Solar Energy Monitoring and Financing System is a comprehensive platform that enables real-time monitoring of solar energy production/consumption, financial management of solar investments, and detailed analytics. Built with Spring Boot, PostgreSQL, and React.js, the system provides role-based access control, customizable dashboards, and automated reporting. It serves solar installation owners, managers, and administrators with tools to optimize energy usage, maximize ROI, and ensure regulatory compliance.
+This repository implements an end‑to‑end solution for monitoring small‑scale solar installations sold on financing plans. It tracks energy production/consumption, enforces payment compliance, detects tampering, and exposes web dashboards for customers and admins.
 
-Welcome to the documentation for the Solar Energy Monitoring and Financing System. This documentation is divided into two main sections:
+Problem to be solved
+- Financing reduces upfront costs but requires providers to monitor payment compliance and prevent tampering that could degrade or bypass the system.
 
-## [User Documentation](./user/README.md)
+Why it’s good
+- Automates reminders, status changes, and tamper alerts, reducing manual effort while protecting provider assets and improving reliability for users.
 
-The user documentation provides information for end-users of the system, including:
-- Introduction and purpose of the system
-- Target audience
-- System requirements
-- Installation guide
-- User guide with screenshots
-- Troubleshooting and FAQs
+Where it’s applied
+- Residential and small commercial solar systems offered on installment/lease models where remote monitoring, payment tracking, and security are required.
 
-## [Developer Documentation](./developer/README.md)
+How it is implemented
+- A Raspberry Pi simulator produces device telemetry (energy, heartbeats, tamper events) and sends it to a Spring Boot backend. The backend stores data, updates compliance states, and publishes notifications and real‑time WebSocket topics. A Next.js frontend provides customer and admin portals for energy insights, payments, and compliance/security analytics.
 
-The developer documentation provides technical information for developers who want to understand, modify, or extend the system:
-- Software design document
-  - System architecture
-  - Component diagrams
-  - Database design
-  - API documentation
-- Implementation details
-  - Code organization
-  - Key components
-  - Design patterns used
-  - Security implementation
-- Testing documentation
-  - Testing approach
-  - Test coverage
-  - How to run tests
+Documentation structure
+- User documentation: non‑technical usage and setup guidance
+  - See `docs/user/README.md`
+- Developer documentation: architecture, APIs, implementation and testing
+  - See `docs/developer/README.md`
 
-## Assessment Criteria
+High‑level data flow (text diagram)
+- Device/Simulator → HTTP: `/monitoring/**`, `/api/service/system/**`
+- Backend (Spring Boot) → DB (JPA) + Scheduling + Integrations
+- Backend → WebSocket topics (`/ws` STOMP → `/topic/**`)
+- Frontend (Next.js) → REST via Next rewrites (`/api/*`, `/monitoring/*`) + STOMP client
 
-This documentation has been prepared according to the assessment criteria for BSc Theses at the Faculty of Informatics, ELTE:
-
-1. The difficulty of the programming task solved
-2. The structure, the language and style, and the appearance of the thesis
-3. User documentation
-4. Software design document (Developer documentation)
-5. Implementation (Developer documentation)
-6. Testing (Developer documentation)
-7. Program execution
+Quick links
+- Frontend overview: `docs/frontend/README.md`
+- API groups and Swagger UI (run backend): `/swagger-ui/index.html`

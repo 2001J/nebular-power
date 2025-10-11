@@ -1,61 +1,46 @@
-# Database Design
+# Database Design (as implemented)
 
-This document describes the database design for the Solar Energy Monitoring and Financing System, including the entity-relationship model, table structures, relationships, indexing strategy, and data migration approach.
+This document reflects the entities and relationships defined in the codebase and keeps a tight link to source so it remains accurate.
 
-## Entity-Relationship Diagram
-
-The following diagram illustrates the main entities in the system and their relationships:
+## Overview & ER Sketch
 
 ```
-┌───────────────┐       ┌───────────────┐       ┌───────────────┐
-│               │       │               │       │               │
-│     User      │◄──────┤  Installation │◄──────┤  EnergyData   │
-│               │       │               │       │               │
-└───────────────┘       └───────────────┘       └───────────────┘
-       ▲                       ▲                       ▲
-       │                       │                       │
-       │                       │                       │
-       ▼                       ▼                       ▼
-┌───────────────┐       ┌───────────────┐       ┌───────────────┐
-│               │       │               │       │               │
-│     Role      │       │EnergySummary  │       │  Payment      │
-│               │       │               │       │               │
-└───────────────┘       └───────────────┘       └───────────────┘
-                                                       ▲
-                                                       │
-                                                       │
-                                                       ▼
-                                               ┌───────────────┐
-                                               │               │
-                                               │   Invoice     │
-                                               │               │
-                                               └───────────────┘
+User (users)
+   ▲            
+   │1..* owner
+   │           
+SolarInstallation (solar_installations)
+   │1..*                │1..*                 │1..1
+   ├── EnergyData       ├── EnergySummary     ├── AlertConfig (+ channels)
+   ├── PaymentPlan ─┐   └── ServiceStatus     └── MonitoringStatus
+   │                └── Payment ──┐
+   │                                └── PaymentReminder
+   ├── DeviceCommand
+   └── OperationalLog
+
+TamperEvent, SecurityLog → SolarInstallation
 ```
 
-## Database Tables
+## Entities & Key Fields
 
-### User Management Tables
+Note: Types shown here are conceptual; see code excerpts for authoritative definitions.
 
-#### User
+### User (users)
+- id (PK), email (unique), password, fullName, phoneNumber, role, enabled, emailVerified, passwordChangeRequired, failedLoginAttempts, accountLocked, lockTime, lastLogin, createdAt, updatedAt
 
-Stores information about system users.
-
-| Column | Type | Constraints | Description |
-|--------|------|-------------|-------------|
-| id | BIGINT | PK, NOT NULL | Unique identifier for the user |
-| username | VARCHAR(50) | UNIQUE, NOT NULL | User's login name |
-| email | VARCHAR(100) | UNIQUE, NOT NULL | User's email address |
-| password | VARCHAR(255) | NOT NULL | Encrypted password |
-| first_name | VARCHAR(50) | NOT NULL | User's first name |
-| last_name | VARCHAR(50) | NOT NULL | User's last name |
-| phone | VARCHAR(20) | | User's phone number |
-| enabled | BOOLEAN | NOT NULL, DEFAULT TRUE | Whether the user account is active |
-| account_non_expired | BOOLEAN | NOT NULL, DEFAULT TRUE | Whether the user account has expired |
-| account_non_locked | BOOLEAN | NOT NULL, DEFAULT TRUE | Whether the user account is locked |
-| credentials_non_expired | BOOLEAN | NOT NULL, DEFAULT TRUE | Whether the user's credentials have expired |
-| created_at | TIMESTAMP | NOT NULL | When the user was created |
-| updated_at | TIMESTAMP | NOT NULL | When the user was last updated |
-| last_login | TIMESTAMP | | When the user last logged in |
+Code excerpt
+```java
+@Entity @Table(name = "users")
+public class User {
+  @Id @GeneratedValue(strategy = IDENTITY) Long id;
+  @Column(nullable=false, unique=true) String email;
+  @Column(nullable=false) String password;
+  @Enumerated(EnumType.STRING) @Column(nullable=false) UserRole role;
+  @Column(nullable=false) boolean enabled = true;
+  @Column(nullable=false) boolean emailVerified = false;
+  @Column(name="last_login") LocalDateTime lastLogin;
+}
+```
 
 #### Role
 
@@ -176,7 +161,7 @@ Stores payment information.
 | created_at | TIMESTAMP | NOT NULL | When the record was created |
 | updated_at | TIMESTAMP | NOT NULL | When the record was last updated |
 
-#### Invoice
+#### Invoice (not implemented)
 
 Stores invoice information.
 
@@ -194,7 +179,7 @@ Stores invoice information.
 | created_at | TIMESTAMP | NOT NULL | When the record was created |
 | updated_at | TIMESTAMP | NOT NULL | When the record was last updated |
 
-#### Invoice_Item
+#### Invoice_Item (not implemented)
 
 Stores individual line items for invoices.
 
@@ -299,11 +284,161 @@ The following indexes are implemented to optimize query performance:
 - `idx_user_username`: Index on `User.username` for fast user lookup by username
 - `idx_user_last_login`: Index on `User.last_login` for reporting on user activity
 
-### Energy Monitoring Indexes
+### Energy Monitoring Entities
 
-- `idx_energy_data_installation_timestamp`: Composite index on `EnergyData.installation_id` and `EnergyData.timestamp` for efficient time-series queries
-- `idx_energy_summary_installation_period_date`: Composite index on `EnergySummary.installation_id`, `EnergySummary.period`, and `EnergySummary.date` for efficient summary retrieval
-- `idx_installation_status`: Index on `SolarInstallation.status` for filtering installations by status
+SolarInstallation (solar_installations)
+- id, name, installedCapacityKW/capacity, location, type, installationDate, status (ACTIVE/SUSPENDED/MAINTENANCE), tamperDetected, lastTamperCheck, user_id (FK)
+
+Code excerpt
+```java
+@Entity @Table(name = "solar_installations")
+public class SolarInstallation {
+  @Id @GeneratedValue(strategy=IDENTITY) Long id;
+  @Column(nullable=false) String name;
+  @Column(nullable=false) String location;
+  @Enumerated(EnumType.STRING) @Column(nullable=false) InstallationStatus status = ACTIVE;
+  @ManyToOne(fetch=LAZY) @JoinColumn(name="user_id") User user;
+}
+```
+
+EnergyData (energy_data)
+- id, installation_id (FK), powerGenerationWatts, powerConsumptionWatts, timestamp, dailyYieldKWh, totalYieldKWh, isSimulated
+- Index: (installation_id, timestamp) as `idx_energy_data_install_ts`
+
+Code excerpt
+```java
+@Entity
+@Table(name="energy_data", indexes={@Index(name="idx_energy_data_install_ts", columnList="installation_id,timestamp")})
+public class EnergyData {
+  @ManyToOne(fetch=LAZY) @JoinColumn(name="installation_id", nullable=false)
+  private SolarInstallation installation;
+  @Column(nullable=false) private double powerGenerationWatts;
+  @Column(nullable=false) private LocalDateTime timestamp;
+}
+```
+
+EnergySummary (energy_summaries)
+- id, installation_id (FK), date, period (DAILY/WEEKLY/MONTHLY/YEARLY), totalGenerationKWh, totalConsumptionKWh, peakGenerationWatts, peakConsumptionWatts, efficiencyPercentage, readingsCount, periodStart, periodEnd
+
+### Payment Compliance Entities
+
+PaymentPlan (payment_plans)
+- id, installation_id (FK), name, description, totalAmount, remainingAmount, numberOfPayments, installmentAmount, frequency, startDate, endDate, status, interestRate, lateFeeAmount, gracePeriodDays
+
+Payment (payments)
+- id, installation_id (FK), payment_plan_id (FK), amount, dueDate, paidAt, status, statusReason, statusUpdatedAt, daysOverdue, transactionId, paymentMethod, notes, lateFee, createdAt, updatedAt
+
+Code excerpt
+```java
+@Entity @Table(name = "payments")
+public class Payment {
+  @ManyToOne @JoinColumn(name="installation_id", nullable=false)
+  private SolarInstallation installation;
+  @Enumerated(EnumType.STRING) @Column(nullable=false)
+  private PaymentStatus status; // PENDING, PAID, OVERDUE, ...
+}
+```
+
+PaymentReminder (payment_reminders)
+- id, payment_id (FK), sentDate, reminderType, deliveryStatus, deliveryChannel, recipientAddress, messageContent, retryCount, lastRetryDate, errorMessage
+
+ReminderConfig (reminder_configs)
+- id, autoSendReminders, firstReminderDays, secondReminderDays, finalReminderDays, reminderMethod, createdAt, updatedAt, createdBy, updatedBy, version
+
+GracePeriodConfig (grace_period_configs)
+- id, numberOfDays, reminderFrequency, autoSuspendEnabled, lateFeesEnabled, lateFeePercentage, lateFeeFixedAmount, createdAt, updatedAt, createdBy, updatedBy, version
+
+### Service Control Entities
+
+ServiceStatus (service_status)
+- id, installation_id (FK), status (ACTIVE, SUSPENDED_* …), updatedAt, updatedBy, scheduledChange, scheduledTime, statusReason, active
+
+DeviceCommand (device_commands)
+- id, installation_id (FK), command, parameters, status, sentAt, processedAt, expiresAt, responseMessage, initiatedBy, retryCount, lastRetryAt, correlationId
+
+Code excerpt
+```java
+@Entity @Table(name = "device_commands")
+public class DeviceCommand {
+  @ManyToOne(fetch=LAZY) @JoinColumn(name="installation_id", nullable=false)
+  private SolarInstallation installation;
+  @Enumerated(EnumType.STRING) @Column(nullable = false)
+  private CommandStatus status; // PENDING, SENT, EXECUTED, ...
+}
+```
+
+OperationalLog (operational_logs)
+- id, installation_id (FK), timestamp, operation, initiator, details, sourceSystem, sourceAction, ipAddress, userAgent, success, errorDetails
+
+### Tampering Detection & Security Entities
+
+TamperEvent (tamper_events)
+- id, installation_id (FK), eventType, timestamp, severity, description, resolved, resolvedAt, resolvedBy, confidenceScore, rawSensorData, status
+
+SecurityLog (security_logs)
+- id, installation_id (FK), timestamp, activityType, details, ipAddress, location, userId
+
+MonitoringStatus (tamper_monitoring_status)
+- id, installation_id (FK), monitoring, updatedAt
+
+AlertConfig (alert_configs) + alert_notification_channels
+- id, installation_id (FK, unique), alertLevel, notificationChannels (EMAIL/SMS/PUSH/IN_APP), autoResponseEnabled, thresholds, samplingRateSeconds, createdAt, updatedAt
+
+## Relationships
+- SolarInstallation → User: many‑to‑one (owner)
+- EnergyData, EnergySummary, PaymentPlan, Payment, ServiceStatus, DeviceCommand, OperationalLog, TamperEvent, SecurityLog → SolarInstallation: many‑to‑one
+- Payment → PaymentPlan: many‑to‑one
+- PaymentReminder → Payment: many‑to‑one
+- AlertConfig → SolarInstallation: one‑to‑one; channels via element collection
+
+## Indexing & Performance Notes
+- energy_data has a composite index on (installation_id, timestamp).
+- Consider adding indexes on common FK columns and date/status columns (e.g., payments.installation_id, payments.dueDate; service_status.installation_id; tamper_events.installation_id,timestamp).
+
+## Schema Export / Migration
+- H2 schema export is supported via `SchemaExportConfig` using properties:
+  - `app.schema.export.enabled` (default false)
+  - `app.schema.export.file` (default `target/schema.sql`)
+  - `app.schema.export.include-data` (default false)
+- Migrations (Flyway) are not configured in this repository; recommended if you plan multi‑env DB evolution.
+
+## Short Code Excerpts (verified)
+EnergyData fields
+```java
+@Table(name = "energy_data", indexes = {
+  @Index(name = "idx_energy_data_install_ts", columnList = "installation_id,timestamp")
+})
+private SolarInstallation installation;
+@Column(nullable = false) private double powerGenerationWatts;
+@Column(nullable = false) private LocalDateTime timestamp;
+```
+
+Payment status enum
+```java
+public enum PaymentStatus {
+  PENDING, PAID, OVERDUE, CANCELLED, REFUNDED,
+  PARTIALLY_PAID, SCHEDULED, UPCOMING, DUE_TODAY,
+  GRACE_PERIOD, SUSPENSION_PENDING
+}
+```
+
+DeviceCommand timing fields
+```java
+@Column(nullable = false) private LocalDateTime sentAt;
+@Column private LocalDateTime processedAt;
+@Column private LocalDateTime expiresAt;
+@PrePersist protected void onCreate() {
+  if (sentAt == null) sentAt = LocalDateTime.now();
+  if (status == null) status = CommandStatus.PENDING;
+}
+```
+
+## Open Items / Gaps
+- No migration tool configured (e.g., Flyway). Add migrations to manage schema changes across environments.
+- Add DB indexes on high‑traffic FKs and date/status fields beyond those already present.
+- Review monetary fields for consistent precision/scale and currency handling; consider enums for `paymentMethod`.
+- Define retention/archiving strategy for large time‑series tables (EnergyData, SecurityLog, TamperEvent).
+- Consider unique or partial indexes to enforce invariants (e.g., one active ServiceStatus per installation if required by business rules).
 
 ### Financial Management Indexes
 
@@ -382,11 +517,7 @@ The system uses Flyway for database migration management, which provides version
 
 ### Migration Naming Convention
 
-Migration scripts follow the naming convention:
-
-```
-V{version}__{description}.sql
-```
+Migration scripts typically follow the naming convention `V{version}__{description}.sql`.
 
 For example:
 - `V1__initial_schema.sql`
@@ -402,42 +533,14 @@ For example:
 
 ### Rollback Strategy
 
-For critical migrations, corresponding rollback scripts are created:
-
-```
-U{version}__{description}.sql
-```
-
-For example:
-- `U3__alter_energy_data_add_efficiency.sql`
+For critical migrations, corresponding rollback scripts can be created, for example `U3__alter_energy_data_add_efficiency.sql`.
 
 ## Data Partitioning
 
-For tables that are expected to grow significantly over time, partitioning strategies are implemented:
+Note: Table partitioning is not configured in this repository. The following strategies are optional for large datasets:
 
-### Time-Based Partitioning
-
-The `EnergyData` table is partitioned by month to improve query performance for time-range queries:
-
-```sql
-CREATE TABLE energy_data_y2023m01 PARTITION OF energy_data
-    FOR VALUES FROM ('2023-01-01') TO ('2023-02-01');
-
-CREATE TABLE energy_data_y2023m02 PARTITION OF energy_data
-    FOR VALUES FROM ('2023-02-01') TO ('2023-03-01');
-```
-
-### Installation-Based Partitioning
-
-For large-scale deployments with many installations, the `EnergySummary` table can be partitioned by installation ID ranges:
-
-```sql
-CREATE TABLE energy_summary_i0001_i1000 PARTITION OF energy_summary
-    FOR VALUES FROM (1) TO (1001);
-
-CREATE TABLE energy_summary_i1001_i2000 PARTITION OF energy_summary
-    FOR VALUES FROM (1001) TO (2001);
-```
+- Time‑based partitioning for `EnergyData` (e.g., monthly partitions) to improve time‑range queries.
+- Installation ID range partitioning for `EnergySummary` in very large deployments.
 
 ## Data Archiving
 
