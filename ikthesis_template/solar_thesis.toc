@@ -1,0 +1,181 @@
+\select@language {english} \contentsline {chapter}{\numberline {1}Introduction}{4}{chapter.1}%
+\select@language {english} \contentsline {section}{\numberline {1.1}Motivation}{4}{section.1.1}%
+\select@language {english} \contentsline {section}{\numberline {1.2}Purpose of the System}{5}{section.1.2}%
+\select@language {english} \contentsline {section}{\numberline {1.3}Key Features}{6}{section.1.3}%
+\select@language {english} \contentsline {subsection}{\numberline {1.3.1}Energy Monitoring}{6}{subsection.1.3.1}%
+\select@language {english} \contentsline {subsection}{\numberline {1.3.2}Payment Compliance}{6}{subsection.1.3.2}%
+\select@language {english} \contentsline {subsection}{\numberline {1.3.3}Security and Tampering Detection}{7}{subsection.1.3.3}%
+\select@language {english} \contentsline {subsection}{\numberline {1.3.4}User Management}{7}{subsection.1.3.4}%
+\select@language {english} \contentsline {section}{\numberline {1.4}System Architecture Overview}{8}{section.1.4}%
+\select@language {english} \contentsline {section}{\numberline {1.5}Thesis Structure}{9}{section.1.5}%
+\select@language {english} \contentsline {chapter}{\numberline {2}User Documentation}{10}{chapter.2}%
+\select@language {english} \contentsline {section}{\numberline {2.1}System Overview}{10}{section.2.1}%
+\select@language {english} \contentsline {subsection}{\numberline {2.1.1}What is the Solar Energy Monitoring and Control System?}{10}{subsection.2.1.1}%
+\select@language {english} \contentsline {subsection}{\numberline {2.1.2}Who Should Use This Documentation}{11}{subsection.2.1.2}%
+\select@language {english} \contentsline {subsection}{\numberline {2.1.3}System Components}{11}{subsection.2.1.3}%
+\select@language {english} \contentsline {section}{\numberline {2.2}Quick Start Guide}{12}{section.2.2}%
+\select@language {english} \contentsline {subsection}{\numberline {2.2.1}System Requirements}{12}{subsection.2.2.1}%
+\select@language {english} \contentsline {subsubsection}{For End Users (Customers)}{12}{section*.3}%
+\select@language {english} \contentsline {subsubsection}{For System Administrators}{12}{section*.4}%
+\select@language {english} \contentsline {subsection}{\numberline {2.2.2}Account Access}{13}{subsection.2.2.2}%
+\select@language {english} \contentsline {subsubsection}{Getting Your Account}{13}{section*.5}%
+\select@language {english} \contentsline {subsubsection}{Logging In}{14}{section*.6}%
+\select@language {english} \contentsline {subsubsection}{Password Management}{14}{section*.8}%
+\select@language {english} \contentsline {section}{\numberline {2.3}User Interface Guide}{15}{section.2.3}%
+\select@language {english} \contentsline {subsection}{\numberline {2.3.1}System Requirements}{15}{subsection.2.3.1}%
+\select@language {english} \contentsline {subsubsection}{Browser Compatibility}{15}{section*.9}%
+\select@language {english} \contentsline {subsubsection}{Hardware Simulation Environment}{16}{section*.10}%
+\select@language {english} \contentsline {subsubsection}{Network and Security Requirements}{17}{section*.11}%
+\select@language {english} \contentsline {section}{\numberline {2.4}Installation and Setup Guide}{17}{section.2.4}%
+\select@language {english} \contentsline {subsection}{\numberline {2.4.1}Prerequisites}{17}{subsection.2.4.1}%
+\select@language {english} \contentsline {subsection}{\numberline {2.4.2}Quick Docker Installation}{18}{subsection.2.4.2}%
+\select@language {english} \contentsline {subsubsection}{Step 1: Get the Source Code}{18}{section*.12}%
+\select@language {english} \contentsline {subsubsection}{Step 2: Launch the System}{18}{section*.13}%
+\select@language {english} \contentsline {subsubsection}{Step 3: Access the Application}{18}{section*.14}%
+\select@language {english} \contentsline {subsection}{\numberline {2.4.3}System Configuration}{19}{subsection.2.4.3}%
+\select@language {english} \contentsline {subsubsection}{Environment Variables}{19}{section*.15}%
+\select@language {english} \contentsline {subsubsection}{Production Deployment}{19}{section*.16}%
+\select@language {english} \contentsline {subsection}{\numberline {2.4.4}Device Simulation Setup}{19}{subsection.2.4.4}%
+\select@language {english} \contentsline {subsubsection}{Raspberry Pi Simulation (Optional)}{19}{section*.17}%
+\select@language {english} \contentsline {subsection}{\numberline {2.4.5}Local Development (Alternative to Docker)}{20}{subsection.2.4.5}%
+\select@language {english} \contentsline {subsection}{\numberline {2.4.6}Verification and Testing}{20}{subsection.2.4.6}%
+\select@language {english} \contentsline {subsubsection}{System Health Check}{20}{section*.18}%
+\select@language {english} \contentsline {subsubsection}{Common Issues and Solutions}{21}{section*.19}%
+\select@language {english} \contentsline {subsection}{\numberline {2.4.7}System Management}{21}{subsection.2.4.7}%
+\select@language {english} \contentsline {subsubsection}{Starting and Stopping}{21}{section*.20}%
+\select@language {english} \contentsline {subsubsection}{Data Management}{21}{section*.21}%
+\select@language {english} \contentsline {subsection}{\numberline {2.4.8}Account Setup and Access}{22}{subsection.2.4.8}%
+\select@language {english} \contentsline {subsubsection}{Customer Onboarding Process}{22}{section*.22}%
+\select@language {english} \contentsline {subsubsection}{Login Procedure}{22}{section*.24}%
+\select@language {english} \contentsline {subsubsection}{Password Management}{23}{section*.25}%
+\select@language {english} \contentsline {section}{\numberline {2.5}Dashboard Interface Guide}{24}{section.2.5}%
+\select@language {english} \contentsline {subsection}{\numberline {2.5.1}Dashboard Overview}{24}{subsection.2.5.1}%
+\select@language {english} \contentsline {subsubsection}{Administrator Dashboard}{24}{section*.26}%
+\select@language {english} \contentsline {subsubsection}{Customer Dashboard}{24}{section*.28}%
+\select@language {english} \contentsline {subsection}{\numberline {2.5.2}Energy Monitoring}{25}{subsection.2.5.2}%
+\select@language {english} \contentsline {subsubsection}{Customer Energy View}{25}{section*.30}%
+\select@language {english} \contentsline {subsubsection}{Administrator Energy View}{26}{section*.32}%
+\select@language {english} \contentsline {subsection}{\numberline {2.5.3}Payment Operations Interface}{26}{subsection.2.5.3}%
+\select@language {english} \contentsline {subsubsection}{Administrator Payment Management}{27}{section*.34}%
+\select@language {english} \contentsline {subsubsection}{Customer Payment Interface}{28}{section*.38}%
+\select@language {english} \contentsline {subsection}{\numberline {2.5.4}Security \& Compliance Interface}{29}{subsection.2.5.4}%
+\select@language {english} \contentsline {subsubsection}{Security Monitoring}{29}{section*.40}%
+\select@language {english} \contentsline {subsubsection}{Security Alerts}{30}{section*.42}%
+\select@language {english} \contentsline {subsubsection}{System Logs}{31}{section*.45}%
+\select@language {english} \contentsline {section}{\numberline {2.6}Operational Procedures}{32}{section.2.6}%
+\select@language {english} \contentsline {subsection}{\numberline {2.6.1}Installation Management}{32}{subsection.2.6.1}%
+\select@language {english} \contentsline {subsubsection}{Adding a New Installation}{32}{section*.49}%
+\select@language {english} \contentsline {subsection}{\numberline {2.6.2}User Management}{33}{subsection.2.6.2}%
+\select@language {english} \contentsline {subsubsection}{Deactivating User Accounts}{33}{section*.50}%
+\select@language {english} \contentsline {subsection}{\numberline {2.6.3}Payment Operations}{34}{subsection.2.6.3}%
+\select@language {english} \contentsline {subsubsection}{Creating New Loans}{34}{section*.51}%
+\select@language {english} \contentsline {subsubsection}{Modifying Existing Loans}{35}{section*.52}%
+\select@language {english} \contentsline {subsubsection}{Processing Manual Payments}{36}{section*.53}%
+\select@language {english} \contentsline {section}{\numberline {2.7}User Workflows and Step-by-Step Procedures}{36}{section.2.7}%
+\select@language {english} \contentsline {subsection}{\numberline {2.7.1}Administrator Workflows}{37}{subsection.2.7.1}%
+\select@language {english} \contentsline {subsubsection}{Complete Customer Onboarding Workflow}{37}{section*.54}%
+\select@language {english} \contentsline {subsubsection}{Security Alert Response Workflow}{39}{section*.55}%
+\select@language {english} \contentsline {subsection}{\numberline {2.7.2}Customer Workflows}{41}{subsection.2.7.2}%
+\select@language {english} \contentsline {subsubsection}{Daily Energy Monitoring Routine}{41}{section*.56}%
+\select@language {english} \contentsline {subsubsection}{Payment Review and Management Workflow}{42}{section*.57}%
+\select@language {english} \contentsline {section}{\numberline {2.8}System Messages and Error Handling}{43}{section.2.8}%
+\select@language {english} \contentsline {subsection}{\numberline {2.8.1}Authentication and Access Messages}{43}{subsection.2.8.1}%
+\select@language {english} \contentsline {subsubsection}{Login and Session Messages}{43}{section*.58}%
+\select@language {english} \contentsline {subsection}{\numberline {2.8.2}Data Operation Messages}{44}{subsection.2.8.2}%
+\select@language {english} \contentsline {subsubsection}{Create Operations}{44}{section*.59}%
+\select@language {english} \contentsline {subsubsection}{Update Operations}{45}{section*.60}%
+\select@language {english} \contentsline {subsubsection}{Delete Operations}{45}{section*.61}%
+\select@language {english} \contentsline {subsection}{\numberline {2.8.3}System Status and Monitoring Messages}{46}{subsection.2.8.3}%
+\select@language {english} \contentsline {subsubsection}{Installation Status Messages}{46}{section*.62}%
+\select@language {english} \contentsline {subsubsection}{Security Alert Messages}{46}{section*.63}%
+\select@language {english} \contentsline {subsection}{\numberline {2.8.4}Technical Error Messages}{47}{subsection.2.8.4}%
+\select@language {english} \contentsline {subsubsection}{Connectivity Issues}{47}{section*.64}%
+\select@language {english} \contentsline {subsubsection}{Application Errors}{47}{section*.65}%
+\select@language {english} \contentsline {section}{\numberline {2.9}Security and Troubleshooting Instructions}{48}{section.2.9}%
+\select@language {english} \contentsline {subsection}{\numberline {2.9.1}Security Best Practices}{48}{subsection.2.9.1}%
+\select@language {english} \contentsline {subsubsection}{Password Security}{48}{section*.66}%
+\select@language {english} \contentsline {subsubsection}{Session Security}{49}{section*.67}%
+\select@language {english} \contentsline {subsubsection}{Data Protection}{49}{section*.68}%
+\select@language {english} \contentsline {subsection}{\numberline {2.9.2}Common Issues and Solutions}{50}{subsection.2.9.2}%
+\select@language {english} \contentsline {subsubsection}{Login and Authentication Issues}{50}{section*.69}%
+\select@language {english} \contentsline {subsubsection}{Dashboard and Interface Issues}{51}{section*.70}%
+\select@language {english} \contentsline {subsubsection}{Data and Monitoring Issues}{52}{section*.71}%
+\select@language {english} \contentsline {subsection}{\numberline {2.9.3}Emergency Procedures}{52}{subsection.2.9.3}%
+\select@language {english} \contentsline {subsubsection}{Security Incident Response}{52}{section*.72}%
+\select@language {english} \contentsline {subsubsection}{System Unavailability}{53}{section*.73}%
+\select@language {english} \contentsline {subsection}{\numberline {2.9.4}Contact and Support Information}{53}{subsection.2.9.4}%
+\select@language {english} \contentsline {subsection}{\numberline {2.9.5}Testing Environment Issues}{54}{subsection.2.9.5}%
+\select@language {english} \contentsline {subsection}{\numberline {2.9.6}Research Implementation Limitations}{54}{subsection.2.9.6}%
+\select@language {english} \contentsline {subsection}{\numberline {2.9.7}Development Testing Guidance}{55}{subsection.2.9.7}%
+\select@language {english} \contentsline {section}{\numberline {2.10}Reference}{55}{section.2.10}%
+\select@language {english} \contentsline {subsection}{\numberline {2.10.1}Glossary}{55}{subsection.2.10.1}%
+\select@language {english} \contentsline {subsection}{\numberline {2.10.2}Research and Development Resources}{56}{subsection.2.10.2}%
+\select@language {english} \contentsline {section}{\numberline {2.11}Documentation Summary and Compliance}{57}{section.2.11}%
+\select@language {english} \contentsline {subsection}{\numberline {2.11.1}Coverage Verification}{57}{subsection.2.11.1}%
+\select@language {english} \contentsline {subsubsection}{Target Audience and Task Description}{57}{section*.74}%
+\select@language {english} \contentsline {subsubsection}{System Requirements and Installation}{57}{section*.75}%
+\select@language {english} \contentsline {subsubsection}{User Interface and Workflows}{58}{section*.76}%
+\select@language {english} \contentsline {subsubsection}{System Messages and Error Handling}{58}{section*.77}%
+\select@language {english} \contentsline {subsubsection}{Security and Troubleshooting}{58}{section*.78}%
+\select@language {english} \contentsline {subsection}{\numberline {2.11.2}Documentation Quality Standards}{59}{subsection.2.11.2}%
+\select@language {english} \contentsline {subsection}{\numberline {2.11.3}Research Context and Limitations}{59}{subsection.2.11.3}%
+\select@language {english} \contentsline {subsection}{\numberline {2.11.4}Maintenance and Updates}{60}{subsection.2.11.4}%
+\select@language {english} \contentsline {chapter}{\numberline {3}Developer Documentation}{61}{chapter.3}%
+\select@language {english} \contentsline {section}{\numberline {3.1}Solution Plan}{61}{section.3.1}%
+\select@language {english} \contentsline {subsection}{\numberline {3.1.1}System Architecture Design}{62}{subsection.3.1.1}%
+\select@language {english} \contentsline {subsubsection}{Architectural Overview and Design Rationale}{62}{section*.79}%
+\select@language {english} \contentsline {paragraph}{Technology Stack Selection and Rationale}{63}{section*.81}%
+\select@language {english} \contentsline {subsubsection}{Modular Architecture Design}{63}{section*.83}%
+\select@language {english} \contentsline {paragraph}{Short Code Excerpts (verified)}{63}{section*.85}%
+\select@language {english} \contentsline {subsubsection}{Inter-Module Communication Design}{64}{section*.86}%
+\select@language {english} \contentsline {paragraph}{Communication Patterns}{64}{section*.87}%
+\select@language {english} \contentsline {subsection}{\numberline {3.1.2}Database Design and Architecture}{65}{subsection.3.1.2}%
+\select@language {english} \contentsline {subsubsection}{Database Schema Design}{65}{section*.88}%
+\select@language {english} \contentsline {subsubsection}{Database Performance Optimization}{66}{section*.89}%
+\select@language {english} \contentsline {paragraph}{Indexing Strategy}{66}{section*.90}%
+\select@language {english} \contentsline {paragraph}{Partitioning}{66}{section*.91}%
+\select@language {english} \contentsline {paragraph}{Data Retention Policy}{66}{section*.92}%
+\select@language {english} \contentsline {subsection}{\numberline {3.1.3}User Interface Design and Architecture}{66}{subsection.3.1.3}%
+\select@language {english} \contentsline {subsubsection}{Frontend Architecture Design}{66}{section*.93}%
+\select@language {english} \contentsline {subsubsection}{Role-Based User Experience Design}{66}{section*.95}%
+\select@language {english} \contentsline {paragraph}{Customer Interface Design}{67}{section*.96}%
+\select@language {english} \contentsline {paragraph}{Administrator Interface Design}{67}{section*.97}%
+\select@language {english} \contentsline {subsubsection}{Responsive Design Strategy}{67}{section*.98}%
+\select@language {english} \contentsline {subsubsection}{Real-Time Data Visualization}{67}{section*.100}%
+\select@language {english} \contentsline {subsection}{\numberline {3.1.4}Security Architecture and Design}{68}{subsection.3.1.4}%
+\select@language {english} \contentsline {subsubsection}{Multi-Layered Security Design}{68}{section*.101}%
+\select@language {english} \contentsline {subsubsection}{Security Implementation Details}{68}{section*.103}%
+\select@language {english} \contentsline {paragraph}{Authentication and Authorization Framework}{68}{section*.104}%
+\select@language {english} \contentsline {paragraph}{Data Protection and Encryption}{69}{section*.105}%
+\select@language {english} \contentsline {paragraph}{API Security Measures}{69}{section*.106}%
+\select@language {english} \contentsline {section}{\numberline {3.2}Implementation}{69}{section.3.2}%
+\select@language {english} \contentsline {section}{\numberline {3.3}Testing}{70}{section.3.3}%
+\select@language {english} \contentsline {section}{\numberline {3.4}Deployment and Performance}{70}{section.3.4}%
+\select@language {english} \contentsline {subsubsection}{Development Environment Setup}{70}{section*.107}%
+\select@language {english} \contentsline {paragraph}{Prerequisites Installation}{70}{section*.108}%
+\select@language {english} \contentsline {paragraph}{Quick Start with Docker (Recommended)}{71}{section*.109}%
+\select@language {english} \contentsline {subsubsection}{Production Deployment}{72}{section*.110}%
+\select@language {english} \contentsline {paragraph}{Production-Ready Docker Compose Configuration}{72}{section*.111}%
+\select@language {english} \contentsline {paragraph}{Production Environment Variables}{74}{section*.112}%
+\select@language {english} \contentsline {paragraph}{Database Backup and Recovery}{75}{section*.113}%
+\select@language {english} \contentsline {subsubsection}{Monitoring and Health Checks}{76}{section*.114}%
+\select@language {english} \contentsline {paragraph}{Health Check Endpoints}{76}{section*.115}%
+\select@language {english} \contentsline {subsubsection}{Debugging Techniques}{77}{section*.116}%
+\select@language {english} \contentsline {subsection}{\numberline {3.4.1}Support Resources}{77}{subsection.3.4.1}%
+\select@language {english} \contentsline {section}{\numberline {3.5}Conclusion}{78}{section.3.5}%
+\select@language {english} \contentsline {chapter}{\numberline {A}Raspberry Pi Simulation Framework}{83}{appendix.A}%
+\select@language {english} \contentsline {section}{\numberline {A.1}Overview}{83}{section.A.1}%
+\select@language {english} \contentsline {section}{\numberline {A.2}Simulation Components}{83}{section.A.2}%
+\select@language {english} \contentsline {subsection}{\numberline {A.2.1}Energy Simulator}{83}{subsection.A.2.1}%
+\select@language {english} \contentsline {subsection}{\numberline {A.2.2}Heartbeat Simulator}{84}{subsection.A.2.2}%
+\select@language {english} \contentsline {subsection}{\numberline {A.2.3}Tamper Simulator}{84}{subsection.A.2.3}%
+\select@language {english} \contentsline {subsection}{\numberline {A.2.4}Command Handler}{85}{subsection.A.2.4}%
+\select@language {english} \contentsline {section}{\numberline {A.3}Implementation Details}{85}{section.A.3}%
+\select@language {english} \contentsline {subsection}{\numberline {A.3.1}Configuration System}{85}{subsection.A.3.1}%
+\select@language {english} \contentsline {subsection}{\numberline {A.3.2}Data Generation}{85}{subsection.A.3.2}%
+\select@language {english} \contentsline {subsection}{\numberline {A.3.3}Communication with Backend}{86}{subsection.A.3.3}%
+\select@language {english} \contentsline {subsection}{\numberline {A.3.4}Command Processing}{86}{subsection.A.3.4}%
+\select@language {english} \contentsline {section}{\numberline {A.4}Interactive Features}{86}{section.A.4}%
+\select@language {english} \contentsline {section}{\numberline {A.5}Usage in Development and Testing}{87}{section.A.5}%
+\select@language {english} \contentsline {chapter}{Acknowledgements}{88}{appendix*.117}%
+\select@language {english} \contentsline {chapter}{Bibliography}{88}{section*.118}%

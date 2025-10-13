@@ -1,0 +1,15 @@
+[0] Config.pm:308> INFO - This is Biber 2.20
+[0] Config.pm:311> INFO - Logfile is 'solar_thesis.blg'
+[26] biber-darwin:340> INFO - === Sat Oct 11, 2025, 19:47:36
+[32] Biber.pm:420> INFO - Reading 'solar_thesis.bcf'
+[61] Biber.pm:994> INFO - Found 2 citekeys in bib section 0
+[67] Biber.pm:4463> INFO - Processing section 0
+[70] Biber.pm:4654> INFO - Looking for bibtex file 'solar_thesis.bib' for section 0
+[71] bibtex.pm:1713> INFO - LaTeX decoding ...
+[73] bibtex.pm:1519> INFO - Found BibTeX data source 'solar_thesis.bib'
+[87] UCollate.pm:68> INFO - Overriding locale 'hungarian' defaults 'normalization = NFD' with 'normalization = prenormalized'
+[87] UCollate.pm:68> INFO - Overriding locale 'hungarian' defaults 'variable = shifted' with 'variable = non-ignorable'
+[87] Biber.pm:4283> INFO - Sorting list 'none/global//global/global/global' of type 'entry' with template 'none' and locale 'hungarian'
+[87] Biber.pm:4289> INFO - No sort tailoring available for locale 'hungarian'
+[88] bbl.pm:676> INFO - Writing 'solar_thesis.bbl' with encoding 'UTF-8'
+[88] bbl.pm:779> INFO - Output to solar_thesis.bbl

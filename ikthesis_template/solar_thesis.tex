@@ -1,0 +1,218 @@
+\documentclass[
+	%parspace, % Add vertical space between paragraphs
+	%noindent, % No indentation of first lines in each paragraph
+	%nohyp, % No hyphenation of words
+	%twoside, % Double sided format
+	%draft, % Quicker draft compilation without rendering images
+	%final, % Set final to hide todos
+]{elteikthesis}[2024/04/26]
+
+% The minted package is also supported for source highlighting
+% See elteikthesis_minted.tex for example
+%\usepackage[newfloat]{minted}
+
+% Add hyperref package for clickable links and numbered bibliography references
+% Note: cite package conflicts with biblatex loaded by elteikthesis.cls, so we remove it
+% Note: hyperref is already loaded by elteikthesis.cls, so we don't load it again
+%\usepackage{cite}
+
+% Document's metadata
+\title{Solar Energy Monitoring and Control System} % title
+\date{2025} % year of defense
+
+% Author's metadata
+\author{Joseph Paul Koyi}
+\degree{Computer Science BSc}
+
+% Superivsor(s)' metadata
+\supervisor{Dr. Alwahab Dhulfiqar Zoltán} % internal supervisor's name
+\affiliation{Associate Professor} % internal supervisor's affiliation
+%\extsupervisor{Jane Doe} % external supervisor's name
+%\extaffiliation{Senior Developer} % external supervisor's affiliation
+
+% University's metadata
+\university{Eötvös Loránd University} % university's name
+\faculty{Faculty of Informatics} % faculty's name
+\department{Dept. of Software Technology and Methodology} % department's name
+\city{Budapest} % city
+\logo{elte_cimer_szines} % logo
+
+% Bibliography configuration for biblatex
+\addbibresource{solar_thesis.bib}
+
+% The document
+\begin{document}
+
+% Set document language
+%\documentlang{hungarian}
+\documentlang{english}
+
+% List of todos (not in the final document)
+%\listoftodos[\todolabel]
+
+% Title page (mandatory)
+\maketitle
+% Topic declaration page (mandatory) - can also be attached instead
+% \includepdf{topicdeclaration.pdf} % Uncomment and provide the file to include
+
+% Abstract (mandatory)
+\chapter*{Abstract}
+\addcontentsline{toc}{chapter}{Abstract}
+This thesis presents the design and implementation of a Solar Energy Monitoring and Control System targeted at residential and small commercial installations offered on financing plans. The system addresses payment compliance monitoring, real-time energy visibility, tamper detection, and remote operational control. The backend is implemented with Spring Boot 3 (Java 21) and exposes REST APIs and STOMP/SockJS for real-time updates; the frontend is built with Next.js and React, and a Raspberry~Pi simulation framework produces realistic telemetry and events for development and testing. We document the system architecture (high- and low-level design), database schema derived from JPA entities, module structure and key methods, implementation decisions (security, data representation, real-time communication), test plans and lessons learned, and practical deployment guidance. The documentation strictly reflects the implemented codebase to ensure reproducibility and evaluation clarity.
+
+% Table of contents (mandatory)
+\tableofcontents
+\listoffigures
+\listoftables
+\cleardoublepage
+
+% Main content
+\input{expanded_intro}
+\input{expanded_user}
+\input{expanded_developer}
+
+\cleardoublepage
+
+% Appendices (optional) - useful for detailed information in long tables, many and/or large figures, etc.
+\appendix
+\chapter{Raspberry Pi Simulation Framework}
+
+\section{Overview}
+The Solar Energy Monitoring and Control System includes a comprehensive simulation framework designed to run on a Raspberry Pi. This framework simulates a real solar installation for testing and demonstration purposes, generating realistic data and responding to commands as if it were an actual installation in the field.
+
+The simulation framework serves several important purposes:
+\begin{itemize}
+    \item Provides a controlled environment for testing the system without requiring actual solar hardware
+    \item Enables demonstration of system features including monitoring, tamper detection, and remote command execution
+    \item Facilitates development and testing of new features before deployment to production
+    \item Allows simulation of edge cases and error conditions that would be difficult to reproduce with real hardware
+\end{itemize}
+
+\section{Simulation Components}
+The simulation framework consists of several specialized modules, each responsible for simulating different aspects of a solar installation:
+
+\subsection{Energy Simulator}
+The Energy Simulator generates realistic energy production and consumption data with the following features:
+\begin{itemize}
+    \item Simulates daily solar generation patterns based on time of day
+    \item Accounts for weather variations affecting energy production
+    \item Generates consumption data with realistic usage patterns
+    \item Calculates metrics such as daily yield and total yield
+    \item Transmits data to the monitoring system at configurable intervals
+\end{itemize}
+
+\subsection{Heartbeat Simulator}
+The Heartbeat Simulator emulates device status updates with:
+\begin{itemize}
+    \item Regular status messages indicating device health
+    \item Battery level simulation with realistic discharge patterns
+    \item Connection status and signal strength variations
+    \item Diagnostic information including temperature, memory usage, and uptime
+    \item Configurable reporting intervals
+\end{itemize}
+
+\subsection{Tamper Simulator}
+The Tamper Simulator generates various security events that might occur in real installations:
+\begin{itemize}
+    \item \textbf{Physical Tamper Events}: Simulates unauthorized physical access to the installation
+    \item \textbf{Voltage Tamper Events}: Emulates unusual voltage patterns that might indicate bypassing
+    \item \textbf{Connection Tamper Events}: Simulates unauthorized disconnection of monitoring equipment
+    \item \textbf{Location Tamper Events}: Generates alerts when the installation appears to have moved
+\end{itemize}
+
+Tamper events can be triggered randomly based on configurable probabilities or manually through an interactive interface, making it ideal for demonstrations and testing.
+
+\subsection{Command Handler}
+The Command Handler listens for and processes commands from the server:
+\begin{itemize}
+    \item Polls the server at regular intervals for pending commands
+    \item Simulates command execution with realistic processing times
+    \item Handles various command types including device reboot, firmware updates, and service suspension
+    \item Generates appropriate responses with success/failure status and detailed results
+    \item Maintains a service state to track the installation's operational status
+\end{itemize}
+
+\section{Implementation Details}
+The simulation framework is implemented in Python and designed to be highly configurable through a JSON configuration file. Key implementation aspects include:
+
+\subsection{Configuration System}
+The simulator uses a flexible configuration system that allows:
+\begin{itemize}
+    \item Setting installation and device identifiers
+    \item Configuring server connection parameters
+    \item Adjusting simulation parameters for each component
+    \item Setting probabilities for random tamper events
+    \item Controlling simulation speed and intervals
+\end{itemize}
+
+\subsection{Data Generation}
+Data generation algorithms produce realistic values that follow expected patterns:
+\begin{itemize}
+    \item Solar generation follows a bell curve peaking at midday
+    \item Weather effects introduce random variations in production
+    \item Consumption patterns vary throughout the day with higher usage in mornings and evenings
+    \item Battery levels decrease gradually with periodic recharging
+\end{itemize}
+
+\subsection{Communication with Backend}
+The simulator communicates with the backend server using:
+\begin{itemize}
+    \item HTTP POST requests to send energy readings, heartbeats, and tamper events
+    \item HTTP GET requests to poll for pending commands
+    \item HTTP POST requests to send command responses
+    \item Authentication using JWT tokens for secure communication
+\end{itemize}
+
+\subsection{Command Processing}
+The command processing system simulates the behavior of real devices with some important distinctions:
+\begin{itemize}
+    \item Commands are received and processed as they would be in a real system
+    \item The simulator logs what actions would be taken in a real system
+    \item Commands like device reboot or firmware update are simulated without actually affecting the Raspberry Pi
+    \item Service suspension commands update the internal state but don't physically disable any hardware
+\end{itemize}
+
+This approach allows for comprehensive testing of the command infrastructure without the risk of disrupting the simulation itself.
+
+\section{Interactive Features}
+The simulation framework includes an interactive console that allows operators to:
+\begin{itemize}
+    \item Trigger specific tamper events on demand
+    \item Monitor the simulation status in real-time
+    \item Control the simulation (start, stop, restart)
+    \item View logs of all simulation activities
+\end{itemize}
+
+These interactive features make the simulator particularly valuable for demonstrations and training.
+
+\section{Usage in Development and Testing}
+The Raspberry Pi simulation framework plays a crucial role in the development and testing process:
+\begin{itemize}
+    \item Developers use it to test new features without requiring physical solar installations
+    \item QA engineers use it to verify system behavior under various conditions
+    \item It enables automated testing of the monitoring and security features
+    \item The simulation can be configured to generate edge cases and error conditions
+\end{itemize}
+
+By providing a controlled, repeatable environment that closely mimics real-world installations, the simulation framework significantly enhances the development process and helps ensure the reliability of the production system.
+
+\cleardoublepage
+
+% Acknowledgements (optional) - in case your thesis received funding or would like to express special thanks to someone
+\chapter*{\acklabel}
+\addcontentsline{toc}{chapter}{\acklabel}
+I would like to express my sincere gratitude to the Faculty of Informatics at Eötvös Loránd University for providing the academic foundation, resources, and environment that enabled me to complete this thesis.
+
+A special thanks goes to my supervisor Dr. Alwahab Dhulfiqar Zoltán,  fellow students and friends, whose encouragement, feedback, and support throughout the development process kept me motivated and focused.
+
+I am especially grateful to my mother, who bought me a new laptop when mine broke down just one month before the submission deadline—her support made it possible to continue working under pressure.
+
+% Bibliography (mandatory)
+\phantomsection
+\addcontentsline{toc}{chapter}{\biblabel}
+\printbibliography
+
+\cleardoublepage
+
+
+\end{document}
