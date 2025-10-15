@@ -1,0 +1,151 @@
+@startuml package-structure
+!define RECTANGLE class
+
+scale 1.3
+skinparam dpi 200
+skinparam packageStyle rectangle
+skinparam backgroundColor #FFFFFF
+skinparam package {
+    BackgroundColor #E8EAF6
+    BorderColor #3F51B5
+    FontSize 12
+}
+
+package "com.solar" {
+    
+    package "user_management" #C5CAE9 {
+        package "controller" {
+            [AuthController]
+            [UserProfileController]
+            [CustomerController]
+        }
+        package "service" {
+            [AuthService]
+            [UserService]
+            [CustomerService]
+        }
+        package "repository" {
+            [UserRepository]
+        }
+        package "model" {
+            [User]
+        }
+        package "dto" {
+            [LoginRequest]
+            [AuthResponse]
+            [UserProfileDTO]
+        }
+    }
+    
+    package "core_services" #BBDEFB {
+        
+        package "energy_monitoring" #90CAF9 {
+            package "controller" {
+                [EnergyDataController]
+                [EnergySummaryController]
+                [SolarInstallationController]
+            }
+            package "service" {
+                [EnergyDataService]
+                [EnergySummaryService]
+                [SolarInstallationService]
+            }
+            package "repository" {
+                [EnergyDataRepository]
+                [EnergySummaryRepository]
+                [SolarInstallationRepository]
+            }
+            package "model" {
+                [EnergyData]
+                [EnergySummary]
+                [SolarInstallation]
+            }
+        }
+        
+        package "payment_compliance" #81C784 {
+            package "controller" {
+                [CustomerPaymentController]
+                [AdminPaymentController]
+                [PaymentReportController]
+            }
+            package "service" {
+                [PaymentService]
+                [PaymentPlanService]
+                [ReminderService]
+            }
+            package "repository" {
+                [PaymentRepository]
+                [PaymentPlanRepository]
+                [ReminderRepository]
+            }
+            package "model" {
+                [Payment]
+                [PaymentPlan]
+                [PaymentReminder]
+            }
+        }
+        
+        package "tampering_detection" #FFAB91 {
+            package "controller" {
+                [TamperEventController]
+                [TamperDetectionController]
+                [SecurityLogController]
+            }
+            package "service" {
+                [TamperEventService]
+                [SecurityLogService]
+            }
+            package "repository" {
+                [TamperEventRepository]
+                [SecurityLogRepository]
+            }
+            package "model" {
+                [TamperEvent]
+                [SecurityLog]
+                [TamperResponse]
+            }
+        }
+        
+        package "service_control" #CE93D8 {
+            package "controller" {
+                [ServiceStatusController]
+                [DeviceCommandController]
+                [SystemIntegrationController]
+            }
+            package "service" {
+                [ServiceStatusService]
+                [DeviceCommandService]
+                [IntegrationService]
+            }
+            package "repository" {
+                [ServiceStatusRepository]
+                [DeviceCommandRepository]
+                [OperationalLogRepository]
+            }
+            package "model" {
+                [ServiceStatus]
+                [DeviceCommand]
+                [OperationalLog]
+            }
+        }
+    }
+    
+    package "common" #FFE0B2 {
+        package "config" {
+            [SecurityConfig]
+            [WebSocketConfig]
+            [JpaConfig]
+        }
+        package "security" {
+            [JwtTokenProvider]
+            [JwtAuthenticationFilter]
+        }
+        package "exception" {
+            [GlobalExceptionHandler]
+            [ResourceNotFoundException]
+            [UnauthorizedException]
+        }
+    }
+}
+
+@enduml

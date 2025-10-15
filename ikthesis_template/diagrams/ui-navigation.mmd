@@ -1,0 +1,53 @@
+graph TB
+    Start([User Login]) --> Auth{Authentication}
+    Auth -->|Admin| AdminDash[Admin Dashboard]
+    Auth -->|Customer| CustDash[Customer Dashboard]
+    
+    subgraph "Admin Portal"
+        AdminDash --> AdminCustomers[Customers Management]
+        AdminDash --> AdminMonitoring[Energy Monitoring]
+        AdminDash --> AdminPayments[Payment Management]
+        AdminDash --> AdminSecurity[Security & Tampering]
+        
+        AdminCustomers --> ViewCustomer[View Customer Details]
+        AdminCustomers --> EditCustomer[Edit Customer Info]
+        AdminCustomers --> ManageInstall[Manage Installations]
+        
+        AdminMonitoring --> ViewAllEnergy[View All Energy Data]
+        AdminMonitoring --> ViewInstallEnergy[View Installation Energy]
+        AdminMonitoring --> GenSummary[Generate Summary]
+        
+        AdminPayments --> ViewAllPayments[View All Payments]
+        AdminPayments --> ViewPlanDetails[View Plan Details]
+        AdminPayments --> ConfigReminders[Configure Reminders]
+        
+        AdminSecurity --> ViewTamperEvents[View Tamper Events]
+        AdminSecurity --> ViewSecurityLogs[View Security Logs]
+        AdminSecurity --> ConfigAlerts[Configure Alerts]
+        AdminSecurity --> SuspendService[Suspend Service]
+    end
+    
+    subgraph "Customer Portal"
+        CustDash --> CustEnergy[Energy Monitoring]
+        CustDash --> CustPayments[My Payments]
+        CustDash --> CustSystem[System Status]
+        CustDash --> CustProfile[My Profile]
+        
+        CustEnergy --> ViewMyEnergy[View Energy Data]
+        CustEnergy --> ViewChart[View Charts]
+        CustEnergy --> ViewSummary[View Summary]
+        
+        CustPayments --> ViewMyPayments[View Payment History]
+        CustPayments --> MakePayment[Make Payment]
+        CustPayments --> ViewPlan[View Payment Plan]
+        
+        CustSystem --> ViewStatus[View Service Status]
+        CustSystem --> ViewAlerts[View Alerts]
+        
+        CustProfile --> EditProfile[Edit Profile]
+        CustProfile --> ChangePassword[Change Password]
+    end
+    
+    style AdminDash fill:#ffeb3b,stroke:#f57c00,stroke-width:2px
+    style CustDash fill:#81c784,stroke:#388e3c,stroke-width:2px
+    style Auth fill:#42a5f5,stroke:#1565c0,stroke-width:2px

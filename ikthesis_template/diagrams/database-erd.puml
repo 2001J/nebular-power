@@ -1,0 +1,255 @@
+@startuml database-erd
+!define Table(name,desc) class name as "desc" << (T,#FFAAAA) >>
+!define primary_key(x) <b>x</b>
+!define foreign_key(x) <i>x</i>
+
+scale 1.2
+skinparam dpi 200
+skinparam backgroundColor #FFFFFF
+skinparam class {
+    BackgroundColor #FFF9C4
+    BorderColor #F57C00
+    ArrowColor #455A64
+    FontSize 11
+}
+
+entity "users" as users {
+    primary_key(id: BIGINT)
+    --
+    email: VARCHAR(255) UNIQUE
+    password: VARCHAR(255)
+    full_name: VARCHAR(255)
+    phone_number: VARCHAR(20)
+    role: VARCHAR(20)
+    enabled: BOOLEAN
+    email_verified: BOOLEAN
+    created_at: TIMESTAMP
+    updated_at: TIMESTAMP
+}
+
+entity "solar_installations" as installations {
+    primary_key(id: BIGINT)
+    --
+    foreign_key(user_id: BIGINT)
+    name: VARCHAR(255)
+    capacity: DECIMAL
+    installed_capacity_kw: DECIMAL
+    location: VARCHAR(500)
+    type: VARCHAR(20)
+    installation_date: DATE
+    status: VARCHAR(20)
+    tamper_detected: BOOLEAN
+    last_tamper_check: TIMESTAMP
+}
+
+entity "energy_data" as energy_data {
+    primary_key(id: BIGINT)
+    --
+    foreign_key(installation_id: BIGINT)
+    power_generation_watts: DECIMAL
+    power_consumption_watts: DECIMAL
+    timestamp: TIMESTAMP
+    daily_yield_kwh: DECIMAL
+    total_yield_kwh: DECIMAL
+    is_simulated: BOOLEAN
+    --
+    INDEX: (installation_id, timestamp)
+}
+
+entity "energy_summaries" as summaries {
+    primary_key(id: BIGINT)
+    --
+    foreign_key(installation_id: BIGINT)
+    period_type: VARCHAR(20)
+    period_start: DATE
+    period_end: DATE
+    total_generation_kwh: DECIMAL
+    total_consumption_kwh: DECIMAL
+    avg_efficiency: DECIMAL
+    peak_power_watts: DECIMAL
+    generated_at: TIMESTAMP
+}
+
+entity "payment_plans" as payment_plans {
+    primary_key(id: BIGINT)
+    --
+    foreign_key(installation_id: BIGINT)
+    name: VARCHAR(255)
+    total_amount: DECIMAL
+    remaining_amount: DECIMAL
+    number_of_payments: INT
+    installment_amount: DECIMAL
+    frequency: VARCHAR(20)
+    start_date: DATE
+    end_date: DATE
+    status: VARCHAR(20)
+    interest_rate: DECIMAL
+    grace_period_days: INT
+}
+
+entity "payments" as payments {
+    primary_key(id: BIGINT)
+    --
+    foreign_key(installation_id: BIGINT)
+    foreign_key(payment_plan_id: BIGINT)
+    amount: DECIMAL
+    due_date: DATE
+    paid_at: TIMESTAMP
+    status: VARCHAR(20)
+    status_reason: VARCHAR(500)
+    days_overdue: INT
+    transaction_id: VARCHAR(255)
+    late_fee: DECIMAL
+}
+
+entity "payment_reminders" as reminders {
+    primary_key(id: BIGINT)
+    --
+    foreign_key(payment_id: BIGINT)
+    reminder_type: VARCHAR(20)
+    scheduled_at: TIMESTAMP
+    sent_at: TIMESTAMP
+    sent: BOOLEAN
+    message: TEXT
+}
+
+entity "reminder_configs" as reminder_configs {
+    primary_key(id: BIGINT)
+    --
+    reminder_type: VARCHAR(20)
+    days_before_due: INT
+    enabled: BOOLEAN
+    message_template: TEXT
+}
+
+entity "grace_period_configs" as grace_configs {
+    primary_key(id: BIGINT)
+    --
+    payment_frequency: VARCHAR(20)
+    grace_period_days: INT
+    late_fee_percentage: DECIMAL
+    enabled: BOOLEAN
+}
+
+entity "tamper_events" as tamper_events {
+    primary_key(id: BIGINT)
+    --
+    foreign_key(installation_id: BIGINT)
+    event_type: VARCHAR(50)
+    timestamp: TIMESTAMP
+    severity: VARCHAR(20)
+    description: TEXT
+    resolved: BOOLEAN
+    confidence_score: DECIMAL
+    raw_sensor_data: TEXT
+    status: VARCHAR(20)
+}
+
+entity "tamper_responses" as tamper_responses {
+    primary_key(id: BIGINT)
+    --
+    foreign_key(tamper_event_id: BIGINT)
+    response_type: VARCHAR(50)
+    response_timestamp: TIMESTAMP
+    action_taken: TEXT
+    responded_by: BIGINT
+}
+
+entity "security_logs" as security_logs {
+    primary_key(id: BIGINT)
+    --
+    foreign_key(installation_id: BIGINT)
+    event_type: VARCHAR(50)
+    timestamp: TIMESTAMP
+    severity: VARCHAR(20)
+    description: TEXT
+    ip_address: VARCHAR(45)
+    user_agent: VARCHAR(500)
+}
+
+entity "alert_configs" as alert_configs {
+    primary_key(id: BIGINT)
+    --
+    alert_type: VARCHAR(50)
+    severity_threshold: VARCHAR(20)
+    enabled: BOOLEAN
+    notification_channels: VARCHAR(255)
+}
+
+entity "service_status" as service_status {
+    primary_key(id: BIGINT)
+    --
+    foreign_key(installation_id: BIGINT)
+    status: VARCHAR(20)
+    updated_at: TIMESTAMP
+    updated_by: VARCHAR(255)
+    scheduled_change: BOOLEAN
+    scheduled_time: TIMESTAMP
+    status_reason: VARCHAR(500)
+    active: BOOLEAN
+}
+
+entity "device_commands" as device_commands {
+    primary_key(id: BIGINT)
+    --
+    foreign_key(installation_id: BIGINT)
+    command_type: VARCHAR(50)
+    issued_at: TIMESTAMP
+    executed_at: TIMESTAMP
+    status: VARCHAR(20)
+    result: TEXT
+    issued_by: BIGINT
+}
+
+entity "operational_logs" as operational_logs {
+    primary_key(id: BIGINT)
+    --
+    foreign_key(installation_id: BIGINT)
+    operation_type: VARCHAR(50)
+    timestamp: TIMESTAMP
+    performed_by: BIGINT
+    details: TEXT
+    success: BOOLEAN
+}
+
+entity "monitoring_status" as monitoring_status {
+    primary_key(id: BIGINT)
+    --
+    foreign_key(installation_id: BIGINT)
+    last_heartbeat: TIMESTAMP
+    is_online: BOOLEAN
+    last_data_received: TIMESTAMP
+    device_info: TEXT
+}
+
+entity "user_activity_logs" as activity_logs {
+    primary_key(id: BIGINT)
+    --
+    foreign_key(user_id: BIGINT)
+    activity_type: VARCHAR(50)
+    timestamp: TIMESTAMP
+    ip_address: VARCHAR(45)
+    details: TEXT
+}
+
+' Relationships
+users ||--o{ installations : "owns"
+users ||--o{ activity_logs : "performs"
+
+installations ||--o{ energy_data : "generates"
+installations ||--o{ summaries : "has"
+installations ||--o{ payment_plans : "has"
+installations ||--o{ payments : "has"
+installations ||--o{ tamper_events : "detects"
+installations ||--o{ security_logs : "logs"
+installations ||--o{ service_status : "has"
+installations ||--o{ device_commands : "receives"
+installations ||--o{ operational_logs : "records"
+installations ||--o{ monitoring_status : "monitors"
+
+payment_plans ||--o{ payments : "includes"
+payments ||--o{ reminders : "triggers"
+
+tamper_events ||--o{ tamper_responses : "receives"
+
+@enduml

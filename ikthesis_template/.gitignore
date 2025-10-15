@@ -1,0 +1,69 @@
+# LaTeX build artifacts (ignore outputs, keep sources)
+
+# Core LaTeX aux files
+*.aux
+*.auxlock
+*.log
+*.out
+*.toc
+*.loa
+*.lof
+*.lot
+*.thm
+
+# latexmk and build caches
+*.fdb_latexmk
+*.fls
+*.latexmk
+*.synctex.gz
+*.synctex(busy)
+
+# BibTeX/Biber
+*.bbl
+*.blg
+*.bcf
+*.run.xml
+
+# Indexing
+*.idx
+*.ind
+*.ilg
+*.ist
+
+# Glossaries/Nomenclature
+*.acn
+*.acr
+*.alg
+*.glg
+*.glo
+*.gls
+*.glsdefs
+*.nlo
+*.nls
+
+# Beamer
+*.nav
+*.snm
+*.vrb
+
+# Minted/Pygments
+/_minted*
+**/_minted*
+*.pyg
+
+# DVI/PS/XDV (intermediate formats)
+*.dvi
+*.ps
+*.xdv
+
+# Editor/OS artifacts
+.DS_Store
+*~
+*.bak
+
+# Temporary error/backups occasionally created by tools
+*-SAVE-ERROR
+
+# Compiled PDFs in this folder root only (don’t ignore PDF images in subfolders)
+/solar_thesis.pdf
+/*.pdf
