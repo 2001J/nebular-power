@@ -1,151 +1,61 @@
 @startuml package-structure
-!define RECTANGLE class
+left to right direction
 
-scale 1.3
-skinparam dpi 200
-skinparam packageStyle rectangle
 skinparam backgroundColor #FFFFFF
+skinparam dpi 190
+skinparam defaultFontSize 18
+skinparam packageStyle rectangle
+skinparam defaultTextAlignment left
 skinparam package {
-    BackgroundColor #E8EAF6
-    BorderColor #3F51B5
-    FontSize 12
+  BorderColor #3F51B5
+  BackgroundColor #EEF1FB
+  FontSize 16
+  FontColor #1A237E
 }
+skinparam rectangle {
+  BorderColor #3F51B5
+  BackgroundColor #FFFFFF
+  FontSize 16
+}
+
+scale 1.4
+
+skinparam titleFontSize 22
+
+title Module and Package Structure 
 
 package "com.solar" {
-    
+  ' Row 1
+  together {
     package "user_management" #C5CAE9 {
-        package "controller" {
-            [AuthController]
-            [UserProfileController]
-            [CustomerController]
-        }
-        package "service" {
-            [AuthService]
-            [UserService]
-            [CustomerService]
-        }
-        package "repository" {
-            [UserRepository]
-        }
-        package "model" {
-            [User]
-        }
-        package "dto" {
-            [LoginRequest]
-            [AuthResponse]
-            [UserProfileDTO]
-        }
+      rectangle "controller (3)\nservice (3) + impl (4)\nrepository (2)\nmodel (2)\nsecurity (7)\nconfig (2)\ndto: auth (4), user (4), customer (1)" as um_summary
     }
-    
-    package "core_services" #BBDEFB {
-        
-        package "energy_monitoring" #90CAF9 {
-            package "controller" {
-                [EnergyDataController]
-                [EnergySummaryController]
-                [SolarInstallationController]
-            }
-            package "service" {
-                [EnergyDataService]
-                [EnergySummaryService]
-                [SolarInstallationService]
-            }
-            package "repository" {
-                [EnergyDataRepository]
-                [EnergySummaryRepository]
-                [SolarInstallationRepository]
-            }
-            package "model" {
-                [EnergyData]
-                [EnergySummary]
-                [SolarInstallation]
-            }
-        }
-        
-        package "payment_compliance" #81C784 {
-            package "controller" {
-                [CustomerPaymentController]
-                [AdminPaymentController]
-                [PaymentReportController]
-            }
-            package "service" {
-                [PaymentService]
-                [PaymentPlanService]
-                [ReminderService]
-            }
-            package "repository" {
-                [PaymentRepository]
-                [PaymentPlanRepository]
-                [ReminderRepository]
-            }
-            package "model" {
-                [Payment]
-                [PaymentPlan]
-                [PaymentReminder]
-            }
-        }
-        
-        package "tampering_detection" #FFAB91 {
-            package "controller" {
-                [TamperEventController]
-                [TamperDetectionController]
-                [SecurityLogController]
-            }
-            package "service" {
-                [TamperEventService]
-                [SecurityLogService]
-            }
-            package "repository" {
-                [TamperEventRepository]
-                [SecurityLogRepository]
-            }
-            package "model" {
-                [TamperEvent]
-                [SecurityLog]
-                [TamperResponse]
-            }
-        }
-        
-        package "service_control" #CE93D8 {
-            package "controller" {
-                [ServiceStatusController]
-                [DeviceCommandController]
-                [SystemIntegrationController]
-            }
-            package "service" {
-                [ServiceStatusService]
-                [DeviceCommandService]
-                [IntegrationService]
-            }
-            package "repository" {
-                [ServiceStatusRepository]
-                [DeviceCommandRepository]
-                [OperationalLogRepository]
-            }
-            package "model" {
-                [ServiceStatus]
-                [DeviceCommand]
-                [OperationalLog]
-            }
-        }
+    package "energy_monitoring" #90CAF9 {
+      rectangle "controller (3)\nservice (5) + impl (3)\nrepository (3)\nmodel (3)\nconfig (3)\ndto (14)" as em_summary
     }
-    
+    package "payment_compliance" #81C784 {
+      rectangle "controller (3)\nservice (7) + impl (8)\nrepository (5)\nmodel (5)\ndto (8)" as pc_summary
+    }
+  }
+
+  ' Row 2
+  together {
+    package "tampering_detection" #FFAB91 {
+      rectangle "controller (5)\nservice (5) + impl (5)\nrepository (5)\nmodel (5)\nconfig (1)\nscheduler (1)\ndto (7)" as td_summary
+    }
+    package "service_control" #CE93D8 {
+      rectangle "controller (5)\nservice (9) + impl (8)\nrepository (4)\nmodel (4)\ndto (10)" as sc_summary
+    }
     package "common" #FFE0B2 {
-        package "config" {
-            [SecurityConfig]
-            [WebSocketConfig]
-            [JpaConfig]
-        }
-        package "security" {
-            [JwtTokenProvider]
-            [JwtAuthenticationFilter]
-        }
-        package "exception" {
-            [GlobalExceptionHandler]
-            [ResourceNotFoundException]
-            [UnauthorizedException]
-        }
+      rectangle "platform config (2) [com.solar.config]\ncore config (1) [com.solar.core_services.config]\nexception (2)" as common_summary
     }
+  }
 }
+
+legend right
+Counts are derived from src/main/java/com/solar/** at commit time.\n
+Each module shows key subpackages and their Java file counts.\n
+For class-level details, see per-module diagrams.
+endlegend
 
 @enduml

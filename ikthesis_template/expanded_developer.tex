@@ -88,7 +88,12 @@ The application layer is organized into five functional modules, each implementi
 
 \begin{figure}[htbp]
     \centering
-    \includegraphics[width=0.85\textwidth]{diagrams/package-structure.png}
+    % Prefer vector PDF for crispness at larger sizes
+    \IfFileExists{diagrams/package-structure.pdf}{%
+        \includegraphics[width=\textwidth,height=0.9\textheight,keepaspectratio]{diagrams/package-structure.pdf}%
+    }{%
+        \includegraphics[width=\textwidth,height=0.9\textheight,keepaspectratio]{diagrams/package-structure.png}% fallback
+    }
     \caption{Module and Package Structure}
     \label{fig:module-structure}
 \end{figure}
