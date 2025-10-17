@@ -174,8 +174,8 @@ Key tables with their fields and purposes:
 \centering
 \caption{Core Entity Tables}
 \label{tab:core-entities}
-\scriptsize
-\begin{tabular}{|p{3.5cm}|p{9.5cm}|}
+\small
+\begin{tabular}{|p{3.5cm}|p{9cm}|}
 \hline
 \textbf{Table} & \textbf{Key Fields and Purpose} \\
 \hline
@@ -232,20 +232,10 @@ The system implements two role-based portals with distinct navigation paths as s
 
 \begin{figure}[htbp]
     \centering
-    \includegraphics[width=0.85\textwidth]{diagrams/ui-navigation.png}
+    \includegraphics[width=0.85\textwidth]{diagrams/UIFlow.png}
     \caption{UI Navigation Flow (Customer and Admin Portals)}
     \label{fig:ui-navigation}
 \end{figure}
-
-\paragraph{Shared Components}
-\begin{itemize}
-    \item \textbf{Header}: Role-based menu, notifications, user dropdown
-    \item \textbf{Sidebar Navigation}: Role-specific links
-    \item \textbf{Footer}: Copyright, links
-    \item \textbf{Toast Notifications}: Success/error feedback
-    \item \textbf{Loading Spinners}: Async operations
-    \item \textbf{Error Boundaries}: Graceful error handling
-\end{itemize}
 
 \subsubsection{Important Event Handlers}
 \label{subsubsec:event-handlers}
