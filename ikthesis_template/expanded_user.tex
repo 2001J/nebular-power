@@ -9,53 +9,19 @@ This chapter provides comprehensive documentation for users of the Solar Energy 
 \subsection{What is the Solar Energy Monitoring and Control System?}
 \label{subsec:system-description}
 
-The Solar Energy Monitoring and Control System is a comprehensive platform designed for solar energy monitoring and payment compliance in developing markets. It enables real-time monitoring of solar installations and automated payment tracking for Pay-As-You-Go (PAYG) solar financing models.
-
-\textbf{Key Capabilities:}
-\begin{itemize}
-    \item \textbf{Energy Monitoring}: Real-time tracking of solar energy production and consumption
-    \item \textbf{Payment Management}: Automated tracking of customer payments and loan compliance
-    \item \textbf{Security Monitoring}: Detection and alerting of potential tampering or unauthorized access
-    \item \textbf{Multi-Role Access}: Role-based access control for administrators and customers
-    \item \textbf{Comprehensive Reporting}: Analytics and insights for operational decision-making
-\end{itemize}
+The Solar Energy Monitoring and Control System enables real-time monitoring of solar installations and automated payment tracking for Pay-As-You-Go (PAYG) financing models. Key capabilities: energy monitoring, payment management, security monitoring, role-based access, and reporting analytics.
 
 \subsection{Who Should Use This Documentation}
 \label{subsec:target-audience}
 
-\textbf{Primary Users:}
-\begin{description}
-    \item[System Administrators] Technical staff responsible for platform configuration, user management, and system maintenance
-    \item[Solar Installation Customers] End-users with solar installations who monitor their energy production and manage payments
-\end{description}
+\textbf{Primary Users:} System Administrators (platform configuration, user management) and Solar Installation Customers (energy monitoring, payment management).
 
-\textbf{Secondary Users:}
-\begin{description}
-    \item[Technical Support Staff] Personnel providing customer support and troubleshooting
-    \item[Research Personnel] Academic researchers and developers evaluating the system
-    \item[Financial Officers] Staff responsible for payment processing and loan management
-\end{description}
-
-\textbf{Prerequisites:}
-\begin{itemize}
-    \item \textbf{Administrators}: Basic web application management skills, user management understanding
-    \item \textbf{Customers}: Basic computer literacy, web browser usage, email access
-    \item \textbf{Support Staff}: Customer service experience, basic troubleshooting skills
-\end{itemize}
+\textbf{Prerequisites:} Administrators need web application management skills; Customers need basic computer literacy and email access.
 
 \subsection{System Components}
 \label{subsec:system-components}
 
-\textbf{User-Facing Components:}
-\begin{itemize}
-    \item \textbf{Web Dashboard}: Responsive web application for monitoring and management
-    \item \textbf{Device Simulation}: Raspberry Pi-based framework for testing and demonstration
-    \item \textbf{Notification System}: Email and web-based alerts and notifications
-\end{itemize}
-
-\textbf{User Roles and Permissions:}
-
-The system implements role-based access control with clearly defined permissions for different user types, as detailed in Table~\ref{tab:role-privileges}.
+Main components: Web Dashboard, Device Simulation (Raspberry Pi-based), and Notification System. The system implements role-based access control (Table~\ref{tab:role-privileges}).
 
 \begin{table}[h]
     \centering
@@ -66,21 +32,14 @@ The system implements role-based access control with clearly defined permissions
         \textbf{Feature} & \textbf{Admin} & \textbf{Customer} \\
         \hline
         User Management & Full & Self Only \\
-        \hline
         Energy Monitoring & Full & Own Only \\
-        \hline
         Payment Processing & Full & Own Only \\
-        \hline
         Security Alerts & Full & Limited \\
-        \hline
         System Configuration & Full & No \\
-        \hline
         Reports & Full & Limited \\
         \hline
     \end{tabular}
 \end{table}
-
-\textit{Note: A mobile application and additional user roles (Customer Support, Field Technician, etc.) are planned for future development.}
 
 \section{Quick Start Guide}
 \label{sec:quick-start}
@@ -91,38 +50,12 @@ The system implements role-based access control with clearly defined permissions
 \subsubsection{For End Users (Customers)}
 \label{subsubsec:end-user-requirements}
 
-\textbf{Device Requirements:}
-\begin{itemize}
-    \item \textbf{Computer}: Any modern computer, tablet, or smartphone
-    \item \textbf{Internet}: Stable internet connection (minimum 1 Mbps)
-    \item \textbf{Email}: Active email account for notifications
-\end{itemize}
-
-\textbf{Browser Requirements:}
-\begin{itemize}
-    \item \textbf{Supported Browsers}: Chrome 88+, Firefox 85+, Edge 88+, Safari 14+
-    \item \textbf{Settings}: JavaScript enabled, cookies allowed
-    \item \textbf{Screen Size}: Minimum 1280$\times$768 resolution
-\end{itemize}
+Requirements: Modern computer/tablet/smartphone, stable internet (1+ Mbps), active email account. Supported browsers: Chrome 88+, Firefox 85+, Edge 88+, Safari 14+. JavaScript and cookies must be enabled. Minimum resolution: 1280$\times$768.
 
 \subsubsection{For System Administrators}
 \label{subsubsec:admin-requirements}
 
-\textbf{Server Infrastructure:}
-\begin{itemize}
-    \item \textbf{CPU}: Dual-core 2.5GHz minimum, quad-core 3.0GHz recommended
-    \item \textbf{RAM}: 8GB minimum, 16GB recommended
-    \item \textbf{Storage}: 100GB minimum, 500GB recommended
-    \item \textbf{Network}: 10 Mbps minimum bandwidth
-\end{itemize}
-
-\textbf{Software Requirements:}
-\begin{itemize}
-    \item \textbf{Operating System}: Ubuntu 20.04+, CentOS 8, Windows Server 2019, or macOS 10.15+
-    \item \textbf{Java}: OpenJDK 21 or Oracle JDK 21
-    \item \textbf{Database}: PostgreSQL 14 or newer
-    \item \textbf{SSL Certificate}: Required for production deployment
-\end{itemize}
+Server: Dual-core 2.5GHz CPU (quad-core 3.0GHz recommended), 8GB RAM (16GB recommended), 100GB storage (500GB recommended), 10 Mbps network. Software: Ubuntu 20.04+/CentOS 8/Windows Server 2019/macOS 10.15+, Java 21, PostgreSQL 14+, SSL certificate.
 
 \subsection{Account Access}
 \label{subsec:account-access}
@@ -130,34 +63,18 @@ The system implements role-based access control with clearly defined permissions
 \subsubsection{Getting Your Account}
 \label{subsubsec:getting-account}
 
-\textbf{For Customers:}
-\begin{enumerate}
-    \item Your solar installation provider will create your account
-    \item You'll receive an email with activation instructions
-    \item Click the activation link and set your password
-    \item Requirements: 8+ characters, uppercase, lowercase, number, special character
-\end{enumerate}
+\textbf{Customers:} Provider creates account; activate via email link; set password (8+ characters with uppercase, lowercase, number, special character).
 
-\textbf{For Administrators:}
-\begin{enumerate}
-    \item System administrators are set up during initial deployment
-    \item Contact your system deployer for admin account credentials
-    \item Change default password on first login
-\end{enumerate}
+\textbf{Administrators:} Set up during deployment; change default password on first login.
 
 \subsubsection{Logging In}
 \label{subsubsec:logging-in}
 
-\begin{enumerate}
-    \item Navigate to the system URL (provided by your administrator)
-    \item Enter your email address and password
-    \item Click "Sign In"
-    \item You'll be redirected to your appropriate dashboard based on your user role, as shown in Figure~\ref{fig:login}
-\end{enumerate}
+Navigate to system URL, enter email and password, click "Sign In". Figure~\ref{fig:login} shows the login interface.
 
 \begin{figure}[htbp]
     \centering
-    \includegraphics[width=1.1\textwidth]{images_2/login_pg.png}
+    \includegraphics[width=0.9\textwidth]{images_2/login_pg.png}
     \caption{User login interface}
     \label{fig:login}
 \end{figure}
@@ -165,327 +82,123 @@ The system implements role-based access control with clearly defined permissions
 \subsubsection{Password Management}
 \label{subsubsec:password-management}
 
-\textbf{Important Note}: Email functionality is not implemented in this demonstration system. All email-related features (password reset, account activation notifications) are simulated for demonstration purposes only.
+\textbf{Note}: Email functionality is simulated for demonstration only.
 
-\textbf{Reset Forgotten Password:}
-\begin{enumerate}
-    \item Click "Forgot Password" on login page
-    \item Enter your email address
-    \item Check email for reset instructions (Note: No actual email will be sent in this demonstration system)
-    \item Follow link to set new password
-\end{enumerate}
-
-\textbf{Change Password:}
-\begin{enumerate}
-    \item Log in to your account
-    \item Go to Profile Settings
-    \item Enter current password and new password
-    \item Save changes
-\end{enumerate}
+\textbf{Reset:} Click "Forgot Password," enter email, follow reset link. \textbf{Change:} Profile Settings $\rightarrow$ enter current and new passwords $\rightarrow$ save.
 
 \section{User Interface Guide}
 \label{sec:ui-guide}
 
-\subsection{System Requirements}
+\subsection{Technical Requirements}
 
-\subsubsection{Browser Compatibility}
-The Solar Energy Monitoring System is designed to work with modern web browsers. Below are the supported browsers and their minimum version requirements:
+\textbf{Browser:} Chrome 90+, Firefox 88+, Edge 90+, Safari 14+, Opera 74+. JavaScript and cookies enabled, 1280$\times$768 minimum resolution.
 
-\begin{itemize}
-    \item \textbf{Web Browsers}:
-    \begin{itemize}
-        \item Chrome version 90 or newer
-        \item Firefox version 88 or newer
-        \item Edge version 90 or newer (Chromium-based)
-        \item Safari version 14 or newer (macOS/iOS)
-        \item Opera version 74 or newer
-    \end{itemize}
-    \item \textbf{Browser Configuration}:
-    \begin{itemize}
-        \item JavaScript enabled (required for all functionality)
-        \item Cookies enabled (required for authentication and user preferences)
-        \item Local Storage enabled (required for session management)
-        \item Pop-up blockers configured to allow notifications from the platform
-    \end{itemize}
-    \item \textbf{Network Requirements}:
-    \begin{itemize}
-        \item Minimum 1 Mbps download speed for basic functionality
-        \item Recommended 5 Mbps for optimal performance with real-time updates
-        \item Stable connection for continuous monitoring features
-        \item HTTPS support (all traffic is encrypted)
-    \end{itemize}
-    \item \textbf{Display Requirements}:
-    \begin{itemize}
-        \item Minimum screen resolution: 1280 $\times$ 768 pixels
-        \item Recommended resolution: 1920 $\times$ 1080 pixels or higher
-        \item Support for responsive design (adapts to various screen sizes)
-        \item Color depth: 16-bit minimum, 24-bit recommended
-    \end{itemize}
-\end{itemize}
+\textbf{Network:} 1 Mbps minimum (5 Mbps recommended), HTTPS required.
 
-\subsubsection{Hardware Simulation Environment}
-The current research implementation includes a Raspberry Pi simulation framework:
+\textbf{Simulation (Optional):} Raspberry Pi 3B+/4, Python 3.8+, packages: requests, numpy, schedule, paho-mqtt.
 
-\begin{itemize}
-    \item \textbf{Raspberry Pi}: Raspberry Pi 4 Model B with 4GB RAM (recommended) or Raspberry Pi 3B+ minimum
-    \item \textbf{Storage}: MicroSD card 32GB Class 10 or higher
-    \item \textbf{Power Supply}: Official Raspberry Pi power supply (5V 3A for Pi 4, 5V 2.5A for Pi 3)
-    \item \textbf{Network Connectivity}: Wi-Fi 802.11n or Gigabit Ethernet for reliable communication
-    \item \textbf{Operating System}: Raspberry Pi OS (32-bit or 64-bit) or Ubuntu 20.04 LTS for Pi
-    \item \textbf{Python Environment}: Python 3.8+ with the following packages:
-    \begin{itemize}
-        \item requests (for HTTP communication)
-        \item numpy (for data simulation)
-        \item schedule (for periodic tasks)
-        \item paho-mqtt (for IoT communication protocols)
-    \end{itemize}
-\end{itemize}
-
-\subsubsection{Network and Security Requirements}
-
-\begin{itemize}
-    \item \textbf{Firewall Configuration}: 
-    \begin{itemize}
-        \item Port 443 (HTTPS) open for web access
-        \item Port 80 (HTTP) for automatic HTTPS redirects
-        \item Port 5432 (PostgreSQL) accessible only from application servers
-        \item Port 22 (SSH) for administrative access with key-based authentication
-    \end{itemize}
-    \item \textbf{SSL/TLS}: TLS 1.2 minimum, TLS 1.3 recommended
-    \item \textbf{Security Protocols}:
-    \begin{itemize}
-        \item Strong password policies enforced
-        \item Session timeout configuration (configurable, default 30 minutes)
-        \item CORS (Cross-Origin Resource Sharing) properly configured
-        \item Content Security Policy (CSP) headers implemented
-    \end{itemize}
-\end{itemize}
+\textbf{Security:} Ports 443 (HTTPS), 80 (HTTP redirect), 5432 (PostgreSQL), 22 (SSH). TLS 1.2+ required.
 
 \section{Installation and Setup Guide}
 \label{sec:installation-setup}
 
-This section provides installation procedures for deploying the Solar Energy Monitoring and Control System using Docker (recommended) and a local development setup.
-
 \subsection{Prerequisites}
 \label{subsec:prerequisites}
 
-Before installation, ensure you have:
-
-\begin{itemize}
-    \item \textbf{Docker}: Docker Desktop 4.0+ or Docker Engine 20.10+
-    \item \textbf{Docker Compose}: Version 2.0+ (included with Docker Desktop)
-    \item \textbf{System Resources}: 4GB RAM minimum, 8GB recommended
-    \item \textbf{Network Access}: Internet connection for downloading images
-    \item \textbf{Ports Available}: 3000 (frontend), 8080 (backend), 5432 (database)
-\end{itemize}
+Docker Desktop 4.0+/Docker Engine 20.10+, Docker Compose 2.0+, 4GB RAM (8GB recommended), ports 3000, 8080, 5432 available.
 
 \subsection{Quick Docker Installation}
 \label{subsec:docker-installation}
 
-\subsubsection{Step 1: Get the Source Code}
-\begin{enumerate}
-    \item Clone the repository:
-    \begin{verbatim}
+\textbf{1) Clone and prepare environment}
+\begin{verbatim}
 git clone https://github.com/2001J/nebular-power.git
 cd nebular-power
-    \end{verbatim}
-    \item Verify Docker is running:
-    \begin{verbatim}
-docker --version
-docker-compose --version
-    \end{verbatim}
-\end{enumerate}
-
-\subsubsection{Step 2: Launch the System}
-\begin{enumerate}
-    \item Start all services with Docker Compose:
-    \begin{verbatim}
-docker-compose up -d
-    \end{verbatim}
-    \item Wait for services to initialize (approximately 2-3 minutes)
-    \item Verify all containers are running:
-    \begin{verbatim}
-docker-compose ps
-    \end{verbatim}
-\end{enumerate}
-
-\subsubsection{Step 3: Access the Application}
-\begin{enumerate}
-    \item Open web browser and navigate to: \url{http://localhost:3000}
-    \item Default administrator credentials:
-    \begin{itemize}
-        \item Email: \texttt{admin@solar.com}
-        \item Password: \texttt{admin123}
-    \end{itemize}
-    \item Change default password on first login
-\end{enumerate}
-
-\subsection{System Configuration}
-\label{subsec:system-configuration}
-
-\subsubsection{Environment Variables}
-The system can be configured through environment variables in the \texttt{compose.yaml} file:
-
-\begin{verbatim}
-POSTGRES_DB=nebula_power
-POSTGRES_USER=nebulapower
-POSTGRES_PASSWORD=secure_password
-JWT_SECRET=your-jwt-secret-key
-FRONTEND_URL=http://localhost:3000
-BACKEND_URL=http://localhost:8080
+cp .env.template .env     # then edit .env with your values
 \end{verbatim}
 
-\subsubsection{Production Deployment}
-For production deployment, modify the \texttt{compose.yaml} file:
+Edit \texttt{.env} (copied from \texttt{.env.template}): set \texttt{ADMIN\_EMAIL}, \texttt{ADMIN\_PASSWORD}, \texttt{JWT\_SECRET}. Defaults for Postgres are provided and can be changed if needed (\texttt{DB\_*}).
 
-\begin{enumerate}
-    \item Update environment variables with secure values
-    \item Configure SSL certificates for HTTPS
-    \item Set production database credentials
-    \item Update CORS settings for your domain
-    \item Configure backup and monitoring
-\end{enumerate}
+\textbf{2) Start services}
+\begin{verbatim}
+docker compose up -d
+\end{verbatim}
 
-\subsection{Device Simulation Setup}
-\label{subsec:device-simulation}
+This starts three containers: \texttt{postgres}, \texttt{solar\_backend}, \texttt{solar\_frontend}. Wait until \texttt{postgres} is healthy.
 
-\subsubsection{Raspberry Pi Simulation (Optional)}
-For hardware simulation demonstration:
-
-\begin{enumerate}
-    \item Set up Raspberry Pi with Python 3.8+
-    \item Install simulation dependencies:
-    \begin{verbatim}
-pip3 install -r pi_simulation/requirements.txt
-    \end{verbatim}
-    \item Configure backend connection in \texttt{pi\_simulation/config.json}
-    \item Run simulation:
-    \begin{verbatim}
-cd pi_simulation
-python3 main.py
-    \end{verbatim}
-\end{enumerate}
-
-\subsection{Local Development (Alternative to Docker)}
-For local testing without containers:
-\begin{enumerate}
-  \item \textbf{Backend (Spring Boot)}: from repo root run \texttt{./mvnw spring-boot:run}. API docs: \url{http://localhost:8080/swagger-ui/index.html}
-  \item \textbf{Frontend (Next.js)}: \texttt{cd solar\_frontend \&\& pnpm install \&\& pnpm dev}. Open \url{http://localhost:3000}
-  \item \textbf{Simulator (optional)}: \texttt{cd pi\_simulation \&\& pip install -r requirements.txt \&\& python main.py -u http://localhost:8080}
-\end{enumerate}
-
-\subsection{Verification and Testing}
-\label{subsec:verification}
-
-\subsubsection{System Health Check}
-Verify installation success:
-
-\begin{enumerate}
-    \item Check all containers are healthy:
-    \begin{verbatim}
-docker-compose logs
-    \end{verbatim}
-    \item Test web interface at \url{http://localhost:3000}
-    \item Log in with administrator credentials
-    \item Create a test customer account
-    \item Verify energy monitoring dashboard displays
-\end{enumerate}
-
-\subsubsection{Common Issues and Solutions}
-
-\begin{description}
-    \item[Port Conflicts]
-    \begin{itemize}
-        \item Ensure ports 3000, 8080, and 5432 are not in use
-        \item Modify port mappings in \texttt{compose.yaml} if needed
-        \item Stop conflicting services or use different ports
-    \end{itemize}
-    
-    \item[Container Startup Failures]
-    \begin{itemize}
-        \item Check Docker service is running
-        \item Verify sufficient system resources (RAM, disk space)
-        \item Review container logs: \texttt{docker-compose logs [service-name]}
-        \item Restart services: \texttt{docker-compose restart}
-    \end{itemize}
-    
-    \item[Database Connection Issues]
-    \begin{itemize}
-        \item Wait for database initialization (may take 2-3 minutes)
-        \item Check database container logs: \texttt{docker-compose logs postgres}
-        \item Verify environment variables are correctly set
-        \item Restart backend service: \texttt{docker-compose restart backend}
-    \end{itemize}
-\end{description}
-
-\subsection{System Management}
-\label{subsec:system-management}
-
-\subsubsection{Starting and Stopping}
+\textbf{3) Access the app}
 \begin{itemize}
-    \item \textbf{Start system}: \texttt{docker-compose up -d}
-    \item \textbf{Stop system}: \texttt{docker-compose down}
-    \item \textbf{Restart service}: \texttt{docker-compose restart [service-name]}
-    \item \textbf{View logs}: \texttt{docker-compose logs -f}
+    \item Frontend: \url{http://localhost:3000}
+    \item Backend API (Swagger UI): \url{http://localhost:8080/swagger-ui.html}
 \end{itemize}
 
-\subsubsection{Data Management}
+Log in with the admin you set in \texttt{.env} (defaults: \texttt{admin@solar.com} / \texttt{admin123}); change the password on first login.
+
+\subsection{Configuration}
+\label{subsec:system-configuration}
+
+Configuration is centralized in \texttt{.env} and consumed by \texttt{compose.yaml}:
 \begin{itemize}
-    \item \textbf{Backup database}: Docker volumes persist data automatically
-    \item \textbf{Reset system}: \texttt{docker-compose down -v} (removes all data)
-    \item \textbf{Update images}: \texttt{docker-compose pull \&\& docker-compose up -d}
+    \item \textbf{Database}: \texttt{DB\_HOST}, \texttt{DB\_PORT}, \texttt{DB\_NAME}, \texttt{DB\_USER}, \texttt{DB\_PASSWORD} (backend uses JDBC URL \texttt{jdbc:postgresql://\$\{DB\_HOST\}:\$\{DB\_PORT\}/\$\{DB\_NAME\}})
+    \item \textbf{Auth}: \texttt{JWT\_SECRET}, \texttt{JWT\_EXPIRATION\_MS}
+    \item \textbf{URLs}: \texttt{FRONTEND\_URL} (used in backend links), \texttt{BACKEND\_URL}
+    \item \textbf{Mail (optional locally)}: \texttt{MAIL\_HOST}, \texttt{MAIL\_PORT}, \texttt{MAIL\_USERNAME}, \texttt{MAIL\_PASSWORD}
+    \item \textbf{Admin bootstrap}: \texttt{ADMIN\_EMAIL}, \texttt{ADMIN\_PASSWORD}, \texttt{ADMIN\_FULL\_NAME}
+    \item \textbf{Profile}: \texttt{SPRING\_PROFILES\_ACTIVE=prod} (uses PostgreSQL per \texttt{application-prod.properties})
+\end{itemize}
+
+For production, set strong secrets (JWT, DB password), real mail credentials, enable HTTPS at your reverse proxy, and configure CORS to allow only your domains.
+
+\subsection{Device Simulation (Optional)}
+\label{subsec:device-simulation}
+
+\textbf{Local simulator (Raspberry Pi or any Python 3.8+ host)}
+\begin{verbatim}
+pip3 install -r pi_simulation/requirements.txt
+# edit pi_simulation/config.json -> set backend base URL (e.g., http://localhost:8080)
+python3 pi_simulation/main.py
+\end{verbatim}
+
+\subsection{Verification and Management}
+\label{subsec:verification}
+
+\textbf{Verify deployment}
+\begin{itemize}
+    \item Container health: \texttt{docker compose ps}
+    \item Logs: \texttt{docker compose logs -f backend} (and \texttt{postgres}, \texttt{frontend} as needed)
+    \item UI check: Open \url{http://localhost:3000} and sign in with admin credentials
+\end{itemize}
+
+\textbf{Common issues}
+\begin{description}
+    \item[Port conflicts] Change \texttt{POSTGRES\_HOST\_PORT} or host ports in \texttt{compose.yaml}
+    \item[Database init delay] Wait 2--3 minutes for Postgres; check \texttt{docker compose logs postgres}
+    \item[Backend DB auth] Verify \texttt{DB\_*} in \texttt{.env} match Postgres env
+\end{description}
+
+\textbf{Lifecycle}
+\begin{itemize}
+    \item Start: \texttt{docker compose up -d}
+    \item Stop: \texttt{docker compose down}
+    \item Restart service: \texttt{docker compose restart backend}
+    \item Tail logs: \texttt{docker compose logs -f backend}
 \end{itemize}
 
 \subsection{Account Setup and Access}
 \label{subsec:account-setup}
 
-\subsubsection{Customer Onboarding Process}
-In this research implementation, the account provisioning follows a controlled approach where customers are onboarded to the Solar Energy Monitoring and Control System platform by administrators once their solar energy system is installed. Self-registration is not available for customers, ensuring systematic data collection for the research study. The onboarding process follows these steps:
-
-\begin{enumerate}
-    \item Administrator navigates to Customer Management in the admin dashboard and selects "All Customers"
-    \item Administrator clicks the "Add Customer" button
-    \item Administrator enters customer information:
-    \begin{itemize}
-        \item Full name
-        \item Email address (will be used as username)
-        \item Phone number
-        \item Temporary password (with confirmation)
-    \end{itemize}
-    \item System sends an account activation email to the customer's email address
-    \item Customer clicks the activation link and sets their own password (minimum 8 characters, including uppercase, lowercase, number, and special character)
-\end{enumerate}
-
-The customer onboarding interface is shown in Figure~\ref{fig:customer-onboarding}, which displays the administrator's view of the onboarding process.
-
-\textit{Note: Terms of service, privacy policy acceptance, and multi-factor authentication are planned for future versions of the platform but are not implemented in the current version.}
+\textbf{Customer Onboarding:} Admin creates account via Customer Management $\rightarrow$ Add Customer. Customer receives activation email and sets password (8+ characters, mixed case, number, special character). See Figure~\ref{fig:customer-onboarding}.
 
 \begin{figure}[htbp]
     \centering
-    \includegraphics[width=1.1\textwidth]{images_2/customer_onboard.png}
+    \includegraphics[width=0.9\textwidth]{images_2/customer_onboard.png}
     \caption{Customer onboarding interface (admin view)}
     \label{fig:customer-onboarding}
 \end{figure}
 
-\subsubsection{Login Procedure}
-Registered users can access the system through:
+\textbf{Login:} Navigate to login page, enter email/password, click "Sign In."
 
-\begin{enumerate}
-    \item Navigate to the login page at \url{https://nebula-power.com/login} (this URL is an example; replace with your deployment URL)
-    \item Enter email address and password
-    \item Click the "Sign In" button
-\end{enumerate}
-
-\textit{Note: Multi-factor authentication and organization context selection are planned for future versions of the platform but are not implemented in the current version.}
-
-\subsubsection{Password Management}
-Users can manage their passwords through the following functions:
-
-\begin{itemize}
-    \item \textbf{Password Reset}: Available through the "Forgot Password" link on the login page. Requires access to the registered email address.
-    \item \textbf{Password Change}: Available in the user profile settings. Requires current password verification.
-    \item \textbf{Password Expiry}: System administrators can configure password expiry policies requiring periodic password changes.
-\end{itemize}
+\textbf{Password Management:} Reset via "Forgot Password" link; change in profile settings.
 
 \section{Dashboard Interface Guide}
 \label{sec:dashboard-guide}
@@ -500,406 +213,166 @@ The dashboard is your main workspace after logging in. The interface you see dep
 \subsubsection{Administrator Dashboard}
 \label{subsubsec:admin-dashboard}
 
-The administrator dashboard provides comprehensive system oversight, as shown in Figure~\ref{fig:admin-dashboard}.
-
-\textbf{Main Navigation:}
-\begin{itemize}
-    \item \textbf{Dashboard}: System overview and key metrics
-    \item \textbf{Customer Management}: Customer accounts and installations
-    \item \textbf{Payment Operations}: Payment analytics and loan management
-    \item \textbf{System}: Energy monitoring, service control, system logs
-    \item \textbf{Security \& Compliance}: Security monitoring and alerts
-\end{itemize}
+Navigation: Dashboard (system overview), Customer Management, Payment Operations, System (energy, logs), Security \& Compliance. See Figure~\ref{fig:admin-dashboard}.
 
 \begin{figure}[h]
     \centering
-    \includegraphics[width=1.1\textwidth]{images_2/admin_dashboard.png}
-    \caption{Administrator dashboard with system overview}
+    \includegraphics[width=0.9\textwidth]{images_2/admin_dashboard.png}
+    \caption{Administrator dashboard}
     \label{fig:admin-dashboard}
 \end{figure}
 
 \subsubsection{Customer Dashboard}
 \label{subsubsec:customer-dashboard}
 
-The customer dashboard provides a focused view of individual installations and payment status, as shown in Figure~\ref{fig:customer-dashboard}.
-
-\textbf{Main Sections:}
-\begin{itemize}
-    \item \textbf{Installation Summary}: Number of installations, total capacity, system health
-    \item \textbf{Loan Status}: Loan progress, payment completion percentage, amount paid
-    \item \textbf{Payment Information}: Payment amount, frequency, loan end date
-    \item \textbf{Navigation Tabs}: Overview, Installations, Payments
-    \item \textbf{Quick Actions}: Direct access to common tasks
-\end{itemize}
+Shows installation summary, loan status, payment information, with tabs for Overview, Installations, Payments. See Figure~\ref{fig:customer-dashboard}.
 
 \begin{figure}[h]
     \centering
-    \includegraphics[width=1.1\textwidth]{images_2/customer_dashboard.png}
-    \caption{Customer dashboard showing installation performance and payment status}
+    \includegraphics[width=0.9\textwidth]{images_2/customer_dashboard.png}
+    \caption{Customer dashboard}
     \label{fig:customer-dashboard}
 \end{figure}
 
 \subsection{Energy Monitoring}
 \label{subsec:energy-monitoring}
 
-The energy monitoring interface shows real-time and historical data about solar energy production and consumption.
-
-\subsubsection{Customer Energy View}
-\label{subsubsec:customer-energy}
-
-The customer energy monitoring interface provides detailed insights into individual installation performance, as shown in Figure~\ref{fig:customer-energy}.
-
-\textbf{Key Metrics Displayed:}
-\begin{itemize}
-    \item \textbf{Current Generation}: Live power output in watts/kilowatts
-    \item \textbf{Daily Production}: Today's energy production in kWh
-    \item \textbf{Monthly Production}: Current month's total energy in kWh
-    \item \textbf{System Efficiency}: Performance percentage compared to optimal
-    \item \textbf{Environmental Impact}: CO\textsubscript{2} saved and trees equivalent
-\end{itemize}
-
-\textbf{Charts and Visualizations:}
-\begin{itemize}
-    \item Daily, weekly, and monthly production graphs
-    \item Energy consumption patterns
-    \item System health indicators
-\end{itemize}
+\textbf{Customer View:} Shows current generation, daily/monthly production, efficiency, environmental impact, with production graphs and health indicators (Figure~\ref{fig:customer-energy}).
 
 \begin{figure}[h]
     \centering
-    \includegraphics[width=1.1\textwidth]{images_2/customer_energy_dashb.png}
+    \includegraphics[width=0.85\textwidth]{images_2/customer_energy_dashb.png}
     \caption{Customer energy monitoring dashboard}
     \label{fig:customer-energy}
 \end{figure}
 
-\subsubsection{Administrator Energy View}
-\label{subsubsec:admin-energy}
-
-The administrator energy monitoring interface provides system-wide visibility across all installations, as shown in Figure~\ref{fig:admin-energy}.
-
-\textbf{System-Wide Monitoring:}
-\begin{itemize}
-    \item \textbf{Aggregated Metrics}: Total system production and consumption
-    \item \textbf{Installation Comparison}: Side-by-side performance metrics
-    \item \textbf{Performance Rankings}: Top-performing installations
-    \item \textbf{Status Indicators}: Operational status of all systems
-\end{itemize}
+\textbf{Admin View:} Displays aggregated metrics, installation comparisons, performance rankings, status indicators across all systems (Figure~\ref{fig:admin-energy}).
 
 \begin{figure}[h]
     \centering
-    \includegraphics[width=1.1\textwidth]{images_2/admin_energy_dashb.png}
-    \caption{Administrator system-wide energy monitoring}
+    \includegraphics[width=0.85\textwidth]{images_2/admin_energy_dashb.png}
+    \caption{Administrator energy monitoring}
     \label{fig:admin-energy}
 \end{figure}
 
 \subsection{Payment Operations Interface}
 \label{subsec:payment-interface}
 
-The Payment Operations section provides comprehensive payment management capabilities for both administrators and customers.
-
-\subsubsection{Administrator Payment Management}
-
-\textbf{Payment Analytics Dashboard}
-
-The payment analytics dashboard provides comprehensive financial oversight, as shown in Figure~\ref{fig:payment-analytics}.
-
-\begin{itemize}
-    \item \textbf{Payment Overview}: Statistical summary and trends analysis
-    \item \textbf{Customer Status Tracking}: Payment status indicators across all accounts
-    \item \textbf{Performance Metrics}: Visual representation of payment patterns and system health
-\end{itemize}
+\textbf{Admin Views:} Payment analytics (trends, status tracking, Figure~\ref{fig:payment-analytics}), loan management (configuration, assignments, Figure~\ref{fig:payment-plans}), payment history (transactions, reconciliation, Figure~\ref{fig:payment-history}).
 
 \begin{figure}[h]
     \centering
-    \includegraphics[width=1.1\textwidth]{images_2/payment_analytics.png}
-    \caption{Payment analytics overview screen}
+    \includegraphics[width=0.85\textwidth]{images_2/payment_analytics.png}
+    \caption{Payment analytics}
     \label{fig:payment-analytics}
 \end{figure}
 
-\textbf{Loan Management Interface}
-
-The loan management interface enables comprehensive configuration and monitoring of payment plans, as shown in Figure~\ref{fig:payment-plans}.
-
-\begin{itemize}
-    \item \textbf{Loan Configuration}: Setting amounts, terms, conditions, and interest rates
-    \item \textbf{Customer Assignment}: Linking loans to specific customer installations
-    \item \textbf{Progress Monitoring}: Real-time tracking of payment completion and defaults
-\end{itemize}
-
 \begin{figure}[h]
     \centering
-    \includegraphics[width=1.1\textwidth]{images_2/loan_management.png}
-    \caption{Payment plan management interface}
+    \includegraphics[width=0.85\textwidth]{images_2/loan_management.png}
+    \caption{Loan management}
     \label{fig:payment-plans}
 \end{figure}
 
-\textbf{Payment History and Tracking}
-
-The payment history interface provides detailed transaction tracking and reporting capabilities, as shown in Figure~\ref{fig:payment-history}.
-
-\begin{itemize}
-    \item \textbf{Transaction Records}: Complete payment history with detailed transaction information
-    \item \textbf{Payment Reconciliation}: Tools for matching payments to customer accounts
-    \item \textbf{Reporting Features}: Export capabilities for financial reporting and analysis
-\end{itemize}
-
 \begin{figure}[h]
     \centering
-    \includegraphics[width=1.1\textwidth]{images_2/admin_payment_history.png}
-    \caption{Payment history and transaction details}
+    \includegraphics[width=0.85\textwidth]{images_2/admin_payment_history.png}
+    \caption{Payment history}
     \label{fig:payment-history}
 \end{figure}
 
-\subsubsection{Customer Payment Interface}
-
-The customer payment interface in the Payments tab provides a streamlined view focused on individual loan management, as shown in Figure~\ref{fig:customer-payment-view}:
-
-\begin{itemize}
-    \item \textbf{Loan Summary}: Current loan details, terms, and remaining balance
-    \item \textbf{Payment Schedule}: Visual calendar showing past and upcoming payment dates
-    \item \textbf{Progress Tracking}: Visual indicators showing loan completion percentage
-    \item \textbf{Payment History}: Personal transaction history with receipt access
-\end{itemize}
+\textbf{Customer View:} Loan summary, payment schedule, progress tracking, transaction history (Figure~\ref{fig:customer-payment-view}).
 
 \begin{figure}[h]
     \centering
-    \includegraphics[width=1.1\textwidth]{images_2/customer_payments_view.png}
-    \caption{Customer payment view showing loan details}
+    \includegraphics[width=0.85\textwidth]{images_2/customer_payments_view.png}
+    \caption{Customer payment view}
     \label{fig:customer-payment-view}
 \end{figure}
 
 \subsection{Security \& Compliance Interface}
 \label{subsec:security-interface}
 
-The Security \& Compliance section of the Administrator Dashboard provides tools for monitoring and responding to security events.
-
-\subsubsection{Security Monitoring}
-The Security Monitoring interface displays comprehensive security oversight, as shown in Figure~\ref{fig:security-monitoring}:
-
-\begin{itemize}
-    \item \textbf{System Access Logs}: Record of user login activities
-    \item \textbf{User Authentication Status}: Current authentication status of all users
-    \item \textbf{Security Health Indicators}: Visual indicators of overall system security
-    \item \textbf{Security Configuration}: Settings for system security parameters
-\end{itemize}
+\textbf{Security Monitoring:} Access logs, authentication status, health indicators, configuration (Figure~\ref{fig:security-monitoring}).
 
 \begin{figure}[h]
     \centering
-    \includegraphics[width=1.1\textwidth]{images_2/admin_security_monitoring.png}
-    \caption{Security monitoring interface}
+    \includegraphics[width=0.85\textwidth]{images_2/admin_security_monitoring.png}
+    \caption{Security monitoring}
     \label{fig:security-monitoring}
 \end{figure}
 
-\subsubsection{Security Alerts}
-The Administrator Security Alerts interface shows comprehensive alert management capabilities, as shown in Figure~\ref{fig:security-alerts-admin}:
-
-\begin{itemize}
-    \item \textbf{Alert Dashboard}: Summary metrics including total alert count, number of open alerts, and critical severity alerts
-    \item \textbf{Alert Filtering}: Ability to filter alerts based on status (open, closed, in progress)
-    \item \textbf{Severity Classification}: Visual indicators of alert priority (critical, high, medium, low)
-    \item \textbf{Response Actions}: Tools for acknowledging and responding to alerts
-    \item \textbf{Alert Assignment}: Functionality to assign alerts to specific administrators
-\end{itemize}
+\textbf{Admin Alerts:} Dashboard with alert counts, filtering (open/closed/in-progress), severity classification, response actions (Figure~\ref{fig:security-alerts-admin}).
 
 \begin{figure}[h]
     \centering
-    \includegraphics[width=1.1\textwidth]{images_2/admin_alerts.png}
-    \caption{Administrator security alert monitoring interface}
+    \includegraphics[width=0.85\textwidth]{images_2/admin_alerts.png}
+    \caption{Admin security alerts}
     \label{fig:security-alerts-admin}
 \end{figure}
 
-The Customer Security Alerts interface shows installation-specific security information, as shown in Figure~\ref{fig:security-alerts-customer}:
-
-\begin{itemize}
-    \item \textbf{Installation Alerts}: Security alerts specific to the customer's installation only
-    \item \textbf{Alert Status}: Indicators showing whether alerts are open, in progress, or resolved
-    \item \textbf{Alert Details}: Information about detected issues and recommended actions
-\end{itemize}
+\textbf{Customer Alerts:} Installation-specific alerts with status and recommended actions (Figure~\ref{fig:security-alerts-customer}).
 
 \begin{figure}[h]
     \centering
-    \includegraphics[width=1.1\textwidth]{images_2/customer_alert.png}
-    \caption{Customer view of installation-specific security alerts}
+    \includegraphics[width=0.85\textwidth]{images_2/customer_alert.png}
+    \caption{Customer security alerts}
     \label{fig:security-alerts-customer}
 \end{figure}
 
 \subsubsection{System Logs}
-The System Logs section in the Administrator Dashboard provides two main categories of logs, as shown in Figures~\ref{fig:system-logs}, \ref{fig:operational-logs}, and \ref{fig:log-status}:
 
-\begin{itemize}
-    \item \textbf{Operational Logs}: 
-    \begin{itemize}
-        \item System logs from all services and installations
-        \item Error and warning messages from system components
-        \item Service start/stop events and status changes
-        \item Installation connection status changes
-    \end{itemize}
-    \item \textbf{Security Logs}:
-    \begin{itemize}
-        \item Security system audit logs
-        \item Tamper detection events
-        \item Authentication attempts (successful and failed)
-        \item Authorization violations
-        \item Configuration changes to security settings
-    \end{itemize}
-\end{itemize}
+\textbf{Operational Logs:} Service logs, errors/warnings, start/stop events, connection status. \textbf{Security Logs:} Audit logs, tamper detection, authentication attempts, authorization violations. Logs support filtering, search, and export (Figures~\ref{fig:system-logs}-\ref{fig:log-status}).
 
 \begin{figure}[h]
     \centering
-    \includegraphics[width=1.1\textwidth]{images_2/admin_system_logs.png}
-    \caption{System logs interface showing security and operational events}
+    \includegraphics[width=0.8\textwidth]{images_2/admin_system_logs.png}
+    \caption{System logs}
     \label{fig:system-logs}
 \end{figure}
 
 \begin{figure}[h]
     \centering
-    \includegraphics[width=1.1\textwidth]{images_2/admin_op_logs.png}
-    \caption{Operational logs display with filtering and search capabilities}
+    \includegraphics[width=0.8\textwidth]{images_2/admin_op_logs.png}
+    \caption{Operational logs}
     \label{fig:operational-logs}
 \end{figure}
 
 \begin{figure}[h]
     \centering
-    \includegraphics[width=1.1\textwidth]{images_2/admin_op_log_status.png}
-    \caption{Operational log status and analysis dashboard}
+    \includegraphics[width=0.8\textwidth]{images_2/admin_op_log_status.png}
+    \caption{Log status dashboard}
     \label{fig:log-status}
 \end{figure}
-
-These logs can be filtered, searched, and exported for compliance and security analysis.
 
 \section{Operational Procedures}
 \label{sec:operational-procedures}
 
-This section outlines common operational procedures for users of the Solar Energy Monitoring and Control System in the research environment. These procedures are designed to facilitate the systematic evaluation of the system's capabilities within the context of the thesis research.
+\textbf{Adding Installation:} Customer Management $\rightarrow$ Installations $\rightarrow$ Add New $\rightarrow$ enter name, capacity, location, customer $\rightarrow$ assign payment plan $\rightarrow$ activate.
 
-\subsection{Installation Management}
-\label{subsec:installation-management}
+\textbf{Deactivating Account:} Customer Management $\rightarrow$ select customer $\rightarrow$ Deactivate Account $\rightarrow$ provide reason $\rightarrow$ confirm.
 
-\subsubsection{Adding a New Installation}
-To add a new solar installation to the system:
+\textbf{Creating Loan:} Payment Operations $\rightarrow$ Loan Management $\rightarrow$ Add New Loan $\rightarrow$ enter details (name, amount, frequency, duration, rate, customer) $\rightarrow$ Create Payment.
 
-\begin{enumerate}
-    \item Navigate to Customer Management $\rightarrow$ Installations in the admin dashboard
-    \item Select "Add New Installation"
-    \item Enter basic installation details:
-    \begin{itemize}
-        \item Installation name
-        \item Capacity (in kW)
-        \item Physical location (address)
-        \item Customer information (select from the dropdown list of existing customers)
-    \end{itemize}
-    \item Assign payment plan to the installation
-    \item Activate the installation
-\end{enumerate}
+\textbf{Modifying Loan:} Loan Management $\rightarrow$ Edit $\rightarrow$ update parameters $\rightarrow$ save.
 
-\subsection{User Management}
-\label{subsec:user-management-ops}
+\textbf{Manual Payment:} Customer payment history $\rightarrow$ Record Manual Payment $\rightarrow$ enter amount, date, method, reference $\rightarrow$ confirm.
 
-\subsubsection{Deactivating User Accounts}
-To deactivate a user account:
+\section{Troubleshooting}
+\label{sec:troubleshooting}
 
-\begin{enumerate}
-    \item Navigate to Customer Management and select the customer from the list
-    \item Select "Deactivate Account"
-    \item Provide reason for deactivation
-    \item Confirm deactivation action
-\end{enumerate}
+\textbf{Authentication Issues:} Verify credentials, check account status, contact administrator if locked.
 
-\textit{Note: The current implementation only allows creation of Customer accounts through the Customer Onboarding process described in section \ref{subsec:account-setup}. Administrator accounts must be created directly by system administrators with appropriate database access.}
+\textbf{System Access:} Ensure stable internet connection, clear browser cache, try alternate browser.
 
-\subsection{Payment Operations}
-\label{subsec:payment-operations}
+\textbf{Data Display:} Refresh page, check installation status, verify device simulation is running.
 
-\subsubsection{Creating New Loans}
-To create a new loan for a customer:
+\textbf{Support:} Contact thesis supervisor for research environment issues; provide account email, browser details, error messages.
 
-\begin{enumerate}
-    \item Navigate to Payment Operations $\rightarrow$ Loan Management in the admin dashboard
-    \item Click the "Add New Loan" button
-    \item Enter loan details:
-    \begin{itemize}
-        \item Loan name and description
-        \item Payment amount and frequency
-        \item Total number of payments or loan duration
-        \item Interest rate (if applicable)
-        \item Select the customer from the dropdown list
-    \end{itemize}
-    \item Click the "Create Payment" button to finalize and activate the loan
-\end{enumerate}
+\section{System Messages and Error Handling}
+\label{sec:system-messages}
 
-\subsubsection{Modifying Existing Loans}
-To modify an existing loan:
-
-\begin{enumerate}
-    \item Navigate to Payment Operations $\rightarrow$ Loan Management in the admin dashboard
-    \item Locate the loan in the list and click "Edit"
-    \item Update the necessary loan parameters
-    \item Save the modifications
-\end{enumerate}
-
-\subsubsection{Processing Manual Payments}
-To record a manual payment:
-
-\begin{enumerate}
-    \item Navigate to the customer's payment history
-    \item Select "Record Manual Payment"
-    \item Enter payment details:
-    \begin{itemize}
-        \item Payment amount
-        \item Payment date
-        \item Payment method
-        \item Reference number or transaction ID
-    \end{itemize}
-    \item Confirm and process the payment
-\end{enumerate}
-
-\section{User Workflows and Step-by-Step Procedures}
-\label{sec:user-workflows}
-
-This section provides detailed step-by-step procedures for common user tasks, complete with screenshots and expected system responses. These workflows are designed to guide users through typical scenarios they will encounter when using the Solar Energy Monitoring and Control System.
-
-\subsection{Administrator Workflows}
-\label{subsec:admin-workflows}
-
-\subsubsection{Complete Customer Onboarding Workflow}
-This workflow demonstrates the complete process of adding a new customer to the system, from initial account creation through installation setup.
-
-\textbf{Workflow Steps:}
-
-\begin{enumerate}
-    \item \textbf{Access Customer Management}
-    \begin{itemize}
-        \item Navigate to Administrator Dashboard
-        \item Click on "Customer Management" in the main navigation
-        \item Select "All Customers" from the submenu
-    \end{itemize}
-    
-    \item \textbf{Create New Customer Account}
-    \begin{itemize}
-        \item Click the "Add Customer" button (top right of customer list)
-        \item Fill in customer information form:
-        \begin{itemize}
-            \item Full Name: Enter customer's complete legal name
-            \item Email Address: Must be valid and unique in the system
-            \item Phone Number: Include country code for international numbers
-            \item Temporary Password: System will generate or allow manual entry
-        \end{itemize}
-        \item Click "Create Customer" to proceed
-    \end{itemize}
-    
-    \item \textbf{System Response and Verification}
-    \begin{itemize}
-        \item System displays success message: "Customer account created successfully"
-        \item New customer appears in the customer list with "Pending Activation" status
-        \item System automatically sends activation email to customer
-    \end{itemize}
-    
-    \item \textbf{Add Solar Installation}
-    \begin{itemize}
-        \item From the customer list, click on the newly created customer
-        \item Navigate to "Installations" tab within customer details
-        \item Click "Add Installation" button
-        \item Enter installation details:
+Common system messages include authentication status ("Login successful", "Invalid credentials"), data operation confirmations ("Created successfully", "Updated successfully"), and error states. For detailed error handling, refer to system logs.
         \begin{itemize}
             \item Installation Name: Descriptive name for the solar installation
             \item Capacity (kW): Total installed solar panel capacity
