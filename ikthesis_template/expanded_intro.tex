@@ -17,28 +17,35 @@ The Solar Energy Monitoring and Control System is designed to monitor, analyze, 
 \subsection{Energy Monitoring}
 \label{subsec:energymonitoring}
 
-The Energy Monitoring module provides: real-time tracking of energy production/consumption, historical data analysis, automated daily/weekly/monthly summaries, performance metrics (efficiency, yield, consumption), and anomaly detection with alerts.
+The Energy Monitoring module provides: real-time tracking of energy production and consumption via WebSocket, batch processing of historical energy readings, automated daily/weekly/monthly summaries with statistics, dashboard visualizations with chart data, and energy analytics for performance insights.
 
 
 
 \subsection{Payment Compliance}
 \label{subsec:paymentcompliance}
 
-The Payment Compliance module manages installment-based financing: customized payment plans, secure transaction processing, automated reminders, comprehensive payment history, compliance reporting, and grace period handling.
+The Payment Compliance module manages installment-based solar financing: flexible payment plan configuration with multiple frequencies (weekly, bi-weekly, monthly, quarterly, semi-annually, annually), automated payment status tracking and updates, payment reminder system with configurable grace periods, comprehensive payment history and dashboard analytics, receipt generation, overdue payment identification, and manual payment recording for administrative use.
 
 
 
 \subsection{Security and Tampering Detection}
 \label{subsec:security}
 
-The Security module includes: physical tampering detection via sensors, electrical anomaly detection, encrypted communication channels, geolocation monitoring, configurable alert management, and comprehensive audit logging.
+The Security module includes: tamper event detection and logging (physical, voltage, connection, location types), severity-based classification and filtering, alert configuration and notification system, real-time tamper event reporting via WebSocket, resolution tracking and acknowledgment workflows, and security audit logging for compliance.
 
 
 
 \subsection{User Management}
 \label{subsec:usermanagement}
 
-The User Management module provides: role-based access control, self-service profile management, activity tracking, and notification preferences.
+The User Management module provides: role-based access control (Admin/Customer), secure authentication with JWT tokens, email-based account activation and password reset, profile management and update capabilities, and user activity tracking.
+
+
+
+\subsection{Service Control}
+\label{subsec:servicecontrol}
+
+The Service Control module enables remote management of solar installations: automated service activation/deactivation based on payment compliance, manual override controls for administrators, scheduled disconnections, reconnection workflows, and operational logging for compliance and troubleshooting.
 
 \section{System Architecture Overview}
 \label{sec:architecture}

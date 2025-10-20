@@ -9,7 +9,7 @@ This chapter provides comprehensive documentation for users of the Solar Energy 
 \subsection{What is the Solar Energy Monitoring and Control System?}
 \label{subsec:system-description}
 
-The Solar Energy Monitoring and Control System enables real-time monitoring of solar installations and automated payment tracking for Pay-As-You-Go (PAYG) financing models. Key capabilities: energy monitoring, payment management, security monitoring, role-based access, and reporting analytics.
+The Solar Energy Monitoring and Control System is a web-based platform that enables real-time monitoring and management of solar installations using Pay-As-You-Go (PAYG) financing models. Key capabilities include: real-time energy production and consumption tracking with automated summaries, flexible installment payment management with multiple frequency options, tamper detection and security monitoring, remote service control for payment compliance, role-based user access (Admin/Customer), and comprehensive analytics dashboards.
 
 \subsection{Who Should Use This Documentation}
 \label{subsec:target-audience}
@@ -21,7 +21,7 @@ The Solar Energy Monitoring and Control System enables real-time monitoring of s
 \subsection{System Components}
 \label{subsec:system-components}
 
-Main components: Web Dashboard, Device Simulation (Raspberry Pi-based), and Notification System. The system implements role-based access control (Table~\ref{tab:role-privileges}).
+The system consists of four main components: (1) \textbf{Backend API} -- Spring Boot application providing REST APIs, WebSocket endpoints for real-time updates, business logic, and authentication; (2) \textbf{Frontend Web Application} -- Next.js-based responsive interface with separate dashboards for administrators and customers; (3) \textbf{PostgreSQL Database} -- Stores user data, energy readings, payments, tamper events, and operational logs; (4) \textbf{IoT Device/Simulator} -- Python-based component representing Raspberry Pi devices installed at solar sites to collect and transmit energy data and tamper alerts (simulator provided for testing without physical hardware). The system implements role-based access control with two roles (Table~\ref{tab:role-privileges}).
 
 \begin{table}[h]
     \centering
@@ -55,7 +55,7 @@ Requirements: Modern computer/tablet/smartphone, stable internet (1+ Mbps), acti
 \subsubsection{For System Administrators}
 \label{subsubsec:admin-requirements}
 
-Server: Dual-core 2.5GHz CPU (quad-core 3.0GHz recommended), 8GB RAM (16GB recommended), 100GB storage (500GB recommended), 10 Mbps network. Software: Ubuntu 20.04+/CentOS 8/Windows Server 2019/macOS 10.15+, Java 21, PostgreSQL 14+, SSL certificate.
+Since the system runs in Docker containers, administrators only need Docker Desktop (or Docker Engine with Docker Compose) installed on their host system. Recommended hardware: at least 8GB RAM and sufficient disk space for container images and database storage. All other dependencies (Java, PostgreSQL, etc.) are bundled within the containers.
 
 \subsection{Account Access}
 \label{subsec:account-access}
@@ -63,9 +63,9 @@ Server: Dual-core 2.5GHz CPU (quad-core 3.0GHz recommended), 8GB RAM (16GB recom
 \subsubsection{Getting Your Account}
 \label{subsubsec:getting-account}
 
-\textbf{Customers:} Provider creates account; activate via email link; set password (8+ characters with uppercase, lowercase, number, special character).
+\textbf{For Customers:} Your solar installation provider (administrator) will create your account and you will receive an email with an activation link. Click the link, then set your password following the requirements: minimum 8 characters including at least one uppercase letter, one lowercase letter, one number, and one special character.
 
-\textbf{Administrators:} Set up during deployment; change default password on first login.
+\textbf{For Administrators:} The administrator account is automatically created during system deployment using credentials configured in the environment file. On first login, you must change this default password to a secure one.
 
 \subsubsection{Logging In}
 \label{subsubsec:logging-in}
@@ -91,13 +91,7 @@ Navigate to system URL, enter email and password, click "Sign In". Figure~\ref{f
 
 \subsection{Technical Requirements}
 
-\textbf{Browser:} Chrome 90+, Firefox 88+, Edge 90+, Safari 14+, Opera 74+. JavaScript and cookies enabled, 1280$\times$768 minimum resolution.
-
-\textbf{Network:} 1 Mbps minimum (5 Mbps recommended), HTTPS required.
-
-\textbf{Simulation (Optional):} Raspberry Pi 3B+/4, Python 3.8+, packages: requests, numpy, schedule, paho-mqtt.
-
-\textbf{Security:} Ports 443 (HTTPS), 80 (HTTP redirect), 5432 (PostgreSQL), 22 (SSH). TLS 1.2+ required.
+The web interface works with modern browsers including Chrome, Firefox, Edge, Safari, and Opera. You need JavaScript and cookies enabled, and a screen resolution of at least 1280$\times$768 pixels. A stable internet connection is required for accessing the system and receiving real-time updates.
 
 \section{Installation and Setup Guide}
 \label{sec:installation-setup}
@@ -105,89 +99,88 @@ Navigate to system URL, enter email and password, click "Sign In". Figure~\ref{f
 \subsection{Prerequisites}
 \label{subsec:prerequisites}
 
-Docker Desktop 4.0+/Docker Engine 20.10+, Docker Compose 2.0+, 4GB RAM (8GB recommended), ports 3000, 8080, 5432 available.
+Before installing, ensure you have Docker Desktop (version 4.0 or newer) or Docker Engine (version 20.10 or newer) with Docker Compose (version 2.0 or newer) installed on your system. Your computer should have at least 4GB of RAM available, though 8GB is recommended for better performance.
 
 \subsection{Quick Docker Installation}
 \label{subsec:docker-installation}
 
 \textbf{1) Clone and prepare environment}
+
+Open a terminal or command-line interface and navigate to the folder where you want to install the system, then run:
+
 \begin{verbatim}
 git clone https://github.com/2001J/nebular-power.git
 cd nebular-power
-cp .env.template .env     # then edit .env with your values
+cp .env.template .env     # create .env (copied from .env.template)
 \end{verbatim}
 
-Edit \texttt{.env} (copied from \texttt{.env.template}): set \texttt{ADMIN\_EMAIL}, \texttt{ADMIN\_PASSWORD}, \texttt{JWT\_SECRET}. Defaults for Postgres are provided and can be changed if needed (\texttt{DB\_*}).
+Open the \texttt{.env} file and set your administrator credentials (\texttt{ADMIN\_EMAIL}, \texttt{ADMIN\_PASSWORD}) and a secure random string for \texttt{JWT\_SECRET}. The database settings have sensible defaults that you can change if needed.
 
 \textbf{2) Start services}
 \begin{verbatim}
 docker compose up -d
 \end{verbatim}
 
-This starts three containers: \texttt{postgres}, \texttt{solar\_backend}, \texttt{solar\_frontend}. Wait until \texttt{postgres} is healthy.
+This command starts three containers running the database, backend API, and frontend application. Wait a minute or two for the database to initialize.
 
-\textbf{3) Access the app}
+\textbf{3) Access the application}
 \begin{itemize}
-    \item Frontend: \url{http://localhost:3000}
-    \item Backend API (Swagger UI): \url{http://localhost:8080/swagger-ui.html}
+    \item Web Interface: \url{http://localhost:3000}
+    \item API Documentation: \url{http://localhost:8080/swagger-ui.html}
 \end{itemize}
 
-Log in with the admin you set in \texttt{.env} (defaults: \texttt{admin@solar.com} / \texttt{admin123}); change the password on first login.
+Log in using the administrator credentials you configured. You should change the password on first login for security.
 
 \subsection{Configuration}
 \label{subsec:system-configuration}
 
-Configuration is centralized in \texttt{.env} and consumed by \texttt{compose.yaml}:
-\begin{itemize}
-    \item \textbf{Database}: \texttt{DB\_HOST}, \texttt{DB\_PORT}, \texttt{DB\_NAME}, \texttt{DB\_USER}, \texttt{DB\_PASSWORD} (backend uses JDBC URL \texttt{jdbc:postgresql://\$\{DB\_HOST\}:\$\{DB\_PORT\}/\$\{DB\_NAME\}})
-    \item \textbf{Auth}: \texttt{JWT\_SECRET}, \texttt{JWT\_EXPIRATION\_MS}
-    \item \textbf{URLs}: \texttt{FRONTEND\_URL} (used in backend links), \texttt{BACKEND\_URL}
-    \item \textbf{Mail (optional locally)}: \texttt{MAIL\_HOST}, \texttt{MAIL\_PORT}, \texttt{MAIL\_USERNAME}, \texttt{MAIL\_PASSWORD}
-    \item \textbf{Admin bootstrap}: \texttt{ADMIN\_EMAIL}, \texttt{ADMIN\_PASSWORD}, \texttt{ADMIN\_FULL\_NAME}
-    \item \textbf{Profile}: \texttt{SPRING\_PROFILES\_ACTIVE=prod} (uses PostgreSQL per \texttt{application-prod.properties})
-\end{itemize}
+All system settings are managed through the \texttt{.env} file (copied from \texttt{.env.template}). The most important settings include your administrator account details for initial access, authentication secrets for security, database connection settings (with defaults provided), email server configuration for notifications (optional for local testing), and the system profile which determines whether to use the development or production database.
 
-For production, set strong secrets (JWT, DB password), real mail credentials, enable HTTPS at your reverse proxy, and configure CORS to allow only your domains.
+For production deployment, use strong passwords and secrets, and configure a real email service for sending notifications.
 
-\subsection{Device Simulation (Optional)}
+\subsection{Device Simulation}
 \label{subsec:device-simulation}
 
-\textbf{Local simulator (Raspberry Pi or any Python 3.8+ host)}
+To simulate IoT devices sending energy data and tamper alerts, you need to set up the Python simulator. This can run on the same machine as your Docker containers (using \texttt{localhost:8080} as the backend URL) or on a separate device like a Raspberry Pi (using the IP address of the machine running the backend).
+
+\textbf{Setup steps:}
+
+Navigate to the simulation folder and create a virtual environment:
 \begin{verbatim}
-pip3 install -r pi_simulation/requirements.txt
-# edit pi_simulation/config.json -> set backend base URL (e.g., http://localhost:8080)
-python3 pi_simulation/main.py
+cd pi_simulation
+python3 -m venv venv
+source venv/bin/activate      # On Windows: venv\Scripts\activate
+\end{verbatim}
+
+Install dependencies:
+\begin{verbatim}
+pip3 install -r requirements.txt
+\end{verbatim}
+
+Edit \texttt{config.json} to set the backend URL:
+\begin{itemize}
+    \item For same machine: \texttt{http://localhost:8080}
+    \item For Raspberry Pi or separate device: \texttt{http://[BACKEND\_IP]:8080} (replace \texttt{[BACKEND\_IP]} with the actual IP address)
+\end{itemize}
+
+Run the simulator:
+\begin{verbatim}
+python3 main.py
 \end{verbatim}
 
 \subsection{Verification and Management}
 \label{subsec:verification}
 
-\textbf{Verify deployment}
-\begin{itemize}
-    \item Container health: \texttt{docker compose ps}
-    \item Logs: \texttt{docker compose logs -f backend} (and \texttt{postgres}, \texttt{frontend} as needed)
-    \item UI check: Open \url{http://localhost:3000} and sign in with admin credentials
-\end{itemize}
+After installation, verify everything is running by checking container status with \texttt{docker compose ps}. You can view logs using \texttt{docker compose logs -f backend} to monitor the application. Open the web interface and sign in with your administrator credentials to confirm successful deployment.
 
-\textbf{Common issues}
-\begin{description}
-    \item[Port conflicts] Change \texttt{POSTGRES\_HOST\_PORT} or host ports in \texttt{compose.yaml}
-    \item[Database init delay] Wait 2--3 minutes for Postgres; check \texttt{docker compose logs postgres}
-    \item[Backend DB auth] Verify \texttt{DB\_*} in \texttt{.env} match Postgres env
-\end{description}
+If you encounter port conflicts, adjust the \texttt{POSTGRES\_HOST\_PORT} setting in your \texttt{.env} file. If the database takes time to initialize, wait 2--3 minutes and check the database logs with \texttt{docker compose logs postgres}. For authentication issues, verify that your database credentials in \texttt{.env} match correctly.
 
-\textbf{Lifecycle}
-\begin{itemize}
-    \item Start: \texttt{docker compose up -d}
-    \item Stop: \texttt{docker compose down}
-    \item Restart service: \texttt{docker compose restart backend}
-    \item Tail logs: \texttt{docker compose logs -f backend}
-\end{itemize}
+To manage the system, use \texttt{docker compose up -d} to start services, \texttt{docker compose down} to stop everything, \texttt{docker compose restart backend} to restart a specific service, and \texttt{docker compose logs -f backend} to monitor logs in real-time.
 
 \subsection{Account Setup and Access}
 \label{subsec:account-setup}
 
-\textbf{Customer Onboarding:} Admin creates account via Customer Management $\rightarrow$ Add Customer. Customer receives activation email and sets password (8+ characters, mixed case, number, special character). See Figure~\ref{fig:customer-onboarding}.
+Administrators can create customer accounts through the Customer Management interface. New customers receive an activation email and set their own password following security requirements (minimum 8 characters with uppercase, lowercase, numbers, and special characters). See Figure~\ref{fig:customer-onboarding}.
 
 \begin{figure}[htbp]
     \centering
