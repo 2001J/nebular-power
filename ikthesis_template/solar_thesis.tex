@@ -78,123 +78,157 @@ This thesis presents the design and implementation of a Solar Energy Monitoring 
 \chapter{Raspberry Pi Simulation Framework}
 
 \section{Overview}
-The Solar Energy Monitoring and Control System includes a comprehensive simulation framework designed to run on a Raspberry Pi. This framework simulates a real solar installation for testing and demonstration purposes, generating realistic data and responding to commands as if it were an actual installation in the field.
+The simulation framework generates realistic solar installation data for testing and demonstration purposes. It simulates energy production, device heartbeats, tamper events, and responds to remote commands as if it were an actual Raspberry Pi installation in the field.
 
-The simulation framework serves several important purposes:
+The simulator serves several purposes:
 \begin{itemize}
-    \item Provides a controlled environment for testing the system without requiring actual solar hardware
-    \item Enables demonstration of system features including monitoring, tamper detection, and remote command execution
-    \item Facilitates development and testing of new features before deployment to production
-    \item Allows simulation of edge cases and error conditions that would be difficult to reproduce with real hardware
+    \item Provides test data without requiring actual solar hardware
+    \item Demonstrates system features including real-time monitoring, tamper detection, and remote service control
+    \item Enables testing of edge cases and error conditions
 \end{itemize}
 
-\section{Simulation Components}
-The simulation framework consists of several specialized modules, each responsible for simulating different aspects of a solar installation:
+\section{Core Components}
+The simulation framework consists of five main Python modules in the \texttt{pi\_simulation/} directory:
 
-\subsection{Energy Simulator}
-The Energy Simulator generates realistic energy production and consumption data with the following features:
+\subsection{main.py}
+The main coordinator script that:
 \begin{itemize}
-    \item Simulates daily solar generation patterns based on time of day
-    \item Accounts for weather variations affecting energy production
-    \item Generates consumption data with realistic usage patterns
-    \item Calculates metrics such as daily yield and total yield
-    \item Transmits data to the monitoring system at configurable intervals
+    \item Loads configuration from \texttt{config.json} (or generates \texttt{default\_config.json} if not present)
+    \item Initializes and runs all simulator components in separate threads
+    \item Provides interactive console for manual tamper event triggering (p=physical, v=voltage, c=connection, l=location)
+    \item Handles command-line arguments for overriding configuration
+    \item Manages graceful shutdown on Ctrl+C
 \end{itemize}
 
-\subsection{Heartbeat Simulator}
-The Heartbeat Simulator emulates device status updates with:
+\subsection{energy\_simulator.py}
+Generates realistic energy production and consumption data:
 \begin{itemize}
-    \item Regular status messages indicating device health
-    \item Battery level simulation with realistic discharge patterns
-    \item Connection status and signal strength variations
-    \item Diagnostic information including temperature, memory usage, and uptime
-    \item Configurable reporting intervals
+    \item Simulates daily solar generation with peak at midday using time-based calculations
+    \item Optional weather effects that randomly reduce production
+    \item Variable consumption patterns throughout the day
+    \item Sends energy readings to backend at configurable intervals (default: 15 seconds)
 \end{itemize}
 
-\subsection{Tamper Simulator}
-The Tamper Simulator generates various security events that might occur in real installations:
+\subsection{heartbeat\_simulator.py}
+Emulates device status updates:
 \begin{itemize}
-    \item \textbf{Physical Tamper Events}: Simulates unauthorized physical access to the installation
-    \item \textbf{Voltage Tamper Events}: Emulates unusual voltage patterns that might indicate bypassing
-    \item \textbf{Connection Tamper Events}: Simulates unauthorized disconnection of monitoring equipment
-    \item \textbf{Location Tamper Events}: Generates alerts when the installation appears to have moved
+    \item Sends periodic heartbeat messages with device health information
+    \item Simulates battery levels with realistic discharge/charge patterns
+    \item Reports diagnostic data (temperature, memory, uptime, signal strength)
+    \item Configurable reporting interval (default: 45 seconds)
 \end{itemize}
 
-Tamper events can be triggered randomly based on configurable probabilities or manually through an interactive interface, making it ideal for demonstrations and testing.
-
-\subsection{Command Handler}
-The Command Handler listens for and processes commands from the server:
+\subsection{tamper\_simulator.py}
+Generates security tamper events:
 \begin{itemize}
-    \item Polls the server at regular intervals for pending commands
-    \item Simulates command execution with realistic processing times
-    \item Handles various command types including device reboot, firmware updates, and service suspension
-    \item Generates appropriate responses with success/failure status and detailed results
-    \item Maintains a service state to track the installation's operational status
+    \item \textbf{Physical Tamper}: Simulates unauthorized physical access
+    \item \textbf{Voltage Tamper}: Unusual voltage patterns indicating bypassing attempts
+    \item \textbf{Connection Tamper}: Unauthorized disconnection of monitoring equipment
+    \item \textbf{Location Tamper}: Device appears to have been moved
+    \item Random event generation based on configurable probabilities
+    \item Manual triggering via interactive console or command-line flag
 \end{itemize}
 
-\section{Implementation Details}
-The simulation framework is implemented in Python and designed to be highly configurable through a JSON configuration file. Key implementation aspects include:
-
-\subsection{Configuration System}
-The simulator uses a flexible configuration system that allows:
+\subsection{command\_handler.py}
+Listens for and processes server commands:
 \begin{itemize}
-    \item Setting installation and device identifiers
-    \item Configuring server connection parameters
-    \item Adjusting simulation parameters for each component
-    \item Setting probabilities for random tamper events
-    \item Controlling simulation speed and intervals
+    \item Polls backend API for pending commands at regular intervals (default: 15 seconds)
+    \item Simulates execution of commands (suspend/activate service, reboot device, update firmware)
+    \item Maintains service state in \texttt{service\_state\_[ID].json}
+    \item Sends command responses with success/failure status
 \end{itemize}
 
-\subsection{Data Generation}
-Data generation algorithms produce realistic values that follow expected patterns:
+\subsection{auth\_helper.py}
+Manages authentication with the backend:
 \begin{itemize}
-    \item Solar generation follows a bell curve peaking at midday
-    \item Weather effects introduce random variations in production
-    \item Consumption patterns vary throughout the day with higher usage in mornings and evenings
-    \item Battery levels decrease gradually with periodic recharging
+    \item Authenticates using JWT tokens via configured credentials
+    \item Automatically includes authentication headers in API requests
+    \item Handles token refresh if needed
 \end{itemize}
 
-\subsection{Communication with Backend}
-The simulator communicates with the backend server using:
+\section{Configuration}
+The simulator is configured via \texttt{config.json} with the following structure:
+
+\textbf{general}: Installation ID, server URL (e.g., \texttt{http://localhost:8080}), authentication credentials
+
+\textbf{energy}: Enable/disable, base/peak generation watts, consumption range, update interval, weather simulation toggle
+
+\textbf{heartbeat}: Enable/disable, interval, device ID, diagnostics and battery simulation toggles
+
+\textbf{tamper}: Enable/disable, random event generation, interval range, probabilities for each tamper type
+
+\textbf{command}: Enable/disable, polling interval, simulated success rate
+
+\section{Usage}
+\textbf{Setup:}
+\begin{verbatim}
+cd pi_simulation
+python3 -m venv venv
+source venv/bin/activate  # Windows: venv\Scripts\activate
+pip install -r requirements.txt
+\end{verbatim}
+
+\textbf{Configuration:} Edit \texttt{config.json} to set:
 \begin{itemize}
-    \item HTTP POST requests to send energy readings, heartbeats, and tamper events
-    \item HTTP GET requests to poll for pending commands
-    \item HTTP POST requests to send command responses
-    \item Authentication using JWT tokens for secure communication
+    \item \texttt{installation\_id}: Must match an installation in the backend database
+    \item \texttt{server\_url}: Backend API URL (localhost for same machine, IP address for remote)
+    \item \texttt{auth.username} and \texttt{auth.password}: Valid customer credentials
 \end{itemize}
 
-\subsection{Command Processing}
-The command processing system simulates the behavior of real devices with some important distinctions:
+\textbf{Run:}
+\begin{verbatim}
+python3 main.py
+\end{verbatim}
+
+\textbf{Interactive Commands:}
 \begin{itemize}
-    \item Commands are received and processed as they would be in a real system
-    \item The simulator logs what actions would be taken in a real system
-    \item Commands like device reboot or firmware update are simulated without actually affecting the Raspberry Pi
-    \item Service suspension commands update the internal state but don't physically disable any hardware
+    \item \texttt{p} - Trigger physical tamper event
+    \item \texttt{v} - Trigger voltage tamper event
+    \item \texttt{c} - Trigger connection tamper event
+    \item \texttt{l} - Trigger location tamper event
+    \item \texttt{q} - Quit simulation
+    \item Ctrl+C - Stop simulation
 \end{itemize}
 
-This approach allows for comprehensive testing of the command infrastructure without the risk of disrupting the simulation itself.
+\textbf{Command-line Options:}
+\begin{verbatim}
+python3 main.py -c custom_config.json  # Use custom config
+python3 main.py -u http://192.168.1.10:8080  # Override server URL
+python3 main.py -i 5  # Override installation ID
+python3 main.py -t physical  # Trigger tamper event and exit
+\end{verbatim}
 
-\section{Interactive Features}
-The simulation framework includes an interactive console that allows operators to:
+\section{Dependencies}
+The simulator requires Python 3.8+ and the following packages (in \texttt{requirements.txt}):
 \begin{itemize}
-    \item Trigger specific tamper events on demand
-    \item Monitor the simulation status in real-time
-    \item Control the simulation (start, stop, restart)
-    \item View logs of all simulation activities
+    \item \texttt{requests} - HTTP communication with backend API
+    \item \texttt{urllib3} - Robust HTTP connection handling
+    \item \texttt{python-dateutil} - Date/time manipulation
+    \item \texttt{python-dotenv} - Environment variable management
+    \item \texttt{colorama} - Console output formatting
+    \item \texttt{loguru} - Advanced logging
 \end{itemize}
 
-These interactive features make the simulator particularly valuable for demonstrations and training.
-
-\section{Usage in Development and Testing}
-The Raspberry Pi simulation framework plays a crucial role in the development and testing process:
+\section{Data Flow}
+The simulator communicates with the backend using HTTP:
 \begin{itemize}
-    \item Developers use it to test new features without requiring physical solar installations
-    \item QA engineers use it to verify system behavior under various conditions
-    \item It enables automated testing of the monitoring and security features
-    \item The simulation can be configured to generate edge cases and error conditions
+    \item POST to \texttt{/api/energy/readings} - Send energy production/consumption data
+    \item POST to \texttt{/api/heartbeat} - Send device status updates
+    \item POST to \texttt{/api/tamper/events} - Report tamper events
+    \item GET from \texttt{/api/commands/pending} - Poll for commands
+    \item POST to \texttt{/api/commands/\{id\}/response} - Send command execution results
+    \item POST to \texttt{/api/auth/login} - Authenticate and obtain JWT token
 \end{itemize}
 
-By providing a controlled, repeatable environment that closely mimics real-world installations, the simulation framework significantly enhances the development process and helps ensure the reliability of the production system.
+All requests (except auth) include JWT authentication headers obtained during initialization.
+
+\section{Limitations}
+\begin{itemize}
+    \item Commands like reboot and firmware update are simulated (logged but not executed) to avoid disrupting the simulator
+    \item Energy production follows simple time-based algorithms, not actual solar physics
+    \item Service suspension updates internal state but doesn't physically disable hardware
+    \item Suitable for demonstration and testing, not production monitoring
+\end{itemize}
 
 \cleardoublepage
 
@@ -203,9 +237,9 @@ By providing a controlled, repeatable environment that closely mimics real-world
 \addcontentsline{toc}{chapter}{\acklabel}
 I would like to express my sincere gratitude to the Faculty of Informatics at Eötvös Loránd University for providing the academic foundation, resources, and environment that enabled me to complete this thesis.
 
-A special thanks goes to my supervisor Dr. Alwahab Dhulfiqar Zoltán,  fellow students and friends, whose encouragement, feedback, and support throughout the development process kept me motivated and focused.
+A special thanks goes to my supervisor Dr. Porkoláb Zoltán,  fellow students and friends, whose encouragement, feedback, and support throughout the development process kept me motivated and focused.
 
-I am especially grateful to my mother, who bought me a new laptop when mine broke down just one month before the submission deadline—her support made it possible to continue working under pressure.
+Finally, I would like to thank my family for their unwavering support and understanding during this journey.
 
 % Bibliography (mandatory)
 \phantomsection
