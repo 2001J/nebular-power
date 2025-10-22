@@ -43,7 +43,7 @@ The system is organized into three primary architectural layers as shown in Figu
 
 \paragraph{Technology Stack and Development Standards}
 
-The technology selection prioritizes type safety, maintainability, and ecosystem maturity as detailed in Table~\ref{tab:tech-stack}:
+The technology selection prioritizes type safety, maintainability, and ecosystem maturity as detailed in Table~\ref{tab:tech-stack}. The backend uses Spring Boot 3 \cite{walls2022spring} with Spring Security for authentication and authorization. The frontend leverages React 19 and Next.js 15 \cite{react2023,nextjsdocs} for server-side rendering and optimal performance. The system follows RESTful principles \cite{fielding2000rest} for API design and uses WebSocket \cite{websocket2011} for real-time bidirectional communication:
 
 \begin{table}[h]
     \centering
@@ -148,10 +148,51 @@ Modules communicate through:
     \item \textbf{WebSocket Broadcasting}: Real-time updates pushed to frontend via WebSocketService on topics \texttt{/topic/installation/\{id\}/energy-data}, \texttt{/topic/installation/\{id\}/status}, \texttt{/topic/installation/\{id\}/tamper}.
 \end{itemize}
 
+Code~\ref{src:websocket-service} shows the WebSocket service for real-time updates:
+
+\lstset{caption={WebSocket Broadcasting Service}, label=src:websocket-service}
+\begin{lstlisting}[language=Java]
+@Service
+public class WebSocketService {
+    
+    private final SimpMessagingTemplate messagingTemplate;
+    
+    public WebSocketService(SimpMessagingTemplate messagingTemplate) {
+        this.messagingTemplate = messagingTemplate;
+    }
+    
+    public void sendEnergyUpdate(Long installationId, 
+                                 EnergyDataDTO data) {
+        String destination = "/topic/installation/" 
+                           + installationId 
+                           + "/energy-data";
+        messagingTemplate.convertAndSend(destination, data);
+    }
+    
+    public void sendStatusUpdate(Long installationId, 
+                                 InstallationStatus status) {
+        String destination = "/topic/installation/" 
+                           + installationId 
+                           + "/status";
+        messagingTemplate.convertAndSend(destination, 
+            Map.of("status", status, "timestamp", LocalDateTime.now())
+        );
+    }
+    
+    public void sendTamperAlert(Long installationId, 
+                                TamperEventDTO event) {
+        String destination = "/topic/installation/" 
+                           + installationId 
+                           + "/tamper";
+        messagingTemplate.convertAndSend(destination, event);
+    }
+}
+\end{lstlisting}
+
 \subsection{Database Design}
 \label{subsec:database-design}
 
-The database design uses PostgreSQL 15 (production) and H2 (development/testing) with Spring Data JPA for object-relational mapping. The schema is entity-first, meaning database tables are generated from JPA entity annotations.
+The database design uses PostgreSQL 15 \cite{postgresql} (production) and H2 (development/testing) with Spring Data JPA \cite{bauer2021java} for object-relational mapping. The schema is entity-first, meaning database tables are generated from JPA entity annotations following domain-driven design principles \cite{martin2019clean}.
 
 \subsubsection{Entity-Relationship Diagram}
 \label{subsubsec:erd}
@@ -389,11 +430,61 @@ Bean Validation (JSR-303) annotations on request DTOs provide declarative valida
 
 The \texttt{@Valid} annotation on controller method parameters triggers automatic validation before method execution. Validation failures return HTTP 400 with field-level error details.
 
+Code~\ref{src:dto-validation} shows a typical DTO with validation annotations:
+
+\lstset{caption={DTO with Bean Validation Annotations}, label=src:dto-validation}
+\begin{lstlisting}[language=Java]
+public class CustomerRegistrationRequest {
+    @NotBlank(message = "Email is required")
+    @Email(message = "Invalid email format")
+    private String email;
+    
+    @NotBlank(message = "Password is required")
+    @Size(min = 8, message = "Password must be at least 8 characters")
+    @Pattern(regexp = "^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[@$!%*?&]).*$",
+             message = "Password must contain uppercase, lowercase, digit, and special character")
+    private String password;
+    
+    @NotBlank(message = "Full name is required")
+    @Size(min = 2, max = 100, message = "Name must be 2-100 characters")
+    private String fullName;
+    
+    @Pattern(regexp = "^\\+?[1-9]\\d{1,14}$", message = "Invalid phone number")
+    private String phoneNumber;
+}
+\end{lstlisting}
+
 Authorization is enforced through:
 \begin{itemize}
     \item \textbf{Method Security}: \texttt{@PreAuthorize("hasRole('ADMIN')")} annotations on admin-only endpoints
     \item \textbf{Resource Ownership}: \texttt{SecurityService.hasAccessToInstallation()} verifies users can only access their own data (or all data if admin)
 \end{itemize}
+
+Code~\ref{src:authorization} demonstrates authorization checks in a controller method:
+
+\lstset{caption={Authorization in Controller Methods}, label=src:authorization}
+\begin{lstlisting}[language=Java]
+@RestController
+@RequestMapping("/api/installations")
+public class InstallationController {
+    @Autowired
+    private SecurityService securityService;
+    
+    @GetMapping("/{id}/energy-data")
+    public ResponseEntity<List<EnergyReading>> getEnergyData(
+            @PathVariable Long id,
+            Authentication authentication) {
+        
+        // Verify user has access to this installation
+        if (!securityService.hasAccessToInstallation(authentication, id)) {
+            throw new AccessDeniedException("Cannot access this installation");
+        }
+        
+        List<EnergyReading> readings = energyService.getReadings(id);
+        return ResponseEntity.ok(readings);
+    }
+}
+\end{lstlisting}
 
 \subsubsection{Exception Handling Implementation}
 \label{subsubsec:exception-handling}
@@ -410,13 +501,55 @@ A \texttt{GlobalExceptionHandler} class annotated with \texttt{@RestControllerAd
 
 This implementation is located in \texttt{src/main/java/com/solar/exception/GlobalExceptionHandler.java} and handles exceptions consistently across all endpoints.
 
+Code~\ref{src:exception-handler} shows the global exception handler implementation:
+
+\lstset{caption={Global Exception Handler}, label=src:exception-handler}
+\begin{lstlisting}[language=Java]
+@RestControllerAdvice
+public class GlobalExceptionHandler {
+    
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<Map<String, String>> handleValidationErrors(
+            MethodArgumentNotValidException ex) {
+        
+        Map<String, String> errors = new HashMap<>();
+        ex.getBindingResult().getFieldErrors().forEach(error ->
+            errors.put(error.getField(), error.getDefaultMessage())
+        );
+        return ResponseEntity.badRequest().body(errors);
+    }
+    
+    @ExceptionHandler(ResourceNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleNotFound(
+            ResourceNotFoundException ex) {
+        
+        ErrorResponse error = new ErrorResponse(
+            HttpStatus.NOT_FOUND.value(),
+            ex.getMessage()
+        );
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error);
+    }
+    
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<ErrorResponse> handleAccessDenied(
+            AccessDeniedException ex) {
+        
+        ErrorResponse error = new ErrorResponse(
+            HttpStatus.FORBIDDEN.value(),
+            "You do not have permission to access this resource"
+        );
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error);
+    }
+}
+\end{lstlisting}
+
 \subsection{Deployment Architecture}
 \label{subsec:physical-components}
 
 \subsubsection{Containerization}
 \label{subsubsec:component-deployment}
 
-The system uses Docker containers orchestrated via Docker Compose (\texttt{compose.yaml}):
+The system uses Docker containers \cite{docker} orchestrated via Docker Compose (\texttt{compose.yaml}):
 
 \paragraph{Backend Container}
 Multi-stage Dockerfile builds the Spring Boot application:

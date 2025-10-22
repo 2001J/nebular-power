@@ -62,8 +62,24 @@ This thesis presents the design and implementation of a Solar Energy Monitoring 
 
 % Table of contents (mandatory)
 \tableofcontents
+\cleardoublepage
+
+% List of figures (optional)
+\phantomsection
+\addcontentsline{toc}{chapter}{\listfigurename}
 \listoffigures
+\cleardoublepage
+
+% List of tables (optional)
+\phantomsection
+\addcontentsline{toc}{chapter}{\listtablename}
 \listoftables
+\cleardoublepage
+
+% List of codes (optional)
+\phantomsection
+\addcontentsline{toc}{chapter}{List of Codes}
+\lstlistoflistings
 \cleardoublepage
 
 % Main content
@@ -241,10 +257,10 @@ A special thanks goes to my supervisor Dr. Porkoláb Zoltán,  fellow students a
 
 Finally, I would like to thank my family for their unwavering support and understanding during this journey.
 
+\cleardoublepage
+
 % Bibliography (mandatory)
-\phantomsection
-\addcontentsline{toc}{chapter}{\biblabel}
-\printbibliography
+\printbibliography[heading=bibintoc]
 
 \cleardoublepage
 
