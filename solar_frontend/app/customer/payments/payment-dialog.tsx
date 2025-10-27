@@ -16,7 +16,7 @@ import { Label } from "@/components/ui/label"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Separator } from "@/components/ui/separator"
 import { useToast } from "@/hooks/use-toast"
-import { paymentApi } from "@/lib/api"
+import { paymentApi } from "@/lib/api/payments"
 import { format } from "date-fns"
 
 interface Installation {

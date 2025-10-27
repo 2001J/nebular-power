@@ -9,6 +9,7 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
 
 
+import java.nio.charset.StandardCharsets;
 import java.security.Key;
 import java.util.Date;
 
@@ -21,8 +22,8 @@ public class JwtTokenProvider {
     public JwtTokenProvider(
             @Value("${jwt.secret}") String jwtSecret,
             @Value("${jwt.expiration}") int jwtExpirationInMs) {
-        // Using the recommended approach for HS512
-        this.jwtSecret = Keys.secretKeyFor(SignatureAlgorithm.HS512);
+        // Derive a stable HMAC key from configured secret to keep tokens valid across restarts
+        this.jwtSecret = Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8));
         this.jwtExpirationInMs = jwtExpirationInMs;
     }
 
@@ -73,5 +74,9 @@ public class JwtTokenProvider {
             // JWT claims string is empty
             return false;
         }
+    }
+
+    public int getJwtExpirationInMs() {
+        return jwtExpirationInMs;
     }
 } 

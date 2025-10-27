@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import React, { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { format, parseISO, subDays } from "date-fns"
 import {
@@ -85,6 +85,7 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb"
 import { DatePickerWithRange } from "@/components/ui/date-range-picker"
+import { DateRange } from "react-day-picker"
 import { Checkbox } from "@/components/ui/checkbox"
 import { toast } from "@/components/ui/use-toast"
 import { securityApi, installationApi } from "@/lib/api"
@@ -93,16 +94,16 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 export default function TamperResponsesPage() {
   const router = useRouter()
   const [loading, setLoading] = useState(true)
-  const [events, setEvents] = useState([])
-  const [responses, setResponses] = useState([])
-  const [filteredResponses, setFilteredResponses] = useState([])
-  const [installations, setInstallations] = useState([])
-  const [dateRange, setDateRange] = useState({
+  const [events, setEvents] = useState<any[]>([])
+  const [responses, setResponses] = useState<any[]>([])
+  const [filteredResponses, setFilteredResponses] = useState<any[]>([])
+  const [installations, setInstallations] = useState<any[]>([])
+  const [dateRange, setDateRange] = useState<DateRange | undefined>({
     from: subDays(new Date(), 30),
     to: new Date(),
   })
-  const [selectedEvent, setSelectedEvent] = useState(null)
-  const [selectedEventResponses, setSelectedEventResponses] = useState([])
+  const [selectedEvent, setSelectedEvent] = useState<any>(null)
+  const [selectedEventResponses, setSelectedEventResponses] = useState<any[]>([])
   const [responseType, setResponseType] = useState("all")
   const [installation, setInstallation] = useState("all")
   const [searchTerm, setSearchTerm] = useState("")
@@ -123,9 +124,99 @@ export default function TamperResponsesPage() {
   })
   const [autoResponseDialogOpen, setAutoResponseDialogOpen] = useState(false)
   const [autoResponseType, setAutoResponseType] = useState("SHUTDOWN")
-  const [selectedResponse, setSelectedResponse] = useState(null)
+  const [selectedResponse, setSelectedResponse] = useState<any | null>(null)
   const [responseDetailsOpen, setResponseDetailsOpen] = useState(false)
   const [activeTab, setActiveTab] = useState("events")
+
+  // Get installation name by ID (memoized)
+  const getInstallationName = useCallback((installationId: string) => {
+    const inst = installations.find(i => i.id === installationId)
+    return inst ? (inst.name || `Installation #${installationId}`) : `Installation #${installationId}`
+  }, [installations])
+
+  // Generate mock events for fallback (memoized)
+  const generateMockEvents = useCallback((count: number) => {
+    const eventTypes = ["PHYSICAL_MOVEMENT", "VOLTAGE_FLUCTUATION", "CONNECTION_INTERRUPTION", "LOCATION_CHANGE"]
+    const severities = ["HIGH", "MEDIUM", "LOW"]
+    const statuses = ["OPEN", "ACKNOWLEDGED", "IN_PROGRESS"]
+    const mockEvents: any[] = []
+
+    for (let i = 0; i < count; i++) {
+      const randomInstallation = installations.length > 0
+        ? installations[Math.floor(Math.random() * installations.length)]
+        : { id: `INST-${i + 100}`, name: `Demo Installation ${i + 1}` }
+
+      mockEvents.push({
+        id: `EVT-${Date.now()}-${i}`,
+        timestamp: new Date(Date.now() - Math.floor(Math.random() * 30 * 24 * 60 * 60 * 1000)).toISOString(),
+        eventType: eventTypes[Math.floor(Math.random() * eventTypes.length)],
+        severity: severities[Math.floor(Math.random() * severities.length)],
+        status: statuses[Math.floor(Math.random() * statuses.length)],
+        description: `Mock tamper event for demonstration purposes.`,
+        installationId: randomInstallation.id,
+        installationName: randomInstallation.name,
+        confidenceScore: Math.random().toFixed(2)
+      })
+    }
+
+    return mockEvents
+  }, [installations])
+
+  // Generate mock responses for fallback (memoized)
+  const generateMockResponses = useCallback((eventsArray: any[], count: number) => {
+    const responseTypes = ["NOTIFICATION", "MANUAL_INTERVENTION", "AUTOMATIC_SHUTDOWN", "REPORT_GENERATION"]
+    const responseStatuses = ["COMPLETED", "PENDING", "FAILED"]
+    const mockResponses: any[] = []
+
+    for (let i = 0; i < count; i++) {
+      const randomEvent = eventsArray.length > 0
+        ? eventsArray[Math.floor(Math.random() * eventsArray.length)]
+        : { id: `EVT-MOCK-${i}`, installationId: `INST-${i + 100}` }
+
+      mockResponses.push({
+        id: `RESP-${Date.now()}-${i}`,
+        eventId: randomEvent.id,
+        timestamp: new Date(Date.now() - Math.floor(Math.random() * 30 * 24 * 60 * 60 * 1000)).toISOString(),
+        responseType: responseTypes[Math.floor(Math.random() * responseTypes.length)],
+        status: responseStatuses[Math.floor(Math.random() * responseStatuses.length)],
+        description: `Mock response action for tamper event.`,
+        actionTaken: `Simulated response action ${i + 1}.`,
+        createdBy: Math.random() > 0.5 ? "system" : "admin",
+        installationId: randomEvent.installationId
+      })
+    }
+
+    return mockResponses
+  }, [])
+
+  // Apply filters to responses (memoized)
+  const applyFilters = useCallback((responsesData: any[] = responses) => {
+    const filtered = responsesData.filter((response: any) => {
+      // Response type filter
+      if (responseType !== "all" && response.responseType !== responseType) return false
+
+      // Installation filter
+      if (installation !== "all" && response.installationId !== installation) return false
+
+      // Search term filter
+      if (searchTerm && searchTerm.length > 0) {
+        const searchLower = searchTerm.toLowerCase()
+        const matchesDescription = response.description?.toLowerCase().includes(searchLower)
+        const matchesAction = response.actionTaken?.toLowerCase().includes(searchLower)
+        const matchesEventId = response.eventId?.toLowerCase().includes(searchLower)
+        const matchesInstallation = getInstallationName(response.installationId)?.toLowerCase().includes(searchLower)
+
+        if (!matchesDescription && !matchesAction && !matchesEventId && !matchesInstallation) return false
+      }
+
+      return true
+    })
+
+    // Sort by timestamp, newest first
+    filtered.sort((a: any, b: any) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+
+    setFilteredResponses(filtered)
+  }, [responses, responseType, installation, searchTerm, getInstallationName])
 
   // Fetch tamper events and responses
   useEffect(() => {
@@ -138,7 +229,7 @@ export default function TamperResponsesPage() {
         setInstallations(installationsData.content || [])
 
         // Fetch tamper events with unresolved status
-        let eventsData = []
+        let eventsData: any[] = []
         try {
           eventsData = await securityApi.getUnresolvedEvents()
           console.log("Fetched tamper events:", eventsData)
@@ -149,12 +240,12 @@ export default function TamperResponsesPage() {
         }
 
         // Fetch responses based on filters
-        let responsesData = []
+        let responsesData: any[] = []
         try {
           if (installation !== "all") {
             // Get responses for specific installation
             responsesData = await securityApi.getResponsesByInstallation(installation)
-          } else if (dateRange.from && dateRange.to) {
+          } else if (dateRange?.from && dateRange?.to) {
             // Get responses by time range
             const startDate = dateRange.from.toISOString()
             const endDate = dateRange.to.toISOString()
@@ -209,7 +300,7 @@ export default function TamperResponsesPage() {
     }
 
     fetchData()
-  }, [dateRange, responseType, installation, isRefreshing])
+  }, [dateRange, responseType, installation, isRefreshing, applyFilters, generateMockEvents, generateMockResponses])
 
   // Fetch responses for selected event
   useEffect(() => {
@@ -217,7 +308,7 @@ export default function TamperResponsesPage() {
       if (!selectedEvent) return
 
       try {
-        const eventResponses = await securityApi.getResponsesByEventId(selectedEvent.id)
+        const eventResponses = await securityApi.getResponsesByEventId((selectedEvent as any).id)
         setSelectedEventResponses(eventResponses || [])
       } catch (error) {
         console.error(`Error fetching responses for event ${selectedEvent.id}:`, error)
@@ -230,9 +321,13 @@ export default function TamperResponsesPage() {
     }
 
     fetchEventResponses()
-  }, [selectedEvent])
+  }, [selectedEvent, generateMockResponses])
 
-  // Generate mock events for fallback
+  // Simple refresh trigger
+  const refreshData = () => setIsRefreshing(true)
+
+  /*
+  // Generate mock events for fallback (moved up and memoized)
   const generateMockEvents = (count) => {
     const eventTypes = ["PHYSICAL_MOVEMENT", "VOLTAGE_FLUCTUATION", "CONNECTION_INTERRUPTION", "LOCATION_CHANGE"]
     const severities = ["HIGH", "MEDIUM", "LOW"]
@@ -260,7 +355,7 @@ export default function TamperResponsesPage() {
     return mockEvents
   }
 
-  // Generate mock responses for fallback
+  // Generate mock responses for fallback (moved up and memoized)
   const generateMockResponses = (eventsArray, count) => {
     const responseTypes = ["NOTIFICATION", "MANUAL_INTERVENTION", "AUTOMATIC_SHUTDOWN", "REPORT_GENERATION"]
     const responseStatuses = ["COMPLETED", "PENDING", "FAILED"]
@@ -287,7 +382,7 @@ export default function TamperResponsesPage() {
     return mockResponses
   }
 
-  // Apply filters to responses
+  // Apply filters to responses (moved up and memoized)
   const applyFilters = (responsesData = responses) => {
     const filtered = responsesData.filter(response => {
       // Response type filter
@@ -319,18 +414,19 @@ export default function TamperResponsesPage() {
   // Apply filters when filter values change
   useEffect(() => {
     applyFilters()
-  }, [searchTerm])
+  }, [searchTerm, applyFilters])
 
   // Refresh data
   const refreshData = () => {
     setIsRefreshing(true)
   }
 
-  // Get installation name by ID
+  // Get installation name by ID (moved up and memoized)
   const getInstallationName = (installationId) => {
     const installation = installations.find(i => i.id === installationId)
     return installation ? (installation.name || `Installation #${installationId}`) : `Installation #${installationId}`
   }
+  */
 
   // Get event by ID
   const getEventById = (eventId) => {
@@ -338,7 +434,7 @@ export default function TamperResponsesPage() {
   }
 
   // Format date
-  const formatDate = (dateString) => {
+  const formatDate = (dateString: string) => {
     try {
       return format(parseISO(dateString), "PPP p")
     } catch (error) {
@@ -347,7 +443,7 @@ export default function TamperResponsesPage() {
   }
 
   // Get severity badge
-  const getSeverityBadge = (severity) => {
+  const getSeverityBadge = (severity: string) => {
     switch (severity?.toUpperCase()) {
       case 'HIGH':
         return <Badge variant="destructive">High</Badge>
@@ -361,7 +457,7 @@ export default function TamperResponsesPage() {
   }
 
   // Get status badge
-  const getStatusBadge = (status) => {
+  const getStatusBadge = (status: string) => {
     switch (status?.toUpperCase()) {
       case 'COMPLETED':
       case 'SUCCESS':
@@ -377,7 +473,7 @@ export default function TamperResponsesPage() {
   }
 
   // Get response type icon
-  const getResponseTypeIcon = (responseType) => {
+  const getResponseTypeIcon = (responseType: string) => {
     switch (responseType) {
       case 'NOTIFICATION':
         return <Bell className="h-4 w-4 text-blue-500" />
@@ -411,7 +507,7 @@ export default function TamperResponsesPage() {
       }
 
       // Call API to create response
-      const createdResponse = await securityApi.createTamperResponse(selectedEvent.id, requestData)
+      const createdResponse = await securityApi.createTamperResponse((selectedEvent as any).id, requestData)
 
       toast({
         title: "Response Created",
@@ -424,8 +520,8 @@ export default function TamperResponsesPage() {
         setSelectedEventResponses(prev => [createdResponse, ...prev])
         applyFilters([createdResponse, ...responses])
       } else {
-        // If no response returned, refresh data
-        refreshData()
+        // If no response returned, trigger refresh
+        setIsRefreshing(true)
       }
 
       // Reset form
@@ -460,7 +556,7 @@ export default function TamperResponsesPage() {
       }
 
       // Call API to send notification
-      const result = await securityApi.sendNotification(selectedEvent.id, requestData)
+      const result = await securityApi.sendNotification((selectedEvent as any).id, requestData)
 
       toast({
         title: "Notification Sent",
@@ -473,7 +569,7 @@ export default function TamperResponsesPage() {
         setSelectedEventResponses(prev => [result, ...prev])
         applyFilters([result, ...responses])
       } else {
-        refreshData()
+        setIsRefreshing(true)
       }
 
       // Reset form
@@ -505,7 +601,7 @@ export default function TamperResponsesPage() {
       }
 
       // Call API to execute automatic response
-      const result = await securityApi.executeAutoResponse(selectedEvent.id, requestData)
+      const result = await securityApi.executeAutoResponse((selectedEvent as any).id, requestData)
 
       toast({
         title: "Auto-Response Executed",
@@ -518,7 +614,7 @@ export default function TamperResponsesPage() {
         setSelectedEventResponses(prev => [result, ...prev])
         applyFilters([result, ...responses])
       } else {
-        refreshData()
+        setIsRefreshing(true)
       }
 
       // Reset and close dialog
@@ -993,7 +1089,7 @@ export default function TamperResponsesPage() {
                 <Checkbox
                   id="notifyUser"
                   checked={newResponse.notifyUser}
-                  onCheckedChange={(checked) => setNewResponse({ ...newResponse, notifyUser: checked })}
+                  onCheckedChange={(checked) => setNewResponse({ ...newResponse, notifyUser: Boolean(checked) })}
                 />
                 <Label htmlFor="notifyUser">Notify customer about this response</Label>
               </div>
@@ -1004,7 +1100,7 @@ export default function TamperResponsesPage() {
                 <Checkbox
                   id="contactAuthorities"
                   checked={newResponse.contactAuthorities}
-                  onCheckedChange={(checked) => setNewResponse({ ...newResponse, contactAuthorities: checked })}
+                  onCheckedChange={(checked) => setNewResponse({ ...newResponse, contactAuthorities: Boolean(checked) })}
                 />
                 <Label htmlFor="contactAuthorities">Authorities were contacted</Label>
               </div>
@@ -1156,7 +1252,7 @@ export default function TamperResponsesPage() {
               </div>
             )}
 
-            <Alert variant="warning">
+            <Alert variant="destructive">
               <AlertCircle className="h-4 w-4" />
               <AlertTitle>Attention</AlertTitle>
               <AlertDescription>
@@ -1266,7 +1362,7 @@ export default function TamperResponsesPage() {
                     toast({
                       title: "Event Not Found",
                       description: "The associated event could not be found in the current view.",
-                      variant: "warning",
+                      variant: "default",
                     })
                   }
                   setResponseDetailsOpen(false)

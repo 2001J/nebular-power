@@ -1,0 +1,125 @@
+2025-10-04 00:14:40,323 - SolarSimulator - INFO - Loaded configuration from config.json
+2025-10-04 00:14:40,323 - SolarSimulator - INFO - Loaded configuration: Raspberry Pi Solar Installation Demo
+2025-10-04 00:14:40,323 - AuthHelper - INFO - Authenticating user customer1@solar.com with server...
+2025-10-04 00:14:40,529 - AuthHelper - INFO - Authentication successful. Token acquired.
+2025-10-04 00:14:40,529 - SolarSimulator - INFO - Authentication enabled: True
+2025-10-04 00:14:40,529 - AuthHelper - INFO - Authenticating user customer1@solar.com with server...
+2025-10-04 00:14:40,601 - AuthHelper - INFO - Authentication successful. Token acquired.
+2025-10-04 00:14:40,601 - EnergySimulator - INFO - Energy simulator initialized for installation 1
+2025-10-04 00:14:40,601 - HeartbeatSimulator - INFO - Heartbeat simulator initialized for installation 1, device RPi-INVERTER-01
+2025-10-04 00:14:40,601 - TamperSimulator - INFO - Tamper simulator initialized for installation 1
+2025-10-04 00:14:40,602 - CommandHandler - INFO - Loaded service state: {'status': 'ACTIVE', 'last_updated': '2025-04-28T17:38:00.874249', 'reason': 'Initial state', 'last_command_id': None}
+2025-10-04 00:14:40,602 - CommandHandler - INFO - Command handler initialized for installation 1 with service state: ACTIVE
+2025-10-04 00:14:40,602 - AuthHelper - INFO - Authenticating user customer1@solar.com with server...
+2025-10-04 00:14:40,672 - AuthHelper - INFO - Authentication successful. Token acquired.
+2025-10-04 00:14:40,672 - SolarSimulator - INFO - Authentication enabled: True
+2025-10-04 00:14:40,672 - AuthHelper - INFO - Authenticating user customer1@solar.com with server...
+2025-10-04 00:14:40,742 - AuthHelper - INFO - Authentication successful. Token acquired.
+2025-10-04 00:14:40,743 - EnergySimulator - INFO - Energy simulator initialized for installation 1
+2025-10-04 00:14:40,743 - HeartbeatSimulator - INFO - Heartbeat simulator initialized for installation 1, device RPi-INVERTER-01
+2025-10-04 00:14:40,743 - TamperSimulator - INFO - Tamper simulator initialized for installation 1
+2025-10-04 00:14:40,743 - CommandHandler - INFO - Loaded service state: {'status': 'ACTIVE', 'last_updated': '2025-04-28T17:38:00.874249', 'reason': 'Initial state', 'last_command_id': None}
+2025-10-04 00:14:40,743 - CommandHandler - INFO - Command handler initialized for installation 1 with service state: ACTIVE
+2025-10-04 00:14:40,743 - SolarSimulator - INFO - Starting simulation: Raspberry Pi Solar Installation Demo
+2025-10-04 00:14:40,743 - SolarSimulator - INFO - Installation ID: 1
+2025-10-04 00:14:40,743 - SolarSimulator - INFO - Server URL: http://localhost:8080
+2025-10-04 00:14:40,743 - EnergySimulator - INFO - Starting energy data simulation
+2025-10-04 00:14:40,743 - SolarSimulator - INFO - Energy simulation started
+2025-10-04 00:14:40,743 - HeartbeatSimulator - INFO - Starting heartbeat simulation
+2025-10-04 00:14:40,743 - SolarSimulator - INFO - Heartbeat simulation started
+2025-10-04 00:14:40,743 - TamperSimulator - INFO - Starting tamper event simulation
+2025-10-04 00:14:40,743 - SolarSimulator - INFO - Tamper simulation started
+2025-10-04 00:14:40,744 - CommandHandler - INFO - Starting command listener
+2025-10-04 00:14:40,744 - SolarSimulator - INFO - Command handler started
+2025-10-04 00:14:40,744 - SolarSimulator - INFO - Simulation running with 4 active components
+2025-10-04 00:15:25,773 - HeartbeatSimulator - INFO - Simulating error condition: E003 - Configuration file corrupted
+2025-10-04 00:16:55,814 - HeartbeatSimulator - INFO - Error condition E003 resolved
+2025-10-05 19:41:06,306 - SolarSimulator - INFO - No config file provided or file not found. Using default configuration
+2025-10-05 19:41:06,306 - SolarSimulator - INFO - Saved default configuration to default_config.json
+2025-10-05 19:41:06,306 - SolarSimulator - INFO - Loaded configuration: Solar Installation Simulator
+2025-10-05 19:41:06,306 - SolarSimulator - INFO - Authentication enabled: False
+2025-10-05 19:41:06,306 - EnergySimulator - INFO - Energy simulator initialized for installation SIM-6933
+2025-10-05 19:41:06,307 - HeartbeatSimulator - INFO - Heartbeat simulator initialized for installation SIM-6933, device INVERTER-1
+2025-10-05 19:41:06,307 - TamperSimulator - INFO - Tamper simulator initialized for installation SIM-6933
+2025-10-05 19:41:06,307 - CommandHandler - INFO - Command handler initialized for installation SIM-6933 with service state: ACTIVE
+2025-10-05 19:41:06,307 - SolarSimulator - INFO - Authentication enabled: False
+2025-10-05 19:41:06,307 - EnergySimulator - INFO - Energy simulator initialized for installation SIM-6933
+2025-10-05 19:41:06,307 - HeartbeatSimulator - INFO - Heartbeat simulator initialized for installation SIM-6933, device INVERTER-1
+2025-10-05 19:41:06,307 - TamperSimulator - INFO - Tamper simulator initialized for installation SIM-6933
+2025-10-05 19:41:06,307 - CommandHandler - INFO - Loaded service state: {'status': 'ACTIVE', 'last_updated': '2025-10-05T19:41:06.307062', 'reason': 'Initial state', 'last_command_id': None}
+2025-10-05 19:41:06,307 - CommandHandler - INFO - Command handler initialized for installation SIM-6933 with service state: ACTIVE
+2025-10-05 19:41:06,307 - SolarSimulator - INFO - Starting simulation: Solar Installation Simulator
+2025-10-05 19:41:06,307 - SolarSimulator - INFO - Installation ID: SIM-6933
+2025-10-05 19:41:06,307 - SolarSimulator - INFO - Server URL: http://localhost:8080
+2025-10-05 19:41:06,307 - EnergySimulator - INFO - Starting energy data simulation
+2025-10-05 19:41:06,307 - SolarSimulator - INFO - Energy simulation started
+2025-10-05 19:41:06,307 - HeartbeatSimulator - INFO - Starting heartbeat simulation
+2025-10-05 19:41:06,307 - SolarSimulator - INFO - Heartbeat simulation started
+2025-10-05 19:41:06,307 - TamperSimulator - INFO - Starting tamper event simulation
+2025-10-05 19:41:06,307 - SolarSimulator - INFO - Tamper simulation started
+2025-10-05 19:41:06,307 - CommandHandler - INFO - Starting command listener
+2025-10-05 19:41:06,308 - SolarSimulator - INFO - Command handler started
+2025-10-05 19:41:06,308 - SolarSimulator - INFO - Simulation running with 4 active components
+2025-10-05 19:41:06,317 - EnergySimulator - WARNING - Failed to send energy data: 401 - 
+2025-10-05 19:41:06,317 - HeartbeatSimulator - WARNING - Failed to send heartbeat for device INVERTER-1: 401 - 
+2025-10-05 19:41:06,318 - CommandHandler - WARNING - Failed to poll for commands: 401 - 
+2025-10-05 19:41:16,330 - EnergySimulator - WARNING - Failed to send energy data: 401 - 
+2025-10-05 19:41:16,331 - CommandHandler - WARNING - Failed to poll for commands: 401 - 
+2025-10-05 19:41:21,607 - SolarSimulator - INFO - Received signal 2, shutting down...
+2025-10-05 19:41:21,608 - SolarSimulator - INFO - Stopping simulation...
+2025-10-05 19:41:23,613 - SolarSimulator - WARNING - Thread EnergySimulator did not terminate gracefully
+2025-10-05 19:41:25,616 - SolarSimulator - WARNING - Thread HeartbeatSimulator did not terminate gracefully
+2025-10-05 19:41:26,336 - SolarSimulator - INFO - Simulation stopped
+2025-10-05 19:41:26,336 - SolarSimulator - WARNING - Simulation not running
+2025-10-05 19:41:42,936 - SolarSimulator - INFO - Loaded configuration from config.json
+2025-10-05 19:41:42,936 - SolarSimulator - INFO - Loaded configuration: Raspberry Pi Solar Installation Demo
+2025-10-05 19:41:42,936 - AuthHelper - INFO - Authenticating user customer1@solar.com with server...
+2025-10-05 19:41:43,011 - AuthHelper - INFO - Authentication successful. Token acquired.
+2025-10-05 19:41:43,011 - SolarSimulator - INFO - Authentication enabled: True
+2025-10-05 19:41:43,011 - AuthHelper - INFO - Authenticating user customer1@solar.com with server...
+2025-10-05 19:41:43,085 - AuthHelper - INFO - Authentication successful. Token acquired.
+2025-10-05 19:41:43,085 - EnergySimulator - INFO - Energy simulator initialized for installation 1
+2025-10-05 19:41:43,085 - HeartbeatSimulator - INFO - Heartbeat simulator initialized for installation 1, device RPi-INVERTER-01
+2025-10-05 19:41:43,085 - TamperSimulator - INFO - Tamper simulator initialized for installation 1
+2025-10-05 19:41:43,086 - CommandHandler - INFO - Loaded service state: {'status': 'ACTIVE', 'last_updated': '2025-04-28T17:38:00.874249', 'reason': 'Initial state', 'last_command_id': None}
+2025-10-05 19:41:43,086 - CommandHandler - INFO - Command handler initialized for installation 1 with service state: ACTIVE
+2025-10-05 19:41:43,086 - AuthHelper - INFO - Authenticating user customer1@solar.com with server...
+2025-10-05 19:41:43,165 - AuthHelper - INFO - Authentication successful. Token acquired.
+2025-10-05 19:41:43,166 - SolarSimulator - INFO - Authentication enabled: True
+2025-10-05 19:41:43,166 - AuthHelper - INFO - Authenticating user customer1@solar.com with server...
+2025-10-05 19:41:43,234 - AuthHelper - INFO - Authentication successful. Token acquired.
+2025-10-05 19:41:43,234 - EnergySimulator - INFO - Energy simulator initialized for installation 1
+2025-10-05 19:41:43,234 - HeartbeatSimulator - INFO - Heartbeat simulator initialized for installation 1, device RPi-INVERTER-01
+2025-10-05 19:41:43,234 - TamperSimulator - INFO - Tamper simulator initialized for installation 1
+2025-10-05 19:41:43,235 - CommandHandler - INFO - Loaded service state: {'status': 'ACTIVE', 'last_updated': '2025-04-28T17:38:00.874249', 'reason': 'Initial state', 'last_command_id': None}
+2025-10-05 19:41:43,235 - CommandHandler - INFO - Command handler initialized for installation 1 with service state: ACTIVE
+2025-10-05 19:41:43,235 - SolarSimulator - INFO - Starting simulation: Raspberry Pi Solar Installation Demo
+2025-10-05 19:41:43,235 - SolarSimulator - INFO - Installation ID: 1
+2025-10-05 19:41:43,235 - SolarSimulator - INFO - Server URL: http://localhost:8080
+2025-10-05 19:41:43,235 - EnergySimulator - INFO - Starting energy data simulation
+2025-10-05 19:41:43,235 - SolarSimulator - INFO - Energy simulation started
+2025-10-05 19:41:43,235 - HeartbeatSimulator - INFO - Starting heartbeat simulation
+2025-10-05 19:41:43,235 - SolarSimulator - INFO - Heartbeat simulation started
+2025-10-05 19:41:43,235 - TamperSimulator - INFO - Starting tamper event simulation
+2025-10-05 19:41:43,235 - SolarSimulator - INFO - Tamper simulation started
+2025-10-05 19:41:43,236 - CommandHandler - INFO - Starting command listener
+2025-10-05 19:41:43,236 - SolarSimulator - INFO - Command handler started
+2025-10-05 19:41:43,236 - SolarSimulator - INFO - Simulation running with 4 active components
+2025-10-05 19:47:58,619 - EnergySimulator - INFO - Weather changed from SUNNY to PARTLY_CLOUDY
+2025-10-05 19:51:28,485 - HeartbeatSimulator - INFO - Simulating error condition: E008 - Voltage sensor calibration error
+2025-10-05 19:52:58,526 - HeartbeatSimulator - INFO - Error condition E008 resolved
+2025-10-05 19:57:03,954 - TamperSimulator - INFO - Triggering voltage tamper event: {'voltageValue': 406.3293400746555, 'rawData': '{"timestamp": "2025-10-05T19:57:03.953958", "sensor": "voltmeter", "voltage": 406.3293400746555, "normalRange": {"min": 180, "max": 280}, "readingHistory": [418.3442392989256, 410.9407445222987, 393.866452106647, 424.39899473426783, 419.0772891007409], "sampleRate": "10Hz", "voltageThreshold": {"low": 180, "high": 280}, "powerMode": "grid", "unitOfMeasure": "V"}'}
+2025-10-05 19:57:03,994 - TamperSimulator - INFO - Successfully sent voltage tamper event. Response: {'id': 1, 'installationId': 1, 'installationLocation': '123 Main St, Anytown, USA', 'eventType': 'VOLTAGE_FLUCTUATION', 'timestamp': '2025-10-05T19:57:03.980105', 'severity': 'CRITICAL', 'description': 'Voltage fluctuation detected: 406.3293400746555 (threshold: 0.5, current: 406.3293400746555, previous: 0.0)', 'resolved': False, 'resolvedAt': None, 'resolvedBy': None, 'confidenceScore': 1.0, 'status': 'NEW'}
+2025-10-05 19:59:59,452 - EnergySimulator - INFO - Weather changed from PARTLY_CLOUDY to SUNNY
+2025-10-05 20:01:58,753 - HeartbeatSimulator - INFO - Simulating error condition: E009 - Current sensor reading out of range
+2025-10-05 20:03:28,825 - HeartbeatSimulator - INFO - Error condition E009 resolved
+2025-10-05 20:13:34,736 - TamperSimulator - INFO - Triggering physical tamper event: {'movementValue': 2.8380132888157417, 'rawData': '{"timestamp": "2025-10-05T20:13:34.735888", "sensor": "accelerometer", "x": 3.471370867576345, "y": 3.489964973559759, "z": 2.9683551516088125, "vectorMagnitude": 2.8380132888157417, "normalThreshold": 0.5, "sampleRate": "100Hz", "deviceOrientation": "vertical", "vibrationDuration": 2.6872877889337783}'}
+2025-10-05 20:13:34,765 - TamperSimulator - INFO - Successfully sent physical tamper event. Response: {'id': 2, 'installationId': 1, 'installationLocation': '123 Main St, Anytown, USA', 'eventType': 'PHYSICAL_MOVEMENT', 'timestamp': '2025-10-05T20:13:34.757364', 'severity': 'CRITICAL', 'description': 'Physical movement detected: 2.8380132888157417 (threshold: 0.75, previous: 0.0)', 'resolved': False, 'resolvedAt': None, 'resolvedBy': None, 'confidenceScore': 1.0, 'status': 'NEW'}
+2025-10-05 20:18:29,203 - HeartbeatSimulator - INFO - Simulating error condition: E006 - Real-time clock drift
+2025-10-05 20:19:59,231 - HeartbeatSimulator - INFO - Error condition E006 resolved
+2025-10-05 20:28:14,427 - HeartbeatSimulator - INFO - Simulating error condition: E010 - Internal fan failure
+2025-10-05 20:29:44,465 - HeartbeatSimulator - INFO - Error condition E010 resolved
+2025-10-05 20:29:45,513 - TamperSimulator - INFO - Triggering physical tamper event: {'movementValue': 9.631635362524447, 'rawData': '{"timestamp": "2025-10-05T20:29:45.513110", "sensor": "accelerometer", "x": 11.545109612753938, "y": 7.582049617924038, "z": 10.772057282450092, "vectorMagnitude": 9.631635362524447, "normalThreshold": 0.5, "sampleRate": "100Hz", "deviceOrientation": "vertical", "vibrationDuration": 1.9613565594666709}'}
+2025-10-05 20:29:45,523 - TamperSimulator - INFO - Successfully sent physical tamper event. Response: {'id': 3, 'installationId': 1, 'installationLocation': '123 Main St, Anytown, USA', 'eventType': 'PHYSICAL_MOVEMENT', 'timestamp': '2025-10-05T20:29:45.518765', 'severity': 'CRITICAL', 'description': 'Physical movement detected: 9.631635362524447 (threshold: 0.75, previous: 2.8380132888157417)', 'resolved': False, 'resolvedAt': None, 'resolvedBy': None, 'confidenceScore': 1.0, 'status': 'NEW'}
+2025-10-05 20:32:16,660 - EnergySimulator - INFO - Weather changed from SUNNY to PARTLY_CLOUDY
+2025-10-05 20:36:16,859 - EnergySimulator - INFO - Weather changed from PARTLY_CLOUDY to SUNNY

@@ -28,6 +28,7 @@ import {
 import { useToast } from "@/components/ui/use-toast"
 import { useAuth } from "@/components/auth-provider"
 import { customerApi } from "@/lib/api"
+import type { Customer, CustomerActivityLog, PaginatedResponse } from "@/lib/api/types"
 
 export default function CustomerActivityPage({ params }: { params: { id: string } }) {
   const { user } = useAuth()
@@ -36,8 +37,8 @@ export default function CustomerActivityPage({ params }: { params: { id: string 
   const customerId = params.id
 
   const [loading, setLoading] = useState(true)
-  const [customer, setCustomer] = useState<any>(null)
-  const [activityLogs, setActivityLogs] = useState([])
+  const [customer, setCustomer] = useState<Customer | null>(null)
+  const [activityLogs, setActivityLogs] = useState<CustomerActivityLog[]>([])
   const [searchTerm, setSearchTerm] = useState("")
   const [pagination, setPagination] = useState({
     currentPage: 0,
@@ -88,7 +89,7 @@ export default function CustomerActivityPage({ params }: { params: { id: string 
   }, [customerId, user, toast])
 
   // Handle page change
-  const handlePageChange = async (page) => {
+  const handlePageChange = async (page: number) => {
     try {
       setLoading(true)
       const logsResponse = await customerApi.getCustomerActivityLogs(customerId, page, pagination.pageSize)
@@ -118,7 +119,7 @@ export default function CustomerActivityPage({ params }: { params: { id: string 
 
   // Filter activity logs based on search term
   const filteredLogs = searchTerm
-    ? activityLogs.filter((log) =>
+    ? activityLogs.filter((log: CustomerActivityLog) =>
       log.activityType?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       log.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       log.details?.toLowerCase().includes(searchTerm.toLowerCase())
@@ -126,7 +127,7 @@ export default function CustomerActivityPage({ params }: { params: { id: string 
     : activityLogs
 
   // Get activity type badge variant
-  const getActivityBadgeVariant = (activityType) => {
+  const getActivityBadgeVariant = (activityType: string) => {
     switch (activityType) {
       case "SYSTEM_ACCESS":
         return "default"

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import React from "react"
 import {
@@ -27,7 +27,7 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb"
 import { toast } from "@/components/ui/use-toast"
-import { paymentComplianceApi } from "@/lib/api"
+import { paymentComplianceApi } from "@/lib/api/paymentCompliance"
 import { format } from "date-fns"
 
 interface PaymentParams {
@@ -36,16 +36,15 @@ interface PaymentParams {
 
 export default function LoanPaymentsPage({ params }: { params: PaymentParams }) {
   const router = useRouter()
-  const unwrappedParams = React.use(params)
-  const loanId = unwrappedParams.id
+  const loanId = params.id
   const [loan, setLoan] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [payments, setPayments] = useState<any[]>([])
   const [refreshing, setRefreshing] = useState(false)
   const [showOnlyPaid, setShowOnlyPaid] = useState(true)
 
-  // Function to fetch payments
-  const fetchPayments = async (installationId, timestamp) => {
+  // Function to fetch payments (memoized)
+  const fetchPayments = useCallback(async (installationId, timestamp) => {
     try {
       // First try direct payment history report approach
       // Create date range - use a wide range to get all payments
@@ -62,8 +61,7 @@ export default function LoanPaymentsPage({ params }: { params: PaymentParams }) 
       const paymentHistoryData = await paymentComplianceApi.getPaymentHistoryReport(
         installationId, 
         formattedStartDate,
-        formattedEndDate,
-        timestamp
+        formattedEndDate
       );
       
       if (paymentHistoryData && Array.isArray(paymentHistoryData) && paymentHistoryData.length > 0) {
@@ -93,7 +91,7 @@ export default function LoanPaymentsPage({ params }: { params: PaymentParams }) 
       }
       
       // Last resort: check if loan data itself has payments
-      const paymentPlanData = await paymentComplianceApi.getPaymentPlanReport(loanId, timestamp);
+      const paymentPlanData = await paymentComplianceApi.getPaymentPlanReport(loanId);
       if (paymentPlanData && paymentPlanData.payments && Array.isArray(paymentPlanData.payments) && paymentPlanData.payments.length > 0) {
         console.log("Found payments in payment plan data:", paymentPlanData.payments);
         return paymentPlanData.payments;
@@ -105,7 +103,7 @@ export default function LoanPaymentsPage({ params }: { params: PaymentParams }) 
       console.error("Error fetching payments:", error);
       return [];
     }
-  };
+  }, [loanId]);
 
   // Refresh function to force reload of payment data
   const refreshPaymentData = async () => {
@@ -135,7 +133,6 @@ export default function LoanPaymentsPage({ params }: { params: PaymentParams }) 
         toast({
           title: "No payments found",
           description: "Could not find any payment records",
-          variant: "warning",
         });
       }
     } catch (error) {
@@ -196,7 +193,7 @@ export default function LoanPaymentsPage({ params }: { params: PaymentParams }) 
     }
     
     fetchLoanPayments()
-  }, [loanId])
+  }, [loanId, fetchPayments])
 
   // Format status badge display
   const getStatusBadge = (status: string) => {
@@ -256,7 +253,7 @@ export default function LoanPaymentsPage({ params }: { params: PaymentParams }) 
           </BreadcrumbItem>
           <BreadcrumbSeparator />
           <BreadcrumbItem>
-            <BreadcrumbLink href={`/admin/loans/${unwrappedParams.id}`}>Loan #{unwrappedParams.id}</BreadcrumbLink>
+            <BreadcrumbLink href={`/admin/loans/${loanId}`}>Loan #{loanId}</BreadcrumbLink>
           </BreadcrumbItem>
           <BreadcrumbSeparator />
           <BreadcrumbItem>
@@ -269,7 +266,7 @@ export default function LoanPaymentsPage({ params }: { params: PaymentParams }) 
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Payment History</h1>
           <p className="text-muted-foreground">
-            {loan ? `Payments for ${loan.customerName || loan.name || `Loan #${unwrappedParams.id}`}` : "Manage payment history"}
+            {loan ? `Payments for ${loan.customerName || loan.name || `Loan #${loanId}`}` : "Manage payment history"}
           </p>
         </div>
 
@@ -284,11 +281,11 @@ export default function LoanPaymentsPage({ params }: { params: PaymentParams }) 
             {refreshing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />}
             Refresh
           </Button>
-          <Button onClick={() => router.push(`/admin/loans/${unwrappedParams.id}/payments/new`)}>
+          <Button onClick={() => router.push(`/admin/loans/${loanId}/payments/new`)}>
             <Plus className="mr-2 h-4 w-4" />
             Record Payment
           </Button>
-          <Button onClick={() => router.push(`/admin/loans/${unwrappedParams.id}`)}>
+          <Button onClick={() => router.push(`/admin/loans/${loanId}`)}>
             <ArrowLeft className="mr-2 h-4 w-4" />
             Back to Loan
           </Button>
@@ -347,7 +344,7 @@ export default function LoanPaymentsPage({ params }: { params: PaymentParams }) 
                     </Button>
                     <Button 
                       variant="outline" 
-                      onClick={() => router.push(`/admin/loans/${unwrappedParams.id}/payments/new`)}
+                      onClick={() => router.push(`/admin/loans/${loanId}/payments/new`)}
                     >
                       Record Payment
                     </Button>
@@ -383,7 +380,7 @@ export default function LoanPaymentsPage({ params }: { params: PaymentParams }) 
                       <Button 
                         variant="ghost" 
                         size="sm"
-                        onClick={() => router.push(`/admin/loans/${unwrappedParams.id}/payments/${payment.id}`)}
+                        onClick={() => router.push(`/admin/loans/${loanId}/payments/${payment.id}`)}
                       >
                         Details
                       </Button>

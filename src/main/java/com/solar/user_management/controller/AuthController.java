@@ -17,6 +17,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
@@ -31,6 +32,7 @@ public class AuthController {
 
     private final UserService userService;
     private final UserActivityLogService activityLogService;
+    // No token refresh injection; keep controller minimal
 
     @PostMapping("/login")
     @Operation(
@@ -185,5 +187,15 @@ public class AuthController {
             response.put("message", e.getMessage());
             return ResponseEntity.badRequest().body(response);
         }
+    }
+
+    // Removed /me and /refresh endpoints to restore prior behavior
+
+    @PostMapping("/logout")
+    @PreAuthorize("hasRole('CUSTOMER') or hasRole('ADMIN')")
+    public ResponseEntity<Map<String, String>> logout(HttpServletRequest request) {
+        // In a production system, you'd blacklist the token or invalidate the session
+        // For now, just return success - the frontend will remove the token
+        return ResponseEntity.ok(Map.of("message", "Logout successful"));
     }
 } 

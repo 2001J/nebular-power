@@ -1,0 +1,121 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  frontend:
+    name: Frontend Lint & Build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: solar_frontend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: solar_frontend/package-lock.json
+
+      - name: Install deps
+        run: npm ci
+
+      - name: Run unit tests with coverage
+        run: npm run test:coverage
+
+      - name: Upload coverage artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-coverage
+          path: |
+            solar_frontend/coverage
+
+      - name: Lint
+        run: npm run lint --if-present
+
+      - name: Build
+        env:
+          NEXT_TELEMETRY_DISABLED: 1
+          NODE_ENV: production
+        run: npm run build
+
+      - name: Archive .next
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: next-artifacts
+          path: |
+            solar_frontend/.next
+            solar_frontend/next.config.mjs
+            solar_frontend/package.json
+
+  backend:
+    name: Backend Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Cache Maven packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2
+          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+          restore-keys: ${{ runner.os }}-m2-
+
+      - name: Build with Maven
+        run: mvn -B -ntp -DskipTests package
+
+  summary:
+    name: CI Summary
+    needs: [frontend, backend]
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Frontend and Backend jobs finished. Review artifacts and logs."
+
+  frontend-e2e:
+    name: Frontend E2E (Playwright)
+    needs: frontend
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: solar_frontend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: solar_frontend/package-lock.json
+
+      - name: Install deps
+        run: npm ci || npm install
+
+      - name: Build Next app
+        env:
+          NEXT_TELEMETRY_DISABLED: 1
+          NODE_ENV: production
+        run: npm run build
+
+      - name: Install Playwright Browsers
+        run: npx playwright install --with-deps || npx --yes playwright@latest install --with-deps
+
+      - name: Run Playwright tests
+        run: npx playwright test

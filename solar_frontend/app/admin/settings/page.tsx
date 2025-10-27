@@ -44,7 +44,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { useToast } from "@/components/ui/use-toast"
-import { settingsApi } from "@/lib/api"
+import { settingsApi } from "@/lib/api/settings"
 
 export default function SettingsPage() {
   const { toast } = useToast()
@@ -106,11 +106,11 @@ export default function SettingsPage() {
         if (settings) {
           // Update general settings
           if (settings.general) {
-            setCompanyName(settings.general.companyName || companyName)
-            setAdminEmail(settings.general.adminEmail || adminEmail)
-            setSupportEmail(settings.general.supportEmail || supportEmail)
-            setTimeZone(settings.general.timeZone || timeZone)
-            setDateFormat(settings.general.dateFormat || dateFormat)
+            setCompanyName(prev => settings.general.companyName || prev)
+            setAdminEmail(prev => settings.general.adminEmail || prev)
+            setSupportEmail(prev => settings.general.supportEmail || prev)
+            setTimeZone(prev => settings.general.timeZone || prev)
+            setDateFormat(prev => settings.general.dateFormat || prev)
           }
 
           // Add other settings categories here
@@ -128,7 +128,7 @@ export default function SettingsPage() {
     }
 
     fetchSettings()
-  }, [])
+  }, [toast])
 
   // Handle settings save
   const handleSaveSettings = async () => {

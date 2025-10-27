@@ -68,6 +68,7 @@ This document outlines the minimum and recommended system requirements for runni
 
 ### Mobile Application
 
+Note: A native mobile app is not part of this repository. If you plan to build one, typical minimums are:
 - **iOS**: Version 14.0 or newer
 - **Android**: Version 10.0 or newer
 - **Internet Connection**: Required for real-time data

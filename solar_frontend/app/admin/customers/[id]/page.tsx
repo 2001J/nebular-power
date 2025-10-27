@@ -37,20 +37,20 @@ import {
 } from "@/components/ui/dialog"
 import { useToast } from "@/components/ui/use-toast"
 import { useAuth } from "@/components/auth-provider"
-import { customerApi, installationApi } from "@/lib/api"
+import { customerApi } from "@/lib/api/customers"
+import { installationApi } from "@/lib/api/installations"
 
 export default function CustomerDetailsPage({ params }: { params: { id: string } }) {
   const { user } = useAuth()
   const { toast } = useToast()
   const router = useRouter()
-  const unwrappedParams = React.use(params)
-  const customerId = unwrappedParams.id
+  const customerId = params.id
 
   const [loading, setLoading] = useState(true)
   const [customer, setCustomer] = useState<any>(null)
   const [showConfirmDialog, setShowConfirmDialog] = useState(false)
   const [confirmAction, setConfirmAction] = useState({ type: "", description: "" })
-  const [installations, setInstallations] = useState([])
+  const [installations, setInstallations] = useState<any[]>([])
   const [loadingInstallations, setLoadingInstallations] = useState(false)
 
   // Fetch customer data
@@ -94,13 +94,13 @@ export default function CustomerDetailsPage({ params }: { params: { id: string }
   }, [customerId, user, toast])
 
   // Format date 
-  const formatDate = (dateString) => {
+  const formatDate = (dateString?: string | null) => {
     if (!dateString) return "N/A"
     return new Date(dateString).toLocaleString()
   }
 
   // Get status icon
-  const getStatusIcon = (status) => {
+  const getStatusIcon = (status: string) => {
     switch (status) {
       case "ACTIVE":
         return <CheckCircle className="h-5 w-5 text-green-500" />
@@ -116,7 +116,7 @@ export default function CustomerDetailsPage({ params }: { params: { id: string }
   }
 
   // Open confirm dialog
-  const openConfirmDialog = (type) => {
+  const openConfirmDialog = (type: string) => {
     let title = ""
     let description = ""
 
@@ -174,7 +174,7 @@ export default function CustomerDetailsPage({ params }: { params: { id: string }
       toast({
         variant: "destructive",
         title: "Error",
-        description: error.response?.data?.message || "Failed to perform action. Please try again.",
+        description: (error as any)?.response?.data?.message || "Failed to perform action. Please try again.",
       })
     } finally {
       setLoading(false)

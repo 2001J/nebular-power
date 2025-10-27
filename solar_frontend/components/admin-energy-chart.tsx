@@ -2,8 +2,9 @@
 
 import { useEffect, useState, useRef } from "react"
 import { Chart, ChartContainer } from "@/components/ui/chart"
-import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, XAxis, YAxis, Tooltip, Line, LineChart } from "recharts"
-import { energyApi } from "@/lib/api"
+import { BarChart3 } from "lucide-react"
+import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, XAxis, YAxis, Tooltip, Line, LineChart } from "@/components/ui/direct-recharts"
+import { energyApi } from "@/lib/api/energy"
 import { energyWebSocket } from "@/lib/energyWebSocket"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -323,7 +324,7 @@ export function AdminEnergyChart({ type = "production" }: AdminEnergyChartProps)
                 </tr>
               </thead>
               <tbody>
-                {systemOverview.recentlyActiveInstallations.map((installation) => (
+                {systemOverview.recentlyActiveInstallations.map((installation: any) => (
                   <tr key={installation.id} className="border-b hover:bg-muted/50">
                     <td className="py-2 px-3">{installation.name}</td>
                     <td className="py-2 px-3">{installation.username}</td>

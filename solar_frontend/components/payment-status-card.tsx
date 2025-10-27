@@ -7,15 +7,51 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { CircleDollarSign, AlertCircle, ArrowRight, CalendarClock, Percent, Bell } from "lucide-react";
-import { paymentApi, paymentComplianceApi } from "@/lib/api";
+import { paymentApi } from "@/lib/api/payments";
+import { paymentComplianceApi } from "@/lib/api/paymentCompliance";
 import { Progress } from "@/components/ui/progress";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
-export default function PaymentStatusCard({ userId, installationId, isLarge = false }) {
-  const [loading, setLoading] = useState(true);
-  const [paymentData, setPaymentData] = useState(null);
-  const [error, setError] = useState(null);
+type Props = {
+  userId?: string;
+  installationId?: string | number;
+  isLarge?: boolean;
+}
+
+type PaymentItem = {
+  id?: string;
+  dueDate: string;
+  amount: number | string;
+  status?: string;
+  daysOverdue?: number;
+}
+
+type PaymentPlanInfo = {
+  id: string;
+  installationId?: string | number | null;
+  totalAmount?: number | string;
+  remainingAmount?: number | string;
+  monthlyPayment?: number | string;
+  installmentAmount?: number | string;
+  frequency?: string;
+  endDate?: string | null;
+  interestRate?: number | string;
+  name?: string;
+  description?: string;
+}
+
+type PaymentState = {
+  nextPayment: PaymentItem | null;
+  paymentPlan: PaymentPlanInfo | null;
+  upcomingPayments: PaymentItem[];
+  dashboardData: any;
+}
+
+export default function PaymentStatusCard({ userId, installationId, isLarge = false }: Props) {
+  const [loading, setLoading] = useState<boolean>(true);
+  const [paymentData, setPaymentData] = useState<PaymentState | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -35,7 +71,7 @@ export default function PaymentStatusCard({ userId, installationId, isLarge = fa
         // try to fetch the plan directly
         if (!activePlan && dashboardData?.paymentPlanId) {
           try {
-            activePlan = await paymentComplianceApi.getPaymentPlan(dashboardData.paymentPlanId);
+            activePlan = await paymentComplianceApi.getPaymentPlanById(dashboardData.paymentPlanId);
             console.log("Fetched payment plan:", activePlan);
           } catch (err) {
             console.error("Error fetching payment plan:", err);
@@ -96,7 +132,7 @@ export default function PaymentStatusCard({ userId, installationId, isLarge = fa
     fetchPaymentData();
   }, [userId, installationId]);
 
-  const getStatusBadge = (status) => {
+  const getStatusBadge = (status?: string) => {
     if (!status) return null;
     
     switch (status.toUpperCase()) {
@@ -120,11 +156,11 @@ export default function PaymentStatusCard({ userId, installationId, isLarge = fa
   };
 
   // Calculate days until next payment
-  const getDaysUntilPayment = (dueDate) => {
+  const getDaysUntilPayment = (dueDate?: string) => {
     if (!dueDate) return null;
     const today = new Date();
     const due = new Date(dueDate);
-    const diffTime = due - today;
+    const diffTime = due.getTime() - today.getTime();
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     return diffDays;
   };
@@ -172,15 +208,19 @@ export default function PaymentStatusCard({ userId, installationId, isLarge = fa
     );
   }
 
-  const { nextPayment, paymentPlan, upcomingPayments } = paymentData;
+  const { nextPayment, paymentPlan, upcomingPayments } = (paymentData as PaymentState);
 
   // Calculate loan progress
-  const loanProgress = paymentPlan ? 
-    ((paymentPlan.totalAmount - paymentPlan.remainingAmount) / paymentPlan.totalAmount) * 100 : 0;
+  const loanProgress = paymentPlan ? (() => {
+    const total = Number(paymentPlan.totalAmount ?? 0);
+    const remaining = Number(paymentPlan.remainingAmount ?? 0);
+    if (!total) return 0;
+    return ((total - remaining) / total) * 100;
+  })() : 0;
   
   // Check if there are any overdue payments
-  const hasOverduePayments = upcomingPayments?.some(payment => 
-    payment.status?.toUpperCase() === "OVERDUE" || payment.daysOverdue > 0
+  const hasOverduePayments = upcomingPayments?.some((payment) =>
+    payment.status?.toUpperCase() === "OVERDUE" || (payment.daysOverdue ?? 0) > 0
   );
 
   const daysUntilNextPayment = nextPayment ? getDaysUntilPayment(nextPayment.dueDate) : null;
@@ -249,10 +289,10 @@ export default function PaymentStatusCard({ userId, installationId, isLarge = fa
                 />
                 <div className="flex justify-between text-slate-500">
                   <span className={isLarge ? "text-sm" : "text-xs"}>
-                    Paid: {formatCurrency(paymentPlan.totalAmount - paymentPlan.remainingAmount)}
+                    Paid: {formatCurrency(Number(paymentPlan.totalAmount ?? 0) - Number(paymentPlan.remainingAmount ?? 0))}
                   </span>
                   <span className={isLarge ? "text-sm" : "text-xs"}>
-                    Total: {formatCurrency(paymentPlan.totalAmount)}
+                    Total: {formatCurrency(Number(paymentPlan.totalAmount ?? 0))}
                   </span>
                 </div>
               </div>
@@ -282,13 +322,13 @@ export default function PaymentStatusCard({ userId, installationId, isLarge = fa
                 </span>
               </div>
               
-              {paymentPlan.interestRate > 0 && (
+              {Number(paymentPlan.interestRate ?? 0) > 0 && (
                 <div className="flex justify-between items-center">
                   <span className={cn("text-slate-500", isLarge ? "text-base" : "text-sm")}>Interest Rate:</span>
                   <div className="flex items-center gap-1.5">
                     <Percent className={cn("text-slate-400", isLarge ? "h-4 w-4" : "h-3.5 w-3.5")} />
                     <span className={cn("font-medium text-slate-800", isLarge ? "text-base" : "")}>
-                      {paymentPlan.interestRate}%
+                      {Number(paymentPlan.interestRate ?? 0)}%
                     </span>
                   </div>
                 </div>

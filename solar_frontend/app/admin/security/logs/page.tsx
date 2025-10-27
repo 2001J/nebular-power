@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import React, { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { format, parseISO, subDays } from "date-fns"
 import {
@@ -59,16 +59,18 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb"
 import { DatePickerWithRange } from "@/components/ui/date-range-picker"
+import { DateRange } from "react-day-picker"
 import { toast } from "@/components/ui/use-toast"
-import { securityApi, installationApi } from "@/lib/api"
+import { securityApi } from "@/lib/api/security"
+import { installationApi } from "@/lib/api/installations"
 
 export default function SecurityLogsPage() {
   const router = useRouter()
   const [loading, setLoading] = useState(true)
-  const [logs, setLogs] = useState([])
-  const [filteredLogs, setFilteredLogs] = useState([])
-  const [installations, setInstallations] = useState([])
-  const [dateRange, setDateRange] = useState({
+  const [logs, setLogs] = useState<any[]>([])
+  const [filteredLogs, setFilteredLogs] = useState<any[]>([])
+  const [installations, setInstallations] = useState<any[]>([])
+  const [dateRange, setDateRange] = useState<DateRange | undefined>({
     from: subDays(new Date(), 7),
     to: new Date(),
   })
@@ -78,6 +80,68 @@ export default function SecurityLogsPage() {
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [activeTab, setActiveTab] = useState("all-logs")
   const [exportFormat, setExportFormat] = useState("csv")
+
+  // Get installation name by ID (memoized)
+  const getInstallationName = React.useCallback((installationId: string) => {
+    const inst = installations.find(i => i.id === installationId)
+    return inst ? (inst.name || `Installation #${installationId}`) : `Installation #${installationId}`
+  }, [installations])
+
+  // Generate mock logs for fallback (memoized)
+  const generateMockLogs = React.useCallback((count: number) => {
+    const activityTypes = ["LOGIN", "CONFIGURATION_CHANGE", "MONITORING_START", "MONITORING_STOP",
+      "SENSITIVITY_CHANGE", "ALERT_ACKNOWLEDGED", "ALERT_RESOLVED", "SYSTEM_DIAGNOSTIC"]
+    const users = ["admin", "system", "technician", "operator"]
+    const mockLogs: any[] = []
+
+    for (let i = 0; i < count; i++) {
+      const randomInstallation = installations.length > 0
+        ? installations[Math.floor(Math.random() * installations.length)]
+        : { id: `INST-${i + 100}`, name: `Demo Installation ${i + 1}` }
+
+      mockLogs.push({
+        id: `LOG-${Date.now()}-${i}`,
+        timestamp: new Date(Date.now() - Math.floor(Math.random() * 7 * 24 * 60 * 60 * 1000)).toISOString(),
+        activityType: activityTypes[Math.floor(Math.random() * activityTypes.length)],
+        description: `Mock security log entry for demonstration purposes.`,
+        username: users[Math.floor(Math.random() * users.length)],
+        installationId: randomInstallation.id,
+        installationName: randomInstallation.name,
+        details: JSON.stringify({ source: "mock_data", success: true })
+      })
+    }
+
+    return mockLogs
+  }, [installations])
+
+  // Apply filters to logs (memoized)
+  const applyFilters = React.useCallback((logsData: any[] = logs) => {
+    const filtered = logsData.filter((log: any) => {
+      // Activity type filter
+      if (activityType !== "all" && log.activityType !== activityType) return false
+
+      // Installation filter (if on a tab where this applies)
+      if (activeTab === "by-installation" && installation !== "all" && log.installationId !== installation) return false
+
+      // Search term filter
+      if (searchTerm && searchTerm.length > 0) {
+        const searchLower = searchTerm.toLowerCase()
+        const matchesDescription = log.description?.toLowerCase().includes(searchLower)
+        const matchesUsername = log.username?.toLowerCase().includes(searchLower)
+        const matchesInstallation = getInstallationName(log.installationId)?.toLowerCase().includes(searchLower)
+        const matchesActivity = log.activityType?.toLowerCase().includes(searchLower)
+
+        if (!matchesDescription && !matchesUsername && !matchesInstallation && !matchesActivity) return false
+      }
+
+      return true
+    })
+
+    // Sort by timestamp, newest first
+    filtered.sort((a: any, b: any) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+
+    setFilteredLogs(filtered)
+  }, [logs, activityType, activeTab, installation, searchTerm, getInstallationName])
 
   // Fetch security logs
   useEffect(() => {
@@ -90,9 +154,9 @@ export default function SecurityLogsPage() {
         setInstallations(installationsData.content || [])
 
         // Fetch security logs based on selected tab and filters
-        let logsData = []
-        const startDate = dateRange.from ? dateRange.from.toISOString() : undefined
-        const endDate = dateRange.to ? dateRange.to.toISOString() : undefined
+        let logsData: any[] = []
+        const startDate = dateRange?.from ? dateRange.from.toISOString() : undefined
+        const endDate = dateRange?.to ? dateRange.to.toISOString() : undefined
 
         switch (activeTab) {
           case "all-logs":
@@ -235,9 +299,10 @@ export default function SecurityLogsPage() {
     }
 
     fetchSecurityLogs()
-  }, [dateRange, activityType, installation, activeTab, isRefreshing])
+  }, [dateRange, activityType, installation, activeTab, isRefreshing, applyFilters, generateMockLogs, installations.length])
 
-  // Generate mock logs for fallback
+  /*
+  // Generate mock logs for fallback (moved up and memoized)
   const generateMockLogs = (count) => {
     const activityTypes = ["LOGIN", "CONFIGURATION_CHANGE", "MONITORING_START", "MONITORING_STOP",
       "SENSITIVITY_CHANGE", "ALERT_ACKNOWLEDGED", "ALERT_RESOLVED", "SYSTEM_DIAGNOSTIC"]
@@ -263,8 +328,10 @@ export default function SecurityLogsPage() {
 
     return mockLogs
   }
+  */
 
-  // Apply filters to logs
+  /*
+  // Apply filters to logs (moved up and memoized)
   const applyFilters = (logsData = logs) => {
     const filtered = logsData.filter(log => {
       // Activity type filter
@@ -292,22 +359,25 @@ export default function SecurityLogsPage() {
 
     setFilteredLogs(filtered)
   }
+  */
 
   // Apply filters when filter values change
   useEffect(() => {
     applyFilters()
-  }, [searchTerm])
+  }, [searchTerm, applyFilters])
 
   // Refresh data
   const refreshData = () => {
     setIsRefreshing(true)
   }
 
-  // Get installation name by ID
+  /*
+  // Get installation name by ID (moved up and memoized)
   const getInstallationName = (installationId) => {
     const installation = installations.find(i => i.id === installationId)
     return installation ? (installation.name || `Installation #${installationId}`) : `Installation #${installationId}`
   }
+  */
 
   // Format date
   const formatDate = (dateString) => {

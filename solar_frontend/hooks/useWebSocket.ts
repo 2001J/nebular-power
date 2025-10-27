@@ -77,16 +77,19 @@ export function useWebSocket(url: string, options: UseWebSocketOptions = {}) {
     }
   }, [url, onOpen, onClose, onMessage, onError, reconnectOnClose, reconnectInterval, maxReconnectAttempts, reconnectAttempts]);
 
-  // Connect on mount, disconnect on unmount
+  // Connect on mount
   useEffect(() => {
     connect();
+  }, [connect]);
 
+  // Disconnect when socket changes or on unmount
+  useEffect(() => {
     return () => {
       if (socket && socket.readyState === WebSocket.OPEN) {
         socket.close();
       }
     };
-  }, [connect]);
+  }, [socket]);
 
   // Send data through the WebSocket
   const send = useCallback((data: string | object) => {

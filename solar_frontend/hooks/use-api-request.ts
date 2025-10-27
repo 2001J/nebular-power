@@ -1,7 +1,7 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import { toast } from '@/components/ui/use-toast';
 import { AxiosError, AxiosRequestConfig, AxiosResponse } from 'axios';
-import apiClient from '@/lib/api';
+import { apiClient } from '@/lib/api/client';
 
 interface ApiRequestState<T> {
   data: T | null;
@@ -48,13 +48,13 @@ export function useApiRequest<T = any>(
     () => void
   ] {
   // Merge options with defaults
-  const mergedOptions = { ...defaultOptions, ...options };
+  const mergedOptions = useMemo(() => ({ ...defaultOptions, ...options }), [options]);
 
   // Initialize state
   const [state, setState] = useState<ApiRequestState<T>>({
     data: null,
     error: null,
-    isLoading: mergedOptions.executeOnMount,
+    isLoading: !!mergedOptions.executeOnMount,
     isSuccess: false,
     isError: false,
   });
@@ -171,7 +171,7 @@ export function useApiRequest<T = any>(
             !axiosError.code?.includes('ERR_NETWORK') &&
             !axiosError.message?.includes('Network Error')) {
             const status = axiosError.response?.status;
-            const errorMessage = axiosError.response?.data?.message || axiosError.message || 'An error occurred';
+            const errorMessage = (axiosError.response?.data as any)?.message || axiosError.message || 'An error occurred';
 
             toast({
               title: status ? `Error (${status})` : "Error",

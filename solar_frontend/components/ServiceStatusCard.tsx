@@ -2,7 +2,7 @@ import React from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
-import { serviceApi } from '@/lib/api';
+import { serviceApi } from '@/lib/api/service';
 import { toast } from 'sonner';
 import { Play, Square, RotateCcw, Clock } from 'lucide-react';
 

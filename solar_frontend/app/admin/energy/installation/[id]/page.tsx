@@ -6,7 +6,8 @@ import { Card } from "@/components/ui/card"
 
 export default function InstallationRedirectPage() {
   const router = useRouter()
-  const { id } = useParams()
+  const params = useParams<{ id: string }>()
+  const id = params?.id ?? ""
 
   useEffect(() => {
     // Redirect to the correct installation detail page

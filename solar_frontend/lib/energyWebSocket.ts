@@ -57,11 +57,11 @@ const createStompClient = (onConnect?: () => void, onDisconnect?: () => void) =>
       console.log('SockJS transport connection opened');
     };
     
-    socket.onerror = (error) => {
+    socket.onerror = (error: any) => {
       console.error('SockJS transport error:', error);
     };
     
-    socket.onclose = (event) => {
+    socket.onclose = (event: any) => {
       console.log(`SockJS transport closed with code ${event.code}, reason: ${event.reason}`);
     };
     

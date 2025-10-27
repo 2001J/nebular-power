@@ -29,7 +29,7 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb"
 import { toast } from "@/components/ui/use-toast"
-import { paymentComplianceApi } from "@/lib/api"
+import { paymentComplianceApi } from "@/lib/api/paymentCompliance"
 import { format } from "date-fns"
 
 // Interface for the payment plan DTO
@@ -77,8 +77,7 @@ interface LoanParams {
 
 export default function LoanDetailsPage({ params }: { params: LoanParams }) {
   const router = useRouter()
-  const unwrappedParams = React.use(params)
-  const loanId = unwrappedParams.id
+  const loanId = params.id
   const [loan, setLoan] = useState<PaymentPlan | null>(null)
   const [loading, setLoading] = useState(true)
   const [payments, setPayments] = useState<Payment[]>([])
@@ -93,7 +92,7 @@ export default function LoanDetailsPage({ params }: { params: LoanParams }) {
         // First try to get active payment plans that match this ID
         try {
           // Try to get both active and completed payment plans
-          const allPlans = [];
+          const allPlans: any[] = [];
           
           // Fetch active plans
           const activePlans = await paymentComplianceApi.getPaymentPlansByStatusReport("ACTIVE");
@@ -109,7 +108,7 @@ export default function LoanDetailsPage({ params }: { params: LoanParams }) {
           
           // Find the plan that matches our ID among all plans
           if (allPlans.length > 0) {
-            const matchingPlan = allPlans.find(plan => plan.id === parseInt(loanId));
+            const matchingPlan = allPlans.find((plan: any) => plan.id === parseInt(loanId));
             if (matchingPlan) {
               console.log("Found matching plan:", matchingPlan);
               
@@ -125,10 +124,10 @@ export default function LoanDetailsPage({ params }: { params: LoanParams }) {
               // and retain customer information
               try {
                 // Try to fetch payments separately
-                await fetchPaymentsForLoan(matchingPlan.id, matchingPlan.installationId);
+                const fetchedPayments = await fetchPaymentsForLoan(matchingPlan.id, matchingPlan.installationId);
                 
                 // Now that we have payments, determine the correct status
-                const correctStatus = determineLoanStatus(enhancedPlan, payments);
+                const correctStatus = determineLoanStatus(enhancedPlan, fetchedPayments);
                 
                 // Apply further customer info enhancements and set next payment date
                 const fullyEnhancedPlan = enhanceCustomerInfo(
@@ -137,10 +136,10 @@ export default function LoanDetailsPage({ params }: { params: LoanParams }) {
                     status: correctStatus,
                     nextPaymentDate: determineNextPaymentDate(
                       { ...enhancedPlan, status: correctStatus },
-                      payments
+                      fetchedPayments
                     )
                   }, 
-                  payments
+                  fetchedPayments
                 );
                 
                 setLoan(fullyEnhancedPlan);
@@ -164,7 +163,7 @@ export default function LoanDetailsPage({ params }: { params: LoanParams }) {
           // Handle different response formats
           if (Array.isArray(paymentData) && paymentData.length > 0) {
             // If paymentData is an array, we'll identify loan info from the first payment
-            const firstPayment = paymentData[0];
+            const firstPayment: any = paymentData[0];
             if (firstPayment.paymentPlan) {
               // Extract payment plan info from the first payment and enhance it
               const enhancedPlan = {
@@ -177,7 +176,7 @@ export default function LoanDetailsPage({ params }: { params: LoanParams }) {
               };
 
               // Determine correct status and enhance customer info
-              const correctStatus = determineLoanStatus(enhancedPlan, paymentData);
+              const correctStatus = determineLoanStatus(enhancedPlan as any, paymentData as any[]);
               const fullyEnhancedPlan = enhanceCustomerInfo(
                 { 
                   ...enhancedPlan, 
@@ -187,37 +186,17 @@ export default function LoanDetailsPage({ params }: { params: LoanParams }) {
                     paymentData
                   )
                 }, 
-                paymentData
+                paymentData as any[]
               );
               
               setLoan(fullyEnhancedPlan);
-              setPayments(paymentData);
+              setPayments(paymentData as any[]);
             } else {
               // Just set payments - we'll need to fetch loan info separately
               setPayments(paymentData);
               
               // Try to get loan details from a different endpoint
-              try {
-                if (firstPayment.installationId) {
-                  const loanDetails = await paymentComplianceApi.getCustomerPaymentPlans(firstPayment.installationId);
-                  if (loanDetails && Array.isArray(loanDetails) && loanDetails.length > 0) {
-                    // Find the matching plan
-                    const matchingPlan = loanDetails.find(plan => plan.id === parseInt(loanId));
-                    if (matchingPlan) {
-                      // Enhance the plan data with derived fields
-                      const enhancedPlan = {
-                        ...matchingPlan,
-                        status: matchingPlan.status || 'ACTIVE',
-                        nextPaymentDate: matchingPlan.nextPaymentDate || getNextUnpaidDueDate(paymentData) || getNextPaymentDate(matchingPlan),
-                        createdAt: matchingPlan.createdAt || matchingPlan.startDate
-                      };
-                      setLoan(enhancedPlan);
-                    }
-                  }
-                }
-              } catch (loanError) {
-                console.error("Error fetching loan details:", loanError);
-              }
+              // Fallback path intentionally skipped (no alternate endpoint available)
             }
           } else if (paymentData.payments && Array.isArray(paymentData.payments)) {
             // If paymentData has a payments array inside it, enhance it with derived fields
@@ -246,8 +225,8 @@ export default function LoanDetailsPage({ params }: { params: LoanParams }) {
             setPayments(paymentData.payments);
           } else {
             // If paymentData is the loan object itself, enhance it with derived fields
-            const enhancedPlan = {
-              ...paymentData,
+            const enhancedPlan: any = {
+              ...(paymentData as any),
               status: paymentData.status || 'ACTIVE',
               nextPaymentDate: paymentData.nextPaymentDate || getNextPaymentDate(paymentData),
               createdAt: paymentData.createdAt || paymentData.startDate
@@ -255,40 +234,40 @@ export default function LoanDetailsPage({ params }: { params: LoanParams }) {
             
             // Try to fetch payments separately if they're not included
             if (!paymentData.payments || paymentData.payments.length === 0) {
-              await fetchPaymentsForLoan(paymentData.id, paymentData.installationId);
+              const fetchedPayments = await fetchPaymentsForLoan(paymentData.id, paymentData.installationId);
               
               // Now determine the correct status with the fetched payments
-              const correctStatus = determineLoanStatus(enhancedPlan, payments);
+              const correctStatus = determineLoanStatus(enhancedPlan as any, fetchedPayments as any[]);
               const fullyEnhancedPlan = enhanceCustomerInfo(
                 { 
                   ...enhancedPlan, 
                   status: correctStatus,
                   nextPaymentDate: determineNextPaymentDate(
                     { ...enhancedPlan, status: correctStatus },
-                    payments
+                    fetchedPayments as any[]
                   )
                 }, 
-                payments
+                fetchedPayments as any[]
               );
               
               setLoan(fullyEnhancedPlan);
             } else {
               // Determine correct status and enhance customer info
-              const correctStatus = determineLoanStatus(enhancedPlan, paymentData.payments);
+              const correctStatus = determineLoanStatus(enhancedPlan as any, paymentData.payments as any[]);
               const fullyEnhancedPlan = enhanceCustomerInfo(
                 { 
                   ...enhancedPlan, 
                   status: correctStatus,
                   nextPaymentDate: determineNextPaymentDate(
                     { ...enhancedPlan, status: correctStatus },
-                    paymentData.payments
+                    paymentData.payments as any[]
                   )
                 }, 
-                paymentData.payments
+                paymentData.payments as any[]
               );
               
               setLoan(fullyEnhancedPlan);
-              setPayments(paymentData.payments);
+              setPayments(paymentData.payments as any[]);
               setLoadingPayments(false);
             }
           }
@@ -333,8 +312,7 @@ export default function LoanDetailsPage({ params }: { params: LoanParams }) {
           const paymentHistoryData = await paymentComplianceApi.getPaymentHistoryReport(
             installationId, 
             formattedStartDate,
-            formattedEndDate,
-            timestamp
+            formattedEndDate
           );
           
           if (paymentHistoryData && Array.isArray(paymentHistoryData) && paymentHistoryData.length > 0) {
@@ -346,7 +324,7 @@ export default function LoanDetailsPage({ params }: { params: LoanParams }) {
             if (filteredPayments.length > 0) {
               setPayments(filteredPayments);
               setLoadingPayments(false);
-              return;
+              return filteredPayments;
             }
           }
           
@@ -361,21 +339,24 @@ export default function LoanDetailsPage({ params }: { params: LoanParams }) {
             if (filteredPayments.length > 0) {
               setPayments(filteredPayments);
               setLoadingPayments(false);
-              return;
+              return filteredPayments;
             }
           }
         }
         
         // Last resort: try payment plan report directly
-        const planPayments = await paymentComplianceApi.getPaymentPlanReport(loanId, new Date().getTime());
+        const planPayments = await paymentComplianceApi.getPaymentPlanReport(loanId);
         if (planPayments && planPayments.payments && planPayments.payments.length > 0) {
           setPayments(planPayments.payments);
+          return planPayments.payments;
         } else {
           console.log("No payments found for this loan through any method");
           setPayments([]);
+          return [];
         }
       } catch (paymentsError) {
         console.error("Error fetching payments:", paymentsError);
+        return [];
       } finally {
         setLoadingPayments(false);
       }
@@ -437,7 +418,7 @@ export default function LoanDetailsPage({ params }: { params: LoanParams }) {
           (payment.status === 'SCHEDULED' || payment.status === 'PENDING') && 
           new Date(payment.dueDate) > today
         )
-        .sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate));
+        .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
       
       return unpaidFuturePayments.length > 0 ? unpaidFuturePayments[0].dueDate : null;
     };
@@ -588,23 +569,22 @@ export default function LoanDetailsPage({ params }: { params: LoanParams }) {
 
   // Calculate progress percentage
   const getProgressPercentage = () => {
+    const total = Number(loan?.totalAmount ?? 0)
+    const remaining = Number(loan?.remainingAmount ?? 0)
     if (!loan) return 0
-    
-    // Handle edge case to avoid division by zero
-    if (loan.totalAmount === 0) return 100;
-    
-    return 100 - Math.round((loan.remainingAmount / loan.totalAmount) * 100)
+    if (total === 0) return 100
+    return 100 - Math.round((remaining / total) * 100)
   }
 
   // Determine what field to use to show the total installments
   // If we have the numberOfPayments field, use that as it matches the actual number
   // Otherwise fall back to totalInstallments with adjustment
   const getActualInstallmentCount = () => {
-    if (loan.numberOfPayments) {
-      return loan.numberOfPayments;
-    } else if (loan.totalInstallments && loan.totalInstallments > 0) {
+    if (loanData.numberOfPayments) {
+      return loanData.numberOfPayments;
+    } else if (loanData.totalInstallments && loanData.totalInstallments > 0) {
       // If showing totalInstallments which includes registration payment, subtract 1
-      return loan.totalInstallments > 1 ? loan.totalInstallments - 1 : loan.totalInstallments;
+      return loanData.totalInstallments > 1 ? loanData.totalInstallments - 1 : loanData.totalInstallments;
     } else if (payments && payments.length > 0) {
       // If we only have raw payments, count them but exclude registration payments
       return payments.filter(p => p.status !== 'REGISTRATION').length;
@@ -635,6 +615,9 @@ export default function LoanDetailsPage({ params }: { params: LoanParams }) {
     )
   }
 
+  // At this point, loan is non-null
+  const loanData = loan as PaymentPlan
+
   return (
     <div className="container mx-auto py-6">
       <Breadcrumb className="mb-4">
@@ -648,7 +631,7 @@ export default function LoanDetailsPage({ params }: { params: LoanParams }) {
           </BreadcrumbItem>
           <BreadcrumbSeparator />
           <BreadcrumbItem>
-            <BreadcrumbPage>Loan #{unwrappedParams.id}</BreadcrumbPage>
+            <BreadcrumbPage>Loan #{loanId}</BreadcrumbPage>
           </BreadcrumbItem>
         </BreadcrumbList>
       </Breadcrumb>
@@ -657,19 +640,19 @@ export default function LoanDetailsPage({ params }: { params: LoanParams }) {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold tracking-tight">
-              Loan Details {loan.name && `- ${loan.name}`}
+              Loan Details {loanData.name && `- ${loanData.name}`}
             </h1>
             <p className="text-muted-foreground">
-              Payment plan for {loan.customerName || `Installation #${loan.installationId}`}
+              Payment plan for {loanData.customerName || `Installation #${loanData.installationId}`}
             </p>
           </div>
 
           <div className="flex gap-2">
-            <Button variant="outline" onClick={() => router.push(`/admin/loans/${unwrappedParams.id}/payments`)}>
+            <Button variant="outline" onClick={() => router.push(`/admin/loans/${loanId}/payments`)}>
               <Receipt className="mr-2 h-4 w-4" />
               Payments
             </Button>
-            <Button variant="outline" onClick={() => router.push(`/admin/loans/${unwrappedParams.id}/edit`)}>
+            <Button variant="outline" onClick={() => router.push(`/admin/loans/${loanId}/edit`)}>
               <Pencil className="mr-2 h-4 w-4" />
               Edit
             </Button>
@@ -686,7 +669,7 @@ export default function LoanDetailsPage({ params }: { params: LoanParams }) {
               <CardTitle className="text-sm font-medium">Total Amount</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">${loan.totalAmount?.toLocaleString() || 0}</div>
+              <div className="text-2xl font-bold">${(loanData.totalAmount ?? 0).toLocaleString()}</div>
               <div className="mt-2">
                 <div className="flex items-center justify-between mb-1">
                   <span className="text-sm font-medium">Repayment Progress</span>
@@ -702,9 +685,9 @@ export default function LoanDetailsPage({ params }: { params: LoanParams }) {
               <CardTitle className="text-sm font-medium">Monthly Payment</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">${loan.monthlyPayment?.toLocaleString() || loan.installmentAmount?.toLocaleString() || 0}</div>
+              <div className="text-2xl font-bold">${(loanData.monthlyPayment ?? loanData.installmentAmount ?? 0).toLocaleString()}</div>
               <p className="text-xs text-muted-foreground">
-                {formatFrequency(loan.frequency)} installments
+                {formatFrequency(loanData.frequency)} installments
               </p>
             </CardContent>
           </Card>
@@ -714,9 +697,9 @@ export default function LoanDetailsPage({ params }: { params: LoanParams }) {
               <CardTitle className="text-sm font-medium">Remaining Balance</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">${loan.remainingAmount?.toLocaleString() || 0}</div>
+              <div className="text-2xl font-bold">${(loanData.remainingAmount ?? 0).toLocaleString()}</div>
               <p className="text-xs text-muted-foreground">
-                {loan.totalAmount > 0 ? Math.round((loan.remainingAmount / loan.totalAmount) * 100) : 0}% of total loan
+                {Number(loanData.totalAmount ?? 0) > 0 ? Math.round((Number(loanData.remainingAmount ?? 0) / Number(loanData.totalAmount ?? 0)) * 100) : 0}% of total loan
               </p>
             </CardContent>
           </Card>
@@ -732,28 +715,28 @@ export default function LoanDetailsPage({ params }: { params: LoanParams }) {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <h4 className="text-sm font-medium">Status</h4>
-                  <div className="mt-1">{getStatusBadge(loan.status)}</div>
+                  <div className="mt-1">{getStatusBadge(loanData.status)}</div>
                 </div>
                 
                 <div>
                   <h4 className="text-sm font-medium">Interest Rate</h4>
-                  <p className="mt-1">{loan.interestRate || 0}%</p>
+                  <p className="mt-1">{loanData.interestRate || 0}%</p>
                 </div>
                 
                 <div>
                   <h4 className="text-sm font-medium">Start Date</h4>
-                  <p className="mt-1">{loan.startDate ? format(new Date(loan.startDate), 'PPP') : 'N/A'}</p>
+                  <p className="mt-1">{loanData.startDate ? format(new Date(loanData.startDate), 'PPP') : 'N/A'}</p>
                 </div>
                 
                 <div>
                   <h4 className="text-sm font-medium">End Date</h4>
-                  <p className="mt-1">{loan.endDate ? format(new Date(loan.endDate), 'PPP') : 'N/A'}</p>
+                  <p className="mt-1">{loanData.endDate ? format(new Date(loanData.endDate), 'PPP') : 'N/A'}</p>
                 </div>
                 
                 <div>
                   <h4 className="text-sm font-medium">Next Payment Due</h4>
                   <p className="mt-1">
-                    {loan.nextPaymentDate ? format(new Date(loan.nextPaymentDate), 'PPP') : 
+                    {loanData.nextPaymentDate ? format(new Date(loanData.nextPaymentDate), 'PPP') : 
                       payments && payments.length > 0 ? (
                         (() => {
                           // Check for the first unpaid/scheduled payment
@@ -775,46 +758,46 @@ export default function LoanDetailsPage({ params }: { params: LoanParams }) {
                 
                 <div>
                   <h4 className="text-sm font-medium">Payment Frequency</h4>
-                  <p className="mt-1">{formatFrequency(loan.frequency)}</p>
+                  <p className="mt-1">{formatFrequency(loanData.frequency)}</p>
                 </div>
                 
                 <div>
                   <h4 className="text-sm font-medium">Total Installments</h4>
-                  <p className="mt-1">{(loan.numberOfPayments || 0)}</p>
+                  <p className="mt-1">{(loanData.numberOfPayments || 0)}</p>
                 </div>
                 
                 <div>
                   <h4 className="text-sm font-medium">Remaining Installments</h4>
-                  <p className="mt-1">{loan.remainingInstallments || 0}</p>
+                  <p className="mt-1">{loanData.remainingInstallments || 0}</p>
                 </div>
                 
                 <div>
                   <h4 className="text-sm font-medium">Late Fee</h4>
-                  <p className="mt-1">${loan.lateFeeAmount || 0}</p>
+                  <p className="mt-1">${loanData.lateFeeAmount || 0}</p>
                 </div>
                 
                 <div>
                   <h4 className="text-sm font-medium">Grace Period</h4>
-                  <p className="mt-1">{loan.gracePeriodDays || 0} days</p>
+                  <p className="mt-1">{loanData.gracePeriodDays || 0} days</p>
                 </div>
 
                 <div>
                   <h4 className="text-sm font-medium">Installment Amount</h4>
-                  <p className="mt-1">${loan.installmentAmount || 0}</p>
+                  <p className="mt-1">${loanData.installmentAmount || 0}</p>
                 </div>
 
                 <div>
                   <h4 className="text-sm font-medium">Created Date</h4>
-                  <p className="mt-1">{loan.createdAt ? format(new Date(loan.createdAt), 'PPP') : 'N/A'}</p>
+                  <p className="mt-1">{loanData.createdAt ? format(new Date(loanData.createdAt), 'PPP') : 'N/A'}</p>
                 </div>
               </div>
               
-              {loan.description && (
+              {loanData.description && (
                 <>
                   <Separator />
                   <div>
                     <h4 className="text-sm font-medium mb-2">Description</h4>
-                    <p className="text-sm">{loan.description}</p>
+                    <p className="text-sm">{loanData.description}</p>
                   </div>
                 </>
               )}
@@ -829,24 +812,24 @@ export default function LoanDetailsPage({ params }: { params: LoanParams }) {
             <CardContent className="space-y-4">
               <div>
                 <h4 className="text-sm font-medium">Customer Name</h4>
-                <p className="mt-1">{loan.customerName || 'Not available'}</p>
+                <p className="mt-1">{loanData.customerName || 'Not available'}</p>
               </div>
               
               <div>
                 <h4 className="text-sm font-medium">Customer Email</h4>
-                <p className="mt-1">{loan.customerEmail || 'Not available'}</p>
+                <p className="mt-1">{loanData.customerEmail || 'Not available'}</p>
               </div>
               
               <div>
                 <h4 className="text-sm font-medium">Installation ID</h4>
-                <p className="mt-1">#{loan.installationId || 'N/A'}</p>
+                <p className="mt-1">#{loanData.installationId || 'N/A'}</p>
               </div>
               
               <div className="pt-4">
                 <Button 
                   variant="outline" 
                   className="w-full"
-                  onClick={() => router.push(`/admin/installations/${loan.installationId}`)}
+                  onClick={() => router.push(`/admin/installations/${loanData.installationId}`)}
                 >
                   View Installation
                 </Button>
@@ -861,7 +844,7 @@ export default function LoanDetailsPage({ params }: { params: LoanParams }) {
               <CardTitle>Scheduled Payments</CardTitle>
               <CardDescription>Upcoming payment installments</CardDescription>
             </div>
-            <Button variant="outline" onClick={() => router.push(`/admin/loans/${unwrappedParams.id}/payments`)}>
+            <Button variant="outline" onClick={() => router.push(`/admin/loans/${loanId}/payments`)}>
               View All
             </Button>
           </CardHeader>
@@ -876,7 +859,7 @@ export default function LoanDetailsPage({ params }: { params: LoanParams }) {
                 <Button 
                   variant="outline" 
                   className="mt-4"
-                  onClick={() => router.push(`/admin/loans/${unwrappedParams.id}/payments/new`)}
+                  onClick={() => router.push(`/admin/loans/${loanId}/payments/new`)}
                 >
                   Record Payment
                 </Button>
@@ -905,7 +888,7 @@ export default function LoanDetailsPage({ params }: { params: LoanParams }) {
                         <Button 
                           variant="ghost" 
                           size="sm"
-                          onClick={() => router.push(`/admin/loans/${unwrappedParams.id}/payments/${payment.id}`)}
+                          onClick={() => router.push(`/admin/loans/${loanId}/payments/${payment.id}`)}
                         >
                           Details
                         </Button>

@@ -44,7 +44,8 @@ import {
 } from "@/components/ui/table"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useToast } from "@/components/ui/use-toast"
-import { energyApi } from "@/lib/api"
+import { energyApi } from "@/lib/api/energy"
+import { securityApi } from "@/lib/api/security"
 import { energyWebSocket } from "@/lib/energyWebSocket"
 
 export default function AlertsDashboardPage() {
@@ -52,7 +53,7 @@ export default function AlertsDashboardPage() {
   const { toast } = useToast()
 
   const [loading, setLoading] = useState(true)
-  const [alerts, setAlerts] = useState([])
+  const [alerts, setAlerts] = useState<any[]>([])
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
   const [severityFilter, setSeverityFilter] = useState("all")
@@ -63,7 +64,7 @@ export default function AlertsDashboardPage() {
       setLoading(true)
       try {
         // Prepare filter parameters
-        const params = {}
+        const params: Record<string, string> = {}
         if (severityFilter !== "all") {
           params.severity = severityFilter
         }
@@ -72,7 +73,8 @@ export default function AlertsDashboardPage() {
         }
 
         // Fetch alerts from API
-        const alertsData = await energyApi.getAlerts(params)
+        // Use security API tamper events as alert source
+        const alertsData = await securityApi.getTamperEvents()
 
         if (alertsData && Array.isArray(alertsData)) {
           setAlerts(alertsData)
@@ -97,7 +99,7 @@ export default function AlertsDashboardPage() {
     fetchAlerts()
 
     // Set up WebSocket for real-time alerts
-    let wsConnection = null
+    let wsConnection: { close: () => void; isConnected: () => boolean } | null = null
 
     try {
       wsConnection = energyWebSocket.createAlertsMonitor(
@@ -105,9 +107,9 @@ export default function AlertsDashboardPage() {
         (data) => {
           if (data.type === 'ALERT_UPDATE') {
             // Add new alert to the list
-            setAlerts(prevAlerts => {
+            setAlerts((prevAlerts: any[]) => {
               // Check if alert already exists
-              const existingIndex = prevAlerts.findIndex(a => a.id === data.payload.id)
+              const existingIndex = prevAlerts.findIndex((a: any) => a.id === data.payload.id)
 
               if (existingIndex >= 0) {
                 // Update existing alert
@@ -129,7 +131,7 @@ export default function AlertsDashboardPage() {
           }
         },
         // Error handler
-        (error) => {
+        (error: any) => {
           console.error('WebSocket error:', error)
         }
       )
@@ -146,7 +148,7 @@ export default function AlertsDashboardPage() {
   }, [statusFilter, severityFilter, toast])
 
   // Filter alerts based on search term
-  const filteredAlerts = alerts.filter(alert => {
+  const filteredAlerts = alerts.filter((alert: any) => {
     if (!searchTerm) return true
 
     const searchLower = searchTerm.toLowerCase()
@@ -159,10 +161,10 @@ export default function AlertsDashboardPage() {
   })
 
   // Get counts for dashboard metrics
-  const activeAlerts = alerts.filter(alert => alert.status === "active")
-  const highSeverityAlerts = activeAlerts.filter(alert => alert.severity === "high")
-  const mediumSeverityAlerts = activeAlerts.filter(alert => alert.severity === "medium")
-  const lowSeverityAlerts = activeAlerts.filter(alert => alert.severity === "low")
+  const activeAlerts = alerts.filter((alert: any) => alert.status === "active")
+  const highSeverityAlerts = activeAlerts.filter((alert: any) => alert.severity === "high")
+  const mediumSeverityAlerts = activeAlerts.filter((alert: any) => alert.severity === "medium")
+  const lowSeverityAlerts = activeAlerts.filter((alert: any) => alert.severity === "low")
 
   // Handle export alerts data
   const handleExportData = () => {
@@ -204,13 +206,13 @@ export default function AlertsDashboardPage() {
   }
 
   // Format date for display
-  const formatDate = (dateString) => {
+  const formatDate = (dateString: string) => {
     const date = new Date(dateString)
     return date.toLocaleString()
   }
 
   // Get severity badge style
-  const getSeverityBadge = (severity) => {
+  const getSeverityBadge = (severity: string) => {
     switch (severity) {
       case "high":
         return <Badge className="bg-red-500">High</Badge>
@@ -224,7 +226,7 @@ export default function AlertsDashboardPage() {
   }
 
   // Get status badge style
-  const getStatusBadge = (status) => {
+  const getStatusBadge = (status: string) => {
     switch (status) {
       case "active":
         return <Badge className="bg-red-500">Active</Badge>

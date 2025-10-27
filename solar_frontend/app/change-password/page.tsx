@@ -54,7 +54,7 @@ function ChangePasswordForm() {
 
   useEffect(() => {
     // Get email from query params
-    const emailParam = searchParams.get("email")
+    const emailParam = searchParams?.get("email")
     if (!emailParam) {
       toast({
         variant: "destructive",

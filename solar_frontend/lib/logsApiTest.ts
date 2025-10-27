@@ -68,12 +68,11 @@ const testLogsAPI = async () => {
     return response.data;
   } catch (error) {
     console.error("API Test Error:", error);
-    
-    if (error.response) {
-      console.error("Error Status:", error.response.status);
-      console.error("Error Data:", error.response.data);
+    const err = error as any;
+    if (err?.response) {
+      console.error("Error Status:", err.response.status);
+      console.error("Error Data:", err.response.data);
     }
-    
     return null;
   }
 };
@@ -138,9 +137,10 @@ const testFormattedDates = async () => {
         console.log(`ISO format - No logs found`);
       }
     } catch (error) {
-      console.error(`ISO format - Error:`, error.message);
-      if (error.response) {
-        console.error(`ISO format - Status:`, error.response.status);
+      const err = error as any;
+      console.error(`ISO format - Error:`, err?.message);
+      if (err?.response) {
+        console.error(`ISO format - Status:`, err.response.status);
       }
     }
     

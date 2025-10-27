@@ -20,7 +20,7 @@ import {
   XAxis,
   YAxis,
   Legend,
-} from "recharts"
+} from "@/components/ui/direct-recharts"
 import { Checkbox } from "@/components/ui/checkbox"
 import { useTheme } from "next-themes"
 import axios from "axios"
@@ -815,7 +815,8 @@ export default function AnalyticsPage() {
                             }}
                             formatter={(value, name) => {
                               if (name === "temperature") return [`${value}°C`, "Temperature"]
-                              return [`${value} ${chartData.unit}`, name.charAt(0).toUpperCase() + name.slice(1)]
+                              const n = String(name)
+                              return [`${value} ${chartData.unit}`, n.charAt(0).toUpperCase() + n.slice(1)]
                             }}
                             labelFormatter={(label) => `Time: ${label}`}
                           />
@@ -1057,7 +1058,8 @@ export default function AnalyticsPage() {
                         }}
                         formatter={(value, name) => {
                           if (name === "temperature") return [`${value}°C`, "Temperature"]
-                          return [`${value} ${chartData.unit}`, name.charAt(0).toUpperCase() + name.slice(1)]
+                          const n = String(name)
+                          return [`${value} ${chartData.unit}`, n.charAt(0).toUpperCase() + n.slice(1)]
                         }}
                         labelFormatter={(label) => `${chartData.xLabel}: ${label}`}
                       />
@@ -1184,7 +1186,8 @@ export default function AnalyticsPage() {
                       }}
                       formatter={(value, name) => {
                         if (name === "temperature") return [`${value}°C`, "Temperature"]
-                        return [`${value} ${chartData.unit}`, name.charAt(0).toUpperCase() + name.slice(1)]
+                        const n = String(name)
+                        return [`${value} ${chartData.unit}`, n.charAt(0).toUpperCase() + n.slice(1)]
                       }}
                       labelFormatter={(label) => `${chartData.xLabel}: ${label}`}
                     />
@@ -1428,7 +1431,8 @@ export default function AnalyticsPage() {
                       }}
                       formatter={(value, name) => {
                         if (name === "temperature") return [`${value}°C`, "Temperature"]
-                        return [`${value} ${chartData.unit}`, name.charAt(0).toUpperCase() + name.slice(1)]
+                        const n = String(name)
+                        return [`${value} ${chartData.unit}`, n.charAt(0).toUpperCase() + n.slice(1)]
                       }}
                       labelFormatter={(label) => `${chartData.xLabel}: ${label}`}
                     />
@@ -1642,4 +1646,3 @@ export default function AnalyticsPage() {
     </div>
   )
 }
-

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { format } from "date-fns"
 import {
@@ -33,14 +33,16 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb"
-import { serviceControlApi, installationApi, securityApi } from "@/lib/api"
+import { serviceControlApi } from "@/lib/api/serviceControl"
+import { installationApi } from "@/lib/api/installations"
+import { securityApi } from "@/lib/api/security"
 
 export default function LogsPage() {
   const router = useRouter()
   const [loading, setLoading] = useState(true)
-  const [logs, setLogs] = useState([])
-  const [securityLogs, setSecurityLogs] = useState([])
-  const [installations, setInstallations] = useState([])
+  const [logs, setLogs] = useState<any[]>([])
+  const [securityLogs, setSecurityLogs] = useState<any[]>([])
+  const [installations, setInstallations] = useState<any[]>([])
   const [searchTerm, setSearchTerm] = useState("")
   const [logType, setLogType] = useState("all")
   const [activeTab, setActiveTab] = useState("operational")
@@ -54,18 +56,8 @@ export default function LogsPage() {
   const [exporting, setExporting] = useState(false)
   const [initialLoadDone, setInitialLoadDone] = useState(false)
 
-  // Add a direct initial fetch when component mounts
-  useEffect(() => {
-    // This effect runs once on component mount to ensure logs are loaded
-    if (!initialLoadDone) {
-      console.log("🔄 Running initial logs fetch on component mount");
-      fetchLogsData();
-      setInitialLoadDone(true);
-    }
-  }, []);
-
   // Function to fetch logs data that can be called anywhere
-  const fetchLogsData = async () => {
+  const fetchLogsData = useCallback(async () => {
     try {
       console.log("📊 Fetching logs data with:", { timeRange, logType, page, pageSize });
       setLoading(true);
@@ -112,7 +104,7 @@ export default function LogsPage() {
         end: endDate.toISOString()
       });
 
-      let logsData = null;
+      let logsData: any = null;
 
       try {
         if (logType === "all") {
@@ -137,7 +129,7 @@ export default function LogsPage() {
         } else if (logType.startsWith("src_")) {
           // Filter by source system
           const source = logType.replace("src_", "");
-          logsData = await serviceControlApi.getLogsBySourceSystem(source, page, pageSize);
+          logsData = await serviceControlApi.getLogsBySourceSystem(source);
         } else if (logType.startsWith("inst_")) {
           // Filter by installation ID
           const installationId = logType.replace("inst_", "");
@@ -158,15 +150,15 @@ export default function LogsPage() {
             setTotalElements(logsData.length);
           } else {
             // Fallback for unexpected response format
-            console.warn("⚠️ Unexpected logs data format:", logsData);
-            setLogs([]);
+          console.warn("⚠️ Unexpected logs data format:", logsData);
+          setLogs([] as any[]);
             setTotalPages(0);
             setTotalElements(0);
           }
         } else {
           // Fallback for null or undefined response
           console.warn("⚠️ No logs data returned:", logsData);
-          setLogs([]);
+          setLogs([] as any[]);
           setTotalPages(0);
           setTotalElements(0);
         }
@@ -190,7 +182,17 @@ export default function LogsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [timeRange, logType, page, pageSize]);
+
+  // Add a direct initial fetch when component mounts
+  useEffect(() => {
+    // This effect runs once on component mount to ensure logs are loaded
+    if (!initialLoadDone) {
+      console.log("🔄 Running initial logs fetch on component mount");
+      fetchLogsData();
+      setInitialLoadDone(true);
+    }
+  }, [initialLoadDone, fetchLogsData]);
 
   // Load installation data for filtering
   useEffect(() => {
@@ -211,7 +213,7 @@ export default function LogsPage() {
     console.log("🔄 Dependencies changed for log fetch. Triggering fetch with:", 
       { timeRange, logType, page, pageSize, sortField, sortDirection });
     fetchLogsData();
-  }, [timeRange, logType, page, pageSize, sortField, sortDirection])
+  }, [timeRange, logType, page, pageSize, sortField, sortDirection, fetchLogsData])
 
   // Handle refreshing logs
   const handleRefreshLogs = () => {
@@ -231,7 +233,7 @@ export default function LogsPage() {
   }
 
   // Handle fetching security logs
-  const handleFetchSecurityLogs = async () => {
+  const handleFetchSecurityLogs = useCallback(async () => {
     try {
       setLoading(true);
 
@@ -302,7 +304,7 @@ export default function LogsPage() {
       });
 
       try {
-        let securityLogsData = [];
+        let securityLogsData: any[] = [];
         let fetchedData = false;
         let requestAttempts = 0;
         let filterApplied = false;
@@ -373,7 +375,7 @@ export default function LogsPage() {
 
         // If not filtering or the filter returned no results AND we're showing "all", get logs for multiple installations
         if (!fetchedData && logType === "all") {
-          const combinedLogs = [];
+          const combinedLogs: any[] = [];
           console.log(`🔍 Fetching security logs for all installations`);
 
           // Try to get logs for the available installations
@@ -415,26 +417,7 @@ export default function LogsPage() {
           // If we still don't have data, try user logs as fallback
           else if (!fetchedData) {
             console.log(`🔍 Fetching user security logs as fallback`);
-            try {
-              requestAttempts++;
-              const userLogsData = await securityApi.getUserSecurityLogs(0, 100);
-
-              if (userLogsData && userLogsData.content) {
-                securityLogsData = userLogsData.content;
-                setTotalPages(userLogsData.totalPages || 1);
-                setTotalElements(userLogsData.totalElements || userLogsData.content.length);
-                fetchedData = true;
-                console.log(`✅ Found ${userLogsData.content.length} user security logs`);
-              } else if (Array.isArray(userLogsData)) {
-                securityLogsData = userLogsData;
-                setTotalPages(1);
-                setTotalElements(userLogsData.length);
-                fetchedData = true;
-                console.log(`✅ Found ${userLogsData.length} user security logs`);
-              }
-            } catch (error) {
-              console.warn("Could not fetch user security logs:", error);
-            }
+            // No user-specific security logs endpoint available; skip fallback
           }
         }
 
@@ -510,7 +493,7 @@ export default function LogsPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [logType, timeRange, installations])
 
   // Handle tab change
   const handleTabChange = (value) => {
@@ -536,7 +519,7 @@ export default function LogsPage() {
       console.log("🔄 Security logs filter changed, auto-refreshing...");
       handleFetchSecurityLogs();
     }
-  }, [logType, timeRange, activeTab, initialLoadDone]);
+  }, [logType, timeRange, activeTab, initialLoadDone, handleFetchSecurityLogs]);
 
   // Filter logs based on search term
   const filteredLogs = activeTab === "operational" 
@@ -671,7 +654,16 @@ export default function LogsPage() {
       }
 
       // Prepare filters based on current view
-      const filters = {
+      const filters: {
+        startTime: string
+        endTime: string
+        sortField: string
+        sortDirection: string
+        operation?: string
+        sourceSystem?: string
+        installationId?: string
+        searchTerm?: string
+      } = {
         startTime: startDate.toISOString(),
         endTime: endDate.toISOString(),
         sortField,
@@ -1255,17 +1247,17 @@ export default function LogsPage() {
                     <div className="space-y-2 w-full max-w-sm">
                       {(() => {
                         // Calculate operation type distribution
-                        const operationCounts = {}
+                        const operationCounts: Record<string, number> = {}
                         logs.forEach(log => {
                           const operation = log.operation || "Unknown"
                           operationCounts[operation] = (operationCounts[operation] || 0) + 1
                         })
 
                         return Object.entries(operationCounts)
-                          .sort((a, b) => b[1] - a[1])
+                          .sort((a, b) => (b[1] as number) - (a[1] as number))
                           .slice(0, 5)
                           .map(([operation, count]) => {
-                            const percentage = Math.round((count / logs.length) * 100)
+                            const percentage = Math.round(((count as number) / logs.length) * 100)
                             return (
                               <div key={operation} className="space-y-1">
                                 <div className="flex justify-between text-sm">

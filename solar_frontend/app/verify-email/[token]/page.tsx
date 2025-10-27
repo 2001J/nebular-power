@@ -24,22 +24,13 @@ export default function VerifyEmail({ params }: { params: { token: string } }) {
         if (typeof window !== 'undefined') {
           const event = new CustomEvent('customerVerified', {
             detail: {
-              email: response.email,
-              userId: response.id || response.userId || null
+              email: response.data.email,
             }
           });
           window.dispatchEvent(event);
-          console.log("Broadcasted customerVerified event:", response.email);
+          console.log("Broadcasted customerVerified event:", response.data.email);
         }
-
-        // If a redirect is required (for password change)
-        if (response.redirectRequired) {
-          setEmailAddress(response.email)
-          // Wait a moment before redirecting
-          setTimeout(() => {
-            router.push(`/change-password?email=${encodeURIComponent(response.email)}`)
-          }, 3000)
-        }
+        setEmailAddress(response.data.email)
       } catch (error: any) {
         setVerificationStatus('error')
         setErrorMessage(error.response?.data?.message || 'Email verification failed. The link may be expired or invalid.')

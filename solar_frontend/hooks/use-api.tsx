@@ -20,7 +20,7 @@ interface UseApiState<T> {
 export function useApi<T>(
   apiCall: () => Promise<T>,
   options: UseApiOptions<T> = {}
-): [UseApiState<T>, () => Promise<void>] {
+): [UseApiState<T>, () => Promise<T>] {
   const {
     onSuccess,
     onError,

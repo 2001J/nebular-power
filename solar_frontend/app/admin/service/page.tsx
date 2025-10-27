@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { ArrowUpDown, CheckCircle, Clock, Settings, ShieldAlert, AlertTriangle, Clock4, RefreshCw, Plus, Activity, BarChart2, Zap, Signal, Server, Loader2 } from "lucide-react"
 import { format } from "date-fns"
@@ -47,16 +47,18 @@ import { Textarea } from "@/components/ui/textarea"
 import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { cn } from "@/lib/utils"
-import { serviceControlApi, installationApi, serviceApi } from "@/lib/api"
+import { serviceControlApi } from "@/lib/api/serviceControl"
+import { installationApi } from "@/lib/api/installations"
+import { serviceApi } from "@/lib/api/service"
 import { ServiceStatusCard } from "./components/ServiceStatusCard"
 import { ServiceStatusTable } from "./components/ServiceStatusTable"
 
 export default function ServicePage() {
   const [activeTab, setActiveTab] = useState("statuses")
-  const [installations, setInstallations] = useState([])
-  const [statuses, setStatuses] = useState([])
-  const [commands, setCommands] = useState([])
-  const [selectedInstallation, setSelectedInstallation] = useState(null)
+  const [installations, setInstallations] = useState<any[]>([])
+  const [statuses, setStatuses] = useState<any[]>([])
+  const [commands, setCommands] = useState<any[]>([])
+  const [selectedInstallation, setSelectedInstallation] = useState<any | null>(null)
   const [loading, setLoading] = useState(true)
   const [commandsLoading, setCommandsLoading] = useState(true)
   const [updateStatusDialogOpen, setUpdateStatusDialogOpen] = useState(false)
@@ -71,7 +73,6 @@ export default function ServicePage() {
   const [sortBy, setSortBy] = useState("lastUpdated")
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc")
   const [totalStatusItems, setTotalStatusItems] = useState(0)
-  const [hasLoadedInitialData, setHasLoadedInitialData] = useState(false)
 
   // Form states
   const [statusFormData, setStatusFormData] = useState({
@@ -116,12 +117,89 @@ export default function ServicePage() {
 
   // Add new states for scheduled changes and status history
   const [scheduleLoading, setScheduleLoading] = useState(false)
-  const [scheduledChanges, setScheduledChanges] = useState([])
-  const [statusHistory, setStatusHistory] = useState([])
+  const [scheduledChanges, setScheduledChanges] = useState<any[]>([])
+  const [statusHistory, setStatusHistory] = useState<any[]>([])
   const [historyLoading, setHistoryLoading] = useState(false)
-  const [selectedHistoryInstallation, setSelectedHistoryInstallation] = useState(null)
+  const [selectedHistoryInstallation, setSelectedHistoryInstallation] = useState<any | null>(null)
 
-  // Fetch installations and statuses
+  // Use this improved function to fetch statuses with pagination (memoized)
+  const fetchPaginatedStatuses = useCallback(async (sourceInstallations?: any[]) => {
+    try {
+      setLoading(true)
+      setStatuses([]) // Clear existing statuses while loading
+
+      let statusesData = []
+      let totalItems = 0
+
+      // If a status filter is applied, use the paginated API endpoint
+      if (statusFilter !== "ALL") {
+        const response = await serviceControlApi.getInstallationsByStatus(statusFilter, page, pageSize)
+        statusesData = response?.content || []
+        totalItems = response?.totalElements || 0
+      } else {
+        // Fetch installations with pagination
+        const baseInstallations = Array.isArray(sourceInstallations) ? sourceInstallations : installations
+        if (baseInstallations.length === 0) {
+          const installationsResponse = await installationApi.getAllInstallations({
+            page, 
+            size: pageSize
+          })
+          
+          const installationsData = installationsResponse?.content || []
+          setInstallations(installationsData)
+          totalItems = installationsResponse?.totalElements || 0
+          
+          // If installations exist, fetch their statuses in batch for better performance
+          if (installationsData.length > 0) {
+            const installationIds = installationsData
+              .filter(installation => installation && installation.id)
+              .map(installation => installation.id)
+            
+            if (installationIds.length > 0) {
+              // Use batch API for better performance
+              statusesData = await serviceControlApi.getBatchStatuses(installationIds)
+            }
+          }
+        } else {
+          // We have installations, fetch statuses for the current page in batch
+          const pageStart = page * pageSize
+          const pageEnd = Math.min(pageStart + pageSize, baseInstallations.length)
+          const pageInstallations = baseInstallations.slice(pageStart, pageEnd)
+          totalItems = baseInstallations.length
+          
+          if (pageInstallations.length > 0) {
+            const installationIds = pageInstallations
+              .filter(installation => installation && installation.id)
+              .map(installation => installation.id)
+            
+            if (installationIds.length > 0) {
+              // Use batch API for better performance
+              statusesData = await serviceControlApi.getBatchStatuses(installationIds)
+            }
+          }
+        }
+      }
+      
+      // Filter out null values
+      statusesData = statusesData.filter(status => status !== null)
+      
+      setStatuses(statusesData)
+      setTotalStatusItems(totalItems)
+      
+    } catch (error) {
+      console.error("Error fetching service status data:", error)
+      toast({
+        title: "Error",
+        description: "Failed to load service status data. Please try again.",
+        variant: "destructive",
+      })
+      setStatuses([])
+    } finally {
+      setLoading(false)
+    }
+  }, [statusFilter, page, pageSize, installations])
+
+  // Fetch installations and statuses on mount (single run)
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -132,7 +210,7 @@ export default function ServicePage() {
         setInstallations(installationsData?.content || [])
         
         // Get statuses
-        await fetchPaginatedStatuses()
+        await fetchPaginatedStatuses(installationsData?.content || [])
       } catch (error) {
         console.error("Error fetching service data:", error)
         toast({
@@ -149,10 +227,11 @@ export default function ServicePage() {
     }
 
     fetchData()
-  }, [page, pageSize, statusFilter])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // Fetch device commands with a more robust approach
-  const fetchCommands = async () => {
+  const fetchCommands = useCallback(async () => {
     try {
       // Set loading state
       setCommandsLoading(true)
@@ -165,7 +244,7 @@ export default function ServicePage() {
         return
       }
 
-      let commandsData = []
+      let commandsData: any[] = []
 
       if (commandStatusFilter !== "all") {
         // Fetch commands by status
@@ -215,7 +294,7 @@ export default function ServicePage() {
     } finally {
       setCommandsLoading(false)
     }
-  }
+  }, [installations, commandStatusFilter, selectedInstallation])
 
   // Handle tab changes
   const handleTabChange = (value) => {
@@ -242,7 +321,7 @@ export default function ServicePage() {
     if (activeTab === "commands" && installations.length > 0) {
       fetchCommands()
     }
-  }, [installations.length, commandStatusFilter, activeTab])
+  }, [installations.length, commandStatusFilter, activeTab, fetchCommands])
 
   const getStatusBadge = (status) => {
     if (!status) return <Badge variant="outline">Unknown</Badge>
@@ -611,7 +690,7 @@ export default function ServicePage() {
       }
 
       // Parse the params string into an object if it's provided
-      let params = {}
+      let params: any = {}
       if (commandFormData.params && commandFormData.params.trim() !== '') {
         try {
           params = JSON.parse(commandFormData.params)
@@ -794,96 +873,11 @@ export default function ServicePage() {
     }
   }
   
-  // Use this improved function to fetch statuses with pagination
-  const fetchPaginatedStatuses = async () => {
-    try {
-      setLoading(true)
-      setStatuses([]) // Clear existing statuses while loading
-
-      let statusesData = []
-      let totalItems = 0
-
-      // If a status filter is applied, use the paginated API endpoint
-      if (statusFilter !== "ALL") {
-        const response = await serviceControlApi.getInstallationsByStatus(statusFilter, page, pageSize)
-        statusesData = response?.content || []
-        totalItems = response?.totalElements || 0
-      } else {
-        // Fetch installations with pagination
-        if (installations.length === 0) {
-          const installationsResponse = await installationApi.getAllInstallations({
-            page, 
-            size: pageSize
-          })
-          
-          const installationsData = installationsResponse?.content || []
-          setInstallations(installationsData)
-          totalItems = installationsResponse?.totalElements || 0
-          
-          // If installations exist, fetch their statuses in batch for better performance
-          if (installationsData.length > 0) {
-            const installationIds = installationsData
-              .filter(installation => installation && installation.id)
-              .map(installation => installation.id)
-            
-            if (installationIds.length > 0) {
-              // Use batch API for better performance
-              statusesData = await serviceControlApi.getBatchStatuses(installationIds)
-            }
-          }
-        } else {
-          // We have installations, fetch statuses for the current page in batch
-          const pageStart = page * pageSize
-          const pageEnd = Math.min(pageStart + pageSize, installations.length)
-          const pageInstallations = installations.slice(pageStart, pageEnd)
-          totalItems = installations.length
-          
-          if (pageInstallations.length > 0) {
-            const installationIds = pageInstallations
-              .filter(installation => installation && installation.id)
-              .map(installation => installation.id)
-            
-            if (installationIds.length > 0) {
-              // Use batch API for better performance
-              statusesData = await serviceControlApi.getBatchStatuses(installationIds)
-            }
-          }
-        }
-      }
-      
-      // Filter out null values
-      statusesData = statusesData.filter(status => status !== null)
-      
-      setStatuses(statusesData)
-      setTotalStatusItems(totalItems)
-      
-    } catch (error) {
-      console.error("Error fetching service status data:", error)
-      toast({
-        title: "Error",
-        description: "Failed to load service status data. Please try again.",
-        variant: "destructive",
-      })
-      setStatuses([])
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  // Fetch initial data on load
-  useEffect(() => {
-    if (!hasLoadedInitialData) {
-      fetchPaginatedStatuses()
-      setHasLoadedInitialData(true)
-    }
-  }, [hasLoadedInitialData])
 
   // Fetch data when pagination or filters change
   useEffect(() => {
-    if (hasLoadedInitialData) {
-      fetchPaginatedStatuses()
-    }
-  }, [page, pageSize, statusFilter, sortBy, sortDirection])
+    fetchPaginatedStatuses()
+  }, [page, pageSize, statusFilter, sortBy, sortDirection, fetchPaginatedStatuses])
 
   // Define a function to handle page changes
   const handlePageChange = (newPage: number) => {
@@ -902,7 +896,7 @@ export default function ServicePage() {
       setScheduleLoading(true)
       
       // Get all installations with scheduled changes
-      const scheduledInstallations = []
+      const scheduledInstallations: any[] = []
       
       // Process in batches to prevent overwhelming the server
       const batchSize = 10
@@ -1010,7 +1004,7 @@ export default function ServicePage() {
                 <Button 
                   variant="outline" 
                   size="sm" 
-                  onClick={fetchPaginatedStatuses}
+                  onClick={() => fetchPaginatedStatuses()}
                 >
                   <RefreshCw className="h-4 w-4 mr-2" />
                   Refresh
@@ -1549,7 +1543,7 @@ export default function ServicePage() {
                       <Calendar
                         mode="single"
                         selected={maintenanceFormData.startDate}
-                        onSelect={(date) => setMaintenanceFormData(prev => ({ ...prev, startDate: date }))}
+                        onSelect={(date) => setMaintenanceFormData(prev => ({ ...prev, startDate: date ?? prev.startDate }))}
                         initialFocus
                       />
                     </PopoverContent>
@@ -1579,7 +1573,7 @@ export default function ServicePage() {
                       <Calendar
                         mode="single"
                         selected={maintenanceFormData.endDate}
-                        onSelect={(date) => setMaintenanceFormData(prev => ({ ...prev, endDate: date }))}
+                        onSelect={(date) => setMaintenanceFormData(prev => ({ ...prev, endDate: date ?? prev.endDate }))}
                         initialFocus
                       />
                     </PopoverContent>
@@ -1747,7 +1741,7 @@ export default function ServicePage() {
                   <Calendar
                     mode="single"
                     selected={scheduleFormData.scheduledTime}
-                    onSelect={(date) => setScheduleFormData(prev => ({ ...prev, scheduledTime: date }))}
+                    onSelect={(date) => setScheduleFormData(prev => ({ ...prev, scheduledTime: date ?? prev.scheduledTime }))}
                     initialFocus
                   />
                 </PopoverContent>

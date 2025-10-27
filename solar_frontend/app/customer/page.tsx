@@ -32,7 +32,8 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb"
-import { paymentApi, installationApi } from "@/lib/api"
+import { paymentApi } from "@/lib/api/payments"
+import { installationApi } from "@/lib/api/installations"
 import { format } from "date-fns"
 import PaymentStatusCard from "@/components/payment-status-card"
 
@@ -427,4 +428,3 @@ export default function CustomerInstallationsPage() {
     </div>
   )
 }
-

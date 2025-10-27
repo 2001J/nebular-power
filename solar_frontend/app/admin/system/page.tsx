@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { format } from "date-fns"
 import {
@@ -56,7 +56,8 @@ import {
 } from "@/components/ui/popover"
 import { Calendar } from "@/components/ui/calendar"
 import { cn } from "@/lib/utils"
-import { serviceControlApi, serviceApi } from "@/lib/api"
+import { serviceControlApi } from "@/lib/api/serviceControl"
+import { serviceApi } from "@/lib/api/service"
 import { Progress } from "@/components/ui/progress"
 
 // Define interfaces for the data structures
@@ -218,7 +219,7 @@ export default function SystemLogsPage() {
     }
   }
 
-  const fetchLogs = async () => {
+  const fetchLogs = useCallback(async () => {
     try {
       setLoading(true)
       
@@ -311,7 +312,7 @@ export default function SystemLogsPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [timeRange, sourceSystem, operationType, startDate, endDate])
 
   const fetchHeartbeats = async () => {
     try {
@@ -405,14 +406,14 @@ export default function SystemLogsPage() {
     } else if (activeTab === "system-health") {
       fetchSystemHealth()
     }
-  }, [activeTab, timeRange, sourceSystem, operationType, page, size])
+  }, [activeTab, timeRange, sourceSystem, operationType, page, size, fetchLogs])
 
   // Handle time range changes for custom date selection
   useEffect(() => {
     if (timeRange === "custom" && startDate && endDate) {
       fetchLogs()
     }
-  }, [timeRange, startDate, endDate])
+  }, [timeRange, startDate, endDate, fetchLogs])
 
   // Format a date for display
   const formatDate = (dateString: string): string => {

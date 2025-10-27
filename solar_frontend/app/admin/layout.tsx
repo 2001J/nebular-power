@@ -67,6 +67,7 @@ export default function AdminLayout({
 }) {
   const { user, logout } = useAuth()
   const pathname = usePathname()
+  const currentPath = pathname ?? ''
   const [notifications, setNotifications] = useState(0)
   const [searchTerm, setSearchTerm] = useState("")
 
@@ -181,7 +182,7 @@ export default function AdminLayout({
                 <SidebarMenu>
                   {dashboardMenuItems.map((item) => (
                     <SidebarMenuItem key={item.href}>
-                      <SidebarMenuButton asChild isActive={pathname === item.href} tooltip={item.title}>
+                      <SidebarMenuButton asChild isActive={currentPath === item.href} tooltip={item.title}>
                         <Link href={item.href}>
                           <item.icon className="h-4 w-4" />
                           <span>{item.title}</span>
@@ -200,10 +201,10 @@ export default function AdminLayout({
                   {customerMenuItems.map((item) => (
                     <SidebarMenuItem key={item.href}>
                       <SidebarMenuButton asChild isActive={
-                        pathname === item.href ||
-                        (pathname.startsWith(`${item.href}/`) &&
+                        currentPath === item.href ||
+                        (currentPath.startsWith(`${item.href}/`) &&
                           // Exclude Payment Reports from highlighting Payment Compliance
-                          !(item.href === "/admin/payments" && pathname === "/admin/payments/reports"))
+                          !(item.href === "/admin/payments" && currentPath === "/admin/payments/reports"))
                       } tooltip={item.title}>
                         <Link href={item.href}>
                           <item.icon className="h-4 w-4" />
@@ -222,7 +223,7 @@ export default function AdminLayout({
                 <SidebarMenu>
                   {systemMenuItems.map((item) => (
                     <SidebarMenuItem key={item.href}>
-                      <SidebarMenuButton asChild isActive={pathname === item.href || pathname.startsWith(`${item.href}/`)} tooltip={item.title}>
+                      <SidebarMenuButton asChild isActive={currentPath === item.href || currentPath.startsWith(`${item.href}/`)} tooltip={item.title}>
                         <Link href={item.href} className="relative">
                           <item.icon className="h-4 w-4" />
                           <span>{item.title}</span>
@@ -242,10 +243,10 @@ export default function AdminLayout({
                   {securityMenuItems.map((item) => (
                     <SidebarMenuItem key={item.href}>
                       <SidebarMenuButton asChild isActive={
-                        pathname === item.href ||
-                        (pathname.startsWith(`${item.href}/`) &&
+                        currentPath === item.href ||
+                        (currentPath.startsWith(`${item.href}/`) &&
                           // Exclude Security Alerts from highlighting Security Monitoring
-                          !(item.href === "/admin/security" && pathname === "/admin/security/alerts"))
+                          !(item.href === "/admin/security" && currentPath === "/admin/security/alerts"))
                       } tooltip={item.title}>
                         <Link href={item.href} className="relative">
                           <item.icon className="h-4 w-4" />
@@ -303,4 +304,3 @@ export default function AdminLayout({
     </SidebarProvider>
   )
 }
-

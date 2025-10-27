@@ -8,10 +8,13 @@ try {
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   eslint: {
-    ignoreDuringBuilds: true,
+    // Enable ESLint during production builds so errors fail the build
+    ignoreDuringBuilds: false,
+    // Limit lint scope to project source directories
+    dirs: ['app', 'components', 'hooks', 'lib', 'pages', 'types', '__tests__'],
   },
   typescript: {
-    ignoreBuildErrors: true,
+    ignoreBuildErrors: false,
   },
   images: {
     unoptimized: true,
