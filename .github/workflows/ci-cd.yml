@@ -88,7 +88,7 @@ jobs:
       - run: echo "Frontend and Backend jobs finished. Review artifacts and logs."
 
   frontend-e2e:
-    name: Frontend E2E (Playwright)
+    name: Frontend E2E Tests
     needs: frontend
     runs-on: ubuntu-latest
     defaults:
@@ -105,17 +105,21 @@ jobs:
           cache: 'npm'
           cache-dependency-path: solar_frontend/package-lock.json
 
-      - name: Install deps
+      - name: Install dependencies
         run: npm ci || npm install
 
-      - name: Build Next app
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Run E2E tests
         env:
-          NEXT_TELEMETRY_DISABLED: 1
-          NODE_ENV: production
-        run: npm run build
+          NEXT_PUBLIC_API_URL: http://localhost:3000
+        run: npm run e2e
 
-      - name: Install Playwright Browsers
-        run: npx playwright install --with-deps || npx --yes playwright@latest install --with-deps
-
-      - name: Run Playwright tests
-        run: npx playwright test
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: solar_frontend/playwright-report/
+          retention-days: 7

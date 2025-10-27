@@ -1,6 +1,41 @@
 import { test, expect } from '@playwright/test';
 
 test('admin customers page renders table shell', async ({ page }) => {
+  // Set a mock auth token in localStorage before navigation
+  await page.addInitScript(() => {
+    localStorage.setItem('token', 'mock-admin-token');
+  });
+
+  // Mock the user profile API endpoint
+  await page.route('**/api/profile', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        id: 'admin-1',
+        email: 'admin@test.com',
+        fullName: 'Test Admin',
+        role: 'ADMIN',
+        passwordChangeRequired: false,
+      }),
+    });
+  });
+
+  // Mock the customer list API endpoint
+  await page.route('**/api/customers**', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        content: [],
+        number: 0,
+        size: 10,
+        totalElements: 0,
+        totalPages: 0,
+      }),
+    });
+  });
+
   await page.goto('/admin/customers');
   
   // Wait for the main heading to be visible

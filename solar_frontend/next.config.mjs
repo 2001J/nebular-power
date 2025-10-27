@@ -36,6 +36,12 @@ const nextConfig = {
     
     console.log(`Using API base URL: ${apiBaseUrl}`);
     
+    // If API URL points to localhost:3000, don't proxy (used for E2E tests with mocks)
+    if (apiBaseUrl === 'http://localhost:3000') {
+      console.log('Skipping API proxy - E2E test mode with mocks');
+      return [];
+    }
+    
     return [
       {
         source: '/api/:path*',
