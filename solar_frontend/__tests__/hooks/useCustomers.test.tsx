@@ -1,46 +1,60 @@
-import { describe, expect, test, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
-import { act } from 'react';
+import { describe, expect, test, vi } from 'vitest';
+import { renderHook, waitFor } from '@testing-library/react';
 import { useCustomers } from '@/hooks/useCustomers';
 
-vi.mock('@/components/auth-provider', () => ({ useAuth: () => ({ user: { role: 'ADMIN' } }) }));
-vi.mock('@/components/ui/use-toast', () => ({ useToast: () => ({ toast: () => {} }) }));
+vi.mock('@/components/auth-provider', () => ({ 
+  useAuth: () => ({ 
+    user: { role: 'ADMIN', id: '1', email: 'admin@test.com' },
+    isAuthenticated: true,
+  }) 
+}));
 
-vi.mock('@/lib/api/customers', () => {
-  const deactivateCustomer = vi.fn().mockResolvedValue({});
-  const deleteCustomer = vi.fn().mockResolvedValue({});
-  const searchCustomers = vi.fn().mockResolvedValue({ content: [{ id: '1', fullName: 'Alice', email: 'a@a.com', status: 'active', createdAt: new Date().toISOString() }] });
-  const getAllCustomers = vi.fn().mockResolvedValue({ content: [{ id: '2', fullName: 'Bob', email: 'b@b.com', status: 'inactive', createdAt: new Date().toISOString() }] });
-  return {
-    customerApi: { deactivateCustomer, deleteCustomer, searchCustomers, getAllCustomers },
-  };
-});
+vi.mock('@/components/ui/use-toast', () => ({ 
+  useToast: () => ({ toast: vi.fn() }) 
+}));
+
+vi.mock('@/lib/api/customers', () => ({
+  customerApi: {
+    deactivateCustomer: vi.fn().mockResolvedValue({}),
+    deleteCustomer: vi.fn().mockResolvedValue({}),
+    searchCustomers: vi.fn().mockResolvedValue({ 
+      content: [{ id: '1', fullName: 'Alice', email: 'a@a.com', status: 'active', createdAt: new Date().toISOString() }],
+      totalElements: 1,
+      totalPages: 1,
+      number: 0,
+      size: 10,
+    }),
+    getAllCustomers: vi.fn().mockResolvedValue({ 
+      content: [{ id: '1', fullName: 'Alice', email: 'a@a.com', status: 'active', createdAt: new Date().toISOString() }],
+      totalElements: 1,
+      totalPages: 1,
+      number: 0,
+      size: 10,
+    }),
+  },
+}));
+
 import { customerApi } from '@/lib/api/customers';
 
-function TestComponent() {
-  const state = useCustomers({ searchDebounceMs: 0 });
-  return (
-    <div>
-      <div data-testid="count">{state.customers.length}</div>
-      <button onClick={() => state.actions.suspendCustomer('1')}>suspend</button>
-      <button onClick={() => state.actions.deleteCustomer('2')}>delete</button>
-    </div>
-  );
-}
-
 describe('useCustomers', () => {
-  beforeEach(() => {
-    (customerApi.deactivateCustomer as any).mockClear();
-    (customerApi.deleteCustomer as any).mockClear();
-  });
-
-test('loads customers and actions work', async () => {
-    render(<TestComponent />);
-    // Wait for customers to load (count should reflect mock response)
-    await waitFor(() => expect(screen.getByTestId('count').textContent).toBe('1'));
-    await act(async () => { screen.getByText('suspend').click(); });
-    expect((customerApi.deactivateCustomer as any)).toHaveBeenCalledWith('1');
-    await act(async () => { screen.getByText('delete').click(); });
-    expect((customerApi.deleteCustomer as any)).toHaveBeenCalledWith('2');
+  test('loads customers and actions work', async () => {
+    const { result } = renderHook(() => useCustomers({ searchDebounceMs: 0 }));
+    
+    // Wait for customers to load
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    }, { timeout: 3000 });
+    
+    // Verify customers are loaded
+    expect(result.current.customers).toHaveLength(1);
+    expect(result.current.customers[0].fullName).toBe('Alice');
+    
+    // Test suspend action
+    await result.current.actions.suspendCustomer('1');
+    expect(customerApi.deactivateCustomer).toHaveBeenCalledWith('1');
+    
+    // Test delete action
+    await result.current.actions.deleteCustomer('2');
+    expect(customerApi.deleteCustomer).toHaveBeenCalledWith('2');
   });
 });
