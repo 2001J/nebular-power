@@ -53,3 +53,7 @@ venv
 *.log
 __pycache__
 
+
+### thesis template ###
+ikthesis_template/
+
