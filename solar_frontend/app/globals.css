@@ -1,108 +1,111 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   :root {
-    /* Base surfaces */
-    --background: 210 20% 98%; /* neutral-50 */
-    --foreground: 222.2 47.4% 11.2%; /* neutral-900 */
+    --font-inter: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    
+    /* Premium Light Theme - Inspired by Linear/Vercel */
+    --background: 0 0% 100%; /* Pure white */
+    --foreground: 240 10% 3.9%; /* Near black with slight blue tint */
 
     --card: 0 0% 100%;
-    --card-foreground: 222.2 47.4% 11.2%;
+    --card-foreground: 240 10% 3.9%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 47.4% 11.2%;
+    --popover-foreground: 240 10% 3.9%;
 
-    /* Brand */
-    --primary: 221.2 83.2% 53.3%; /* blue-600 */
-    --primary-foreground: 210 40% 98%; /* zinc-50 */
+    /* Refined Brand Colors */
+    --primary: 221.2 83.2% 53.3%; /* Vibrant blue */
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 210 40% 96.1%; /* zinc-100 */
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 240 4.8% 95.9%; /* Very light gray */
+    --secondary-foreground: 240 5.9% 10%;
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%; /* zinc-500 */
+    --muted: 240 4.8% 95.9%;
+    --muted-foreground: 240 3.8% 46.1%; /* Softer gray text */
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    --accent: 240 4.8% 95.9%;
+    --accent-foreground: 240 5.9% 10%;
 
-    --destructive: 0 72% 51%; /* red-600 */
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 0 84.2% 60.2%; /* Softer red */
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
+    --border: 240 5.9% 90%; /* Very subtle border */
+    --input: 240 5.9% 90%;
     --ring: 221.2 83.2% 53.3%;
 
-    --radius: 0.5rem;
+    --radius: 0.75rem;
 
-    /* Sidebar variables */
-    --sidebar-background: 0 0% 98%;
+    /* Minimal Sidebar */
+    --sidebar-background: 0 0% 100%;
     --sidebar-foreground: 240 5.3% 26.1%;
     --sidebar-primary: 240 5.9% 10%;
-    --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 240 4.8% 95.9%;
-    --sidebar-accent-foreground: 240 5.9% 10%;
-    --sidebar-border: 220 13% 91%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 240 4.8% 97%;
+    --sidebar-accent-foreground: 221.2 83.2% 53.3%;
+    --sidebar-border: 240 5.9% 94%;
+    --sidebar-ring: 221.2 83.2% 53.3%;
 
-    /* Chart palette (light) */
-    --chart-1: 12 76% 61%;   /* orange */
-    --chart-2: 173 58% 39%;  /* teal */
-    --chart-3: 197 37% 24%;  /* blue slate */
-    --chart-4: 43 74% 66%;   /* amber */
-    --chart-5: 27 87% 67%;   /* orange deep */
+    /* Elegant Chart Colors */
+    --chart-1: 221.2 83.2% 53.3%;   /* Primary blue */
+    --chart-2: 142.1 76.2% 36.3%;   /* Green */
+    --chart-3: 262.1 83.3% 57.8%;   /* Purple */
+    --chart-4: 346.8 77.2% 49.8%;   /* Pink */
+    --chart-5: 24.6 95% 53.1%;      /* Orange */
 
-    /* Let native controls match theme */
     color-scheme: light;
   }
 
   .dark {
-    --background: 222.2 47.4% 6%; /* near-neutral-950 */
-    --foreground: 210 40% 96%;
+    /* Premium Dark Theme - Enhanced with deep gray-blue neutrals */
+    --background: 220 26% 6%; /* Deep gray-blue, not pure black */
+    --foreground: 210 40% 98%;
 
-    --card: 222.2 47.4% 8%;
-    --card-foreground: 210 40% 96%;
+    --card: 220 26% 7%; /* Slightly elevated from background */
+    --card-foreground: 210 40% 98%;
 
-    --popover: 222.2 47.4% 8%;
-    --popover-foreground: 210 40% 96%;
+    --popover: 220 26% 7%;
+    --popover-foreground: 210 40% 98%;
 
-    /* Teal accent in dark mode */
-    --primary: 173 58% 45%;
-    --primary-foreground: 210 40% 98%;
+    --primary: 217 91% 60%; /* Brighter blue for better visibility */
+    --primary-foreground: 220 26% 6%;
 
-    --secondary: 222.2 15% 14%;
-    --secondary-foreground: 210 40% 96%;
+    --secondary: 217 33% 12%; /* Warmer secondary */
+    --secondary-foreground: 210 40% 98%;
 
-    --muted: 222.2 15% 14%;
-    --muted-foreground: 215 20% 70%;
+    --muted: 217 33% 12%;
+    --muted-foreground: 215 20% 65%; /* Better contrast */
 
-    --accent: 222.2 15% 14%;
-    --accent-foreground: 210 40% 96%;
+    --accent: 217 33% 12%;
+    --accent-foreground: 210 40% 98%;
 
-    --destructive: 0 72% 40%;
-    --destructive-foreground: 210 40% 96%;
+    --destructive: 0 85% 60%; /* Brighter for dark mode */
+    --destructive-foreground: 210 40% 98%;
 
-    --border: 222.2 18% 16%;
-    --input: 222.2 18% 16%;
-    --ring: 173 58% 45%;
+    --border: 217 33% 14%; /* More visible borders */
+    --input: 217 33% 14%;
+    --ring: 217 91% 60%;
 
-    /* Sidebar variables */
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 0 0% 98%;
-    --sidebar-primary-foreground: 240 5.9% 10%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    /* Enhanced Dark Sidebar */
+    --sidebar-background: 220 26% 6%;
+    --sidebar-foreground: 210 40% 98%;
+    --sidebar-primary: 210 40% 98%;
+    --sidebar-primary-foreground: 220 26% 6%;
+    --sidebar-accent: 217 33% 10%;
+    --sidebar-accent-foreground: 217 91% 60%;
+    --sidebar-border: 217 33% 12%;
+    --sidebar-ring: 217 91% 60%;
 
-    /* Chart palette (dark) – toned for dark bg */
-    --chart-1: 220 70% 55%;  /* blue */
-    --chart-2: 160 60% 45%;  /* teal */
-    --chart-3: 45 90% 65%;   /* amber */
-    --chart-4: 340 70% 60%;  /* pink/red */
-    --chart-5: 280 65% 60%;  /* violet */
+    /* Enhanced Dark Chart Colors */
+    --chart-1: 217 91% 60%; /* Blue */
+    --chart-2: 142 76% 36%; /* Green */
+    --chart-3: 280 80% 65%; /* Purple */
+    --chart-4: 346 77% 60%; /* Pink */
+    --chart-5: 36 95% 60%; /* Orange */
 
     color-scheme: dark;
   }
@@ -111,26 +114,127 @@
 @layer base {
   * {
     @apply border-border;
-  }
-  body {
-    @apply bg-background text-foreground;
-    transition: background-color 150ms ease, color 150ms ease;
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--muted-foreground) / 0.3) transparent;
   }
 
-  /* Themed scrollbars */
-  * {
-    scrollbar-width: thin;
-    scrollbar-color: hsl(var(--muted-foreground)) hsl(var(--muted));
+  /* Smooth theme transitions, but scoped to layout surfaces to avoid global flicker */
+  /* Exclude form inputs from color transitions to prevent flickering while typing */
+  input,
+  textarea,
+  select,
+  button,
+  a,
+  svg,
+  canvas {
+    transition: none !important;
   }
+  
+  body {
+    @apply bg-background text-foreground font-sans;
+    font-feature-settings: 'rlig' 1, 'calt' 1;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    letter-spacing: -0.011em;
+  }
+
+  /* Optimize rendering performance */
+  html {
+    color-scheme: light dark;
+  }
+
+  /* Premium Typography */
+  h1, h2, h3, h4, h5, h6 {
+    font-weight: 600;
+    letter-spacing: -0.02em;
+  }
+
+  /* Minimal Scrollbars */
+  
   *::-webkit-scrollbar {
-    height: 8px;
     width: 8px;
+    height: 8px;
   }
-  *::-webkit-scrollbar-thumb {
-    background-color: hsl(var(--muted-foreground) / 0.4);
-    border-radius: 9999px;
-  }
+  
   *::-webkit-scrollbar-track {
-    background-color: hsl(var(--muted) / 0.5);
+    background: transparent;
+  }
+  
+  *::-webkit-scrollbar-thumb {
+    background-color: hsl(var(--muted-foreground) / 0.3);
+    border-radius: 9999px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+    transition: background-color 150ms ease;
+  }
+  
+  *::-webkit-scrollbar-thumb:hover {
+    background-color: hsl(var(--muted-foreground) / 0.5);
+  }
+
+  /* Dark mode specific scrollbar */
+  .dark *::-webkit-scrollbar-thumb {
+    background-color: hsl(var(--muted-foreground) / 0.4);
+  }
+  
+  .dark *::-webkit-scrollbar-thumb:hover {
+    background-color: hsl(var(--muted-foreground) / 0.6);
+  }
+}
+
+@layer components {
+  /* Elegant Card Hover Effect */
+  .card-hover {
+    transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  
+  .card-hover:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.08);
+  }
+
+  /* Dark mode card shadows */
+  .dark .shadow-soft {
+    box-shadow: 0 2px 8px -2px rgba(0, 0, 0, 0.3), 
+                0 4px 12px -4px rgba(0, 0, 0, 0.2);
+  }
+
+  .dark .shadow-soft-lg {
+    box-shadow: 0 4px 16px -4px rgba(0, 0, 0, 0.4), 
+                0 8px 24px -8px rgba(0, 0, 0, 0.3);
+  }
+
+  /* Minimal Button Styles */
+  .btn-minimal {
+    @apply inline-flex items-center justify-center rounded-lg text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50;
+  }
+
+  /* Smooth Transitions */
+  .transition-smooth {
+    transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /* Premium Grid Background Pattern */
+  .bg-grid-white\/\[0\.02\] {
+    background-image: linear-gradient(to right, rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+                      linear-gradient(to bottom, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+    background-size: 64px 64px;
+  }
+
+  /* Fade up animation */
+  @keyframes fade-up {
+    from {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .animate-fade-up {
+    animation: fade-up 0.6s ease-out forwards;
+    animation-delay: var(--animate-delay, 0ms);
   }
 }

@@ -33,8 +33,6 @@ public class ServiceStatusTest {
         assertEquals(ServiceStatus.ServiceState.ACTIVE, serviceStatus.getStatus());
         assertNotNull(serviceStatus.getUpdatedAt());
         assertTrue(serviceStatus.isActive());
-        assertNull(serviceStatus.getScheduledChange());
-        assertNull(serviceStatus.getScheduledTime());
         assertNull(serviceStatus.getStatusReason());
     }
     
@@ -51,8 +49,6 @@ public class ServiceStatusTest {
         serviceStatus.setUpdatedBy("admin");
         serviceStatus.setActive(false);
         serviceStatus.setStatusReason("Payment overdue");
-        serviceStatus.setScheduledChange(ServiceStatus.ServiceState.ACTIVE);
-        serviceStatus.setScheduledTime(now.plusDays(3));
         
         // Assert
         assertEquals(ServiceStatus.ServiceState.SUSPENDED_PAYMENT, serviceStatus.getStatus());
@@ -60,8 +56,6 @@ public class ServiceStatusTest {
         assertEquals("admin", serviceStatus.getUpdatedBy());
         assertFalse(serviceStatus.isActive());
         assertEquals("Payment overdue", serviceStatus.getStatusReason());
-        assertEquals(ServiceStatus.ServiceState.ACTIVE, serviceStatus.getScheduledChange());
-        assertEquals(now.plusDays(3), serviceStatus.getScheduledTime());
     }
     
     @Test
@@ -109,23 +103,5 @@ public class ServiceStatusTest {
         
         serviceStatus.setStatus(ServiceStatus.ServiceState.TRANSITIONING);
         assertEquals(ServiceStatus.ServiceState.TRANSITIONING, serviceStatus.getStatus());
-    }
-    
-    @Test
-    @DisplayName("Should handle scheduled status changes")
-    void shouldHandleScheduledStatusChanges() {
-        // Arrange
-        ServiceStatus serviceStatus = new ServiceStatus();
-        serviceStatus.setStatus(ServiceStatus.ServiceState.ACTIVE);
-        LocalDateTime scheduledTime = LocalDateTime.now().plusDays(1);
-        
-        // Act
-        serviceStatus.setScheduledChange(ServiceStatus.ServiceState.SUSPENDED_MAINTENANCE);
-        serviceStatus.setScheduledTime(scheduledTime);
-        
-        // Assert
-        assertEquals(ServiceStatus.ServiceState.ACTIVE, serviceStatus.getStatus());
-        assertEquals(ServiceStatus.ServiceState.SUSPENDED_MAINTENANCE, serviceStatus.getScheduledChange());
-        assertEquals(scheduledTime, serviceStatus.getScheduledTime());
     }
 } 

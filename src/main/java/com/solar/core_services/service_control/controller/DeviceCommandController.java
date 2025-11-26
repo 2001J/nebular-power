@@ -226,7 +226,7 @@ public class DeviceCommandController {
         
         // Log the operation
         operationalLogService.logOperation(
-                null, // Will be filled in service layer based on command
+                cancelledCommand.getInstallationId(), // Use installation ID from cancelled command
                 OperationalLog.OperationType.COMMAND_CANCELLED,
                 username,
                 "Cancelled command with ID: " + commandId,
@@ -263,7 +263,7 @@ public class DeviceCommandController {
         
         // Log the operation
         operationalLogService.logOperation(
-                null, // Will be filled in service layer based on command
+                retriedCommand.getInstallationId(),
                 OperationalLog.OperationType.COMMAND_RETRIED,
                 username,
                 "Retried command with ID: " + commandId,

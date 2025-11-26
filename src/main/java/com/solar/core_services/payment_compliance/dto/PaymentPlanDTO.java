@@ -38,6 +38,7 @@ public class PaymentPlanDTO {
     private LocalDateTime endDate;
     private PaymentPlan.PaymentPlanStatus status;
     private BigDecimal interestRate;
+    private BigDecimal downPayment;
     private BigDecimal lateFeeAmount;
     private Integer gracePeriodDays;
     private List<PaymentDTO> payments;
@@ -83,6 +84,7 @@ public class PaymentPlanDTO {
                 .endDate(paymentPlan.getEndDate())
                 .status(paymentPlan.getStatus())
                 .interestRate(paymentPlan.getInterestRate())
+                .downPayment(paymentPlan.getDownPayment())
                 .lateFeeAmount(paymentPlan.getLateFeeAmount())
                 .gracePeriodDays(paymentPlan.getGracePeriodDays())
                 .payments(paymentPlan.getPayments().stream()

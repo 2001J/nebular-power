@@ -1,6 +1,7 @@
 package com.solar.user_management.security;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -32,6 +33,9 @@ public class SecurityConfig {
         private final UserDetailsService userDetailsService;
         private final JwtTokenProvider tokenProvider;
 
+        @Value("${app.frontend.url:http://localhost:3000}")
+        private String frontendUrl;
+
         @Bean
         public JwtAuthenticationFilter jwtAuthenticationFilter() {
                 return new JwtAuthenticationFilter(tokenProvider, userDetailsService);
@@ -51,7 +55,7 @@ public class SecurityConfig {
         public CorsConfigurationSource corsConfigurationSource() {
                 CorsConfiguration configuration = new CorsConfiguration();
                 configuration.setAllowedOrigins(
-                                Arrays.asList("http://localhost:3000", "https://solar-monitor.vercel.app"));
+                                Arrays.asList(frontendUrl, "https://solar-monitor.vercel.app"));
                 configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
                 configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "X-Requested-With",
                                 "Accept", "Origin", "Access-Control-Request-Method", "Access-Control-Request-Headers",

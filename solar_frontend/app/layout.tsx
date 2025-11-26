@@ -11,7 +11,9 @@ const inter = Inter({ subsets: ["latin"] })
 export const metadata = {
   title: "NebulaPower - Solar Energy Monitoring & Management",
   description: "Monitor and manage your solar energy system",
-  generator: 'v0.dev'
+  generator: 'Next.js',
+  authors: [{ name: 'Joseph Koyi' }],
+  creator: 'Joseph Koyi'
 }
 
 export default function RootLayout({
@@ -22,7 +24,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
-        <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
           <AuthProvider>
             {children}
             <Toaster />
@@ -32,7 +34,3 @@ export default function RootLayout({
     </html>
   )
 }
-
-
-
-import './globals.css'

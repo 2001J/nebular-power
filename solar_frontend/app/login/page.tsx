@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { useToast } from "@/components/ui/use-toast"
 import { useAuth } from "@/components/auth-provider"
+import { ModeToggle } from "@/components/mode-toggle"
 
 const loginSchema = z.object({
   email: z.string().email({ message: "Please enter a valid email address" }),
@@ -100,94 +101,112 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col md:flex-row">
+    <div className="flex min-h-screen flex-col md:flex-row bg-white dark:bg-[#0f1419]">
+      {/* Theme toggle - Fixed top right corner */}
+      <div className="fixed top-6 right-6 z-50">
+        <ModeToggle />
+      </div>
+
       {/* Left panel - Brand section */}
-      <div className="hidden md:flex md:w-1/2 bg-[#1e2e4a] text-white p-8 flex-col justify-between">
-        <div className="flex items-center gap-2">
-          <Sun className="h-6 w-6" />
-          <span className="text-lg font-bold">NebulaPower</span>
+      <div className="hidden md:flex md:w-1/2 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 dark:from-[#0a0f1a] dark:via-[#0f1419] dark:to-[#0a0f1a] text-white p-12 flex-col justify-between relative overflow-hidden">
+        {/* Background solar panel image */}
+        <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1509391366360-2e959784a276?w=800')] bg-cover bg-center opacity-20 dark:opacity-10"></div>
+        
+        {/* Subtle background pattern and gradient overlay */}
+        <div className="absolute inset-0 bg-gradient-to-br from-slate-900/90 via-slate-900/80 to-slate-900/90 dark:from-gray-950/90 dark:via-gray-900/80 dark:to-gray-950/90"></div>
+        <div className="absolute inset-0 bg-grid-white/[0.02]"></div>
+        
+        <div className="relative z-10">
+          <div className="flex items-center gap-2">
+            <Sun className="h-7 w-7 text-amber-400" />
+            <span className="text-xl font-bold">NebulaPower</span>
+          </div>
         </div>
 
-        <div className="space-y-6 max-w-md">
-          <h1 className="text-4xl font-bold tracking-tight">Renewable Energy Solutions within your reach</h1>
-          <p className="text-lg text-gray-300">
+        <div className="space-y-8 max-w-md relative z-10">
+          <h1 className="text-4xl md:text-5xl font-bold tracking-tight leading-tight">Renewable Energy Solutions within your reach</h1>
+          <p className="text-lg text-white/80 dark:text-white/60 leading-relaxed">
             Track production, manage payments, and optimize your solar energy system all in one place.
           </p>
           <div className="flex space-x-4">
-            <div className="bg-[#2a3e64] rounded-lg p-4 flex-1">
-              <p className="text-xl font-bold">98%</p>
-              <p className="text-sm text-gray-300">Customer satisfaction</p>
+            <div className="bg-white/10 dark:bg-white/5 backdrop-blur-sm rounded-xl p-5 flex-1 border border-white/20 dark:border-white/10">
+              <p className="text-2xl font-bold">98%</p>
+              <p className="text-sm text-white/80 dark:text-white/60 mt-1">Customer satisfaction</p>
             </div>
-            <div className="bg-[#2a3e64] rounded-lg p-4 flex-1">
-              <p className="text-xl font-bold">+14%</p>
-              <p className="text-sm text-gray-300">Energy efficiency</p>
+            <div className="bg-white/10 dark:bg-white/5 backdrop-blur-sm rounded-xl p-5 flex-1 border border-white/20 dark:border-white/10">
+              <p className="text-2xl font-bold">+14%</p>
+              <p className="text-sm text-white/80 dark:text-white/60 mt-1">Energy efficiency</p>
             </div>
           </div>
         </div>
 
-        <p className="text-sm text-gray-300">&copy; {new Date().getFullYear()} NebulaPower. All rights reserved.</p>
+        <p className="text-sm text-white/70 dark:text-white/50 relative z-10">&copy; {new Date().getFullYear()} NebulaPower. All rights reserved.</p>
       </div>
 
       {/* Right panel - Login form */}
-      <div className="flex-1 p-6 md:p-12 flex flex-col justify-center">
+      <div className="flex-1 p-6 md:p-12 flex flex-col justify-center dark:bg-[#0f1419]">
         <div className="max-w-md mx-auto w-full space-y-8">
-          <div className="flex justify-between items-center">
+          <div className="flex justify-between items-start">
             <div className="md:hidden flex items-center gap-2">
-              <Sun className="h-6 w-6 text-[#1e2e4a]" />
-              <span className="text-lg font-bold text-[#1e2e4a]">NebulaPower</span>
-            </div>
-            <div className="text-sm text-gray-500">
-              <span className="flex items-center">
-                <span className="mr-1">❗</span> Accounts are created by administrators after system installation
-              </span>
+              <Sun className="h-7 w-7 text-primary dark:text-amber-400" />
+              <span className="text-xl font-bold text-gray-900 dark:text-white">NebulaPower</span>
             </div>
           </div>
 
-          <div className="space-y-2 md:pt-8">
-            <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-gray-900">WELCOME BACK</h1>
-            <p className="text-gray-600">Sign in to monitor and manage your solar energy system.</p>
+          <div className="space-y-3 md:pt-8">
+            <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-gray-900 dark:text-white">WELCOME BACK</h1>
+            <p className="text-base text-gray-600 dark:text-gray-400 leading-relaxed">Sign in to monitor and manage your solar energy system.</p>
+            <div className="text-sm text-gray-500 dark:text-gray-500 flex items-start gap-2 pt-2">
+              <span className="text-amber-500 dark:text-amber-400">ℹ️</span>
+              <span>Accounts are created by administrators after system installation</span>
+            </div>
           </div>
 
-          <form className="space-y-6" onSubmit={handleSubmit(onSubmit)}>
+          <form className="space-y-5" onSubmit={handleSubmit(onSubmit)}>
             {error && (
-              <div className="p-3 text-sm bg-red-50 border border-red-200 text-red-600 rounded-md">
+              <div className="p-4 text-sm bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800/30 text-red-600 dark:text-red-400 rounded-lg">
                 {error}
               </div>
             )}
 
             <div className="space-y-2">
-              <label htmlFor="email" className="text-sm font-medium">
+              <label htmlFor="email" className="text-sm font-medium text-gray-700 dark:text-gray-300">
                 Email
               </label>
               <div className="relative">
-                <Input id="email" type="email" className="h-12 rounded-lg" {...register("email")} />
-                {errors.email && <p className="mt-1 text-sm text-destructive">{errors.email.message}</p>}
+                <Input 
+                  id="email" 
+                  type="email" 
+                  className="h-11 rounded-lg border-gray-300 bg-white focus:border-[#192f50] dark:bg-[#0a0f1a] dark:border-gray-700 dark:focus:border-blue-500 dark:text-gray-100 dark:placeholder:text-gray-500" 
+                  {...register("email")} 
+                />
+                {errors.email && <p className="mt-2 text-sm text-destructive dark:text-red-400">{errors.email.message}</p>}
               </div>
             </div>
 
             <div className="space-y-2">
-              <label htmlFor="password" className="text-sm font-medium">
+              <label htmlFor="password" className="text-sm font-medium text-gray-700 dark:text-gray-300">
                 Password
               </label>
               <div className="relative">
                 <Input
                   id="password"
                   type={showPassword ? "text" : "password"}
-                  className="h-12 rounded-lg pr-10"
+                  className="h-11 rounded-lg pr-10 border-gray-300 bg-white focus:border-[#192f50] dark:bg-[#0a0f1a] dark:border-gray-700 dark:focus:border-blue-500 dark:text-gray-100 dark:placeholder:text-gray-500"
                   {...register("password")}
                 />
                 <button
                   type="button"
-                  className="absolute right-3 top-1/2 -translate-y-1/2"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 hover:scale-110 transition-transform"
                   onClick={() => setShowPassword(!showPassword)}
                 >
                   {showPassword ? (
-                    <EyeOff className="h-5 w-5 text-gray-400" />
+                    <EyeOff className="h-5 w-5 text-gray-400 dark:text-white/40" />
                   ) : (
-                    <Eye className="h-5 w-5 text-gray-400" />
+                    <Eye className="h-5 w-5 text-gray-400 dark:text-white/40" />
                   )}
                 </button>
-                {errors.password && <p className="mt-1 text-sm text-destructive">{errors.password.message}</p>}
+                {errors.password && <p className="mt-2 text-sm text-destructive dark:text-red-400">{errors.password.message}</p>}
               </div>
             </div>
 
@@ -196,21 +215,21 @@ export default function LoginPage() {
                 <input
                   id="remember-me"
                   type="checkbox"
-                  className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                  className="h-4 w-4 rounded border-gray-300 dark:border-gray-700 text-primary focus:ring-primary dark:bg-[#0a0f1a]"
                   {...register("rememberMe")}
                 />
-                <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-900">
+                <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-900 dark:text-gray-300">
                   Remember me
                 </label>
               </div>
-              <Link href="/forgot-password" className="text-sm font-medium text-primary">
+              <Link href="/forgot-password" className="text-sm font-medium text-[#192f50] dark:text-blue-400 hover:underline">
                 Forgot password?
               </Link>
             </div>
 
             <Button
               type="submit"
-              className="w-full h-12 rounded-lg bg-[#1e2e4a] hover:bg-[#2a3e64] text-white"
+              className="w-full h-11 rounded-lg bg-[#192f50] hover:bg-[#192f50]/90 dark:bg-gradient-to-r dark:from-primary dark:to-primary/90 dark:hover:from-primary/90 dark:hover:to-primary/80 text-white shadow-lg hover:shadow-xl transition-all font-medium"
               disabled={isLoading}
             >
               {isLoading ? "Signing in..." : "Sign in"}
@@ -219,17 +238,17 @@ export default function LoginPage() {
 
           <div className="relative">
             <div className="absolute inset-0 flex items-center">
-              <span className="w-full border-t"></span>
+              <span className="w-full border-t dark:border-gray-700"></span>
             </div>
             <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-background px-2 text-gray-500">or sign in with</span>
+              <span className="bg-background dark:bg-[#0f1419] px-2 text-gray-500 dark:text-gray-500">or sign in with</span>
             </div>
           </div>
 
           <div className="space-y-3">
             <Button
               variant="outline"
-              className="w-full h-12 rounded-lg flex items-center justify-center gap-2 border border-gray-300"
+              className="w-full h-11 rounded-lg flex items-center justify-center gap-2 border border-gray-300 dark:border-gray-700 dark:bg-[#0a0f1a] dark:hover:bg-[#1a2332] dark:text-gray-300 transition-all"
             >
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" className="h-5 w-5">
                 <path
@@ -250,11 +269,11 @@ export default function LoginPage() {
                 />
                 <path d="M1 1h22v22H1z" fill="none" />
               </svg>
-              Sign in with Google
+              <span className="dark:text-gray-300">Sign in with Google</span>
             </Button>
             <Button
               variant="outline"
-              className="w-full h-12 rounded-lg flex items-center justify-center gap-2 border border-gray-300"
+              className="w-full h-11 rounded-lg flex items-center justify-center gap-2 border border-gray-300 dark:border-gray-700 dark:bg-[#0a0f1a] dark:hover:bg-[#1a2332] dark:text-gray-300 transition-all"
             >
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" className="h-5 w-5">
                 <path
@@ -262,7 +281,7 @@ export default function LoginPage() {
                   fill="#1877F2"
                 />
               </svg>
-              Sign in with Facebook
+              <span className="dark:text-gray-300">Sign in with Facebook</span>
             </Button>
           </div>
         </div>

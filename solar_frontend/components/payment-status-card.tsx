@@ -167,16 +167,16 @@ export default function PaymentStatusCard({ userId, installationId, isLarge = fa
 
   if (loading) {
     return (
-      <Card className={cn("overflow-hidden border-0 shadow-md", isLarge ? "w-full" : "")}>
-        <CardHeader className={cn("pb-3 bg-gradient-to-r from-slate-50 to-white", isLarge ? "" : "")}>
-          <CardTitle className={cn("flex items-center gap-2 text-slate-800", isLarge ? "text-xl" : "text-sm")}>
-            <CircleDollarSign className={cn("text-primary", isLarge ? "h-6 w-6" : "h-4 w-4")} />
+      <Card className={cn("overflow-hidden border-gray-200 dark:border-white/10 shadow-sm dark:shadow-none rounded-2xl bg-white dark:bg-[#111318]", isLarge ? "w-full" : "")}>
+        <CardHeader className={cn("pb-4 px-6 pt-6 bg-gray-50 dark:bg-white/5 border-b border-gray-200 dark:border-white/10", isLarge ? "" : "")}>
+          <CardTitle className={cn("flex items-center gap-2 text-gray-900 dark:text-white/90", isLarge ? "text-xl" : "text-sm")}>
+            <CircleDollarSign className={cn("text-blue-600 dark:text-blue-400", isLarge ? "h-6 w-6" : "h-4 w-4")} strokeWidth={2} />
             Payment Status
           </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-6 pb-6">
           <div className={`${isLarge ? "h-32" : "h-20"} flex items-center justify-center`}>
-            <div className="animate-pulse h-4 w-full bg-gray-200 rounded"></div>
+            <div className="animate-pulse h-4 w-full bg-gray-200 dark:bg-white/10 rounded"></div>
           </div>
         </CardContent>
       </Card>
@@ -185,23 +185,23 @@ export default function PaymentStatusCard({ userId, installationId, isLarge = fa
 
   if (error) {
     return (
-      <Card className={cn("overflow-hidden border-0 shadow-md", isLarge ? "w-full" : "")}>
-        <CardHeader className={cn("pb-3 bg-gradient-to-r from-slate-50 to-white", isLarge ? "" : "")}>
-          <CardTitle className={cn("flex items-center gap-2 text-slate-800", isLarge ? "text-xl" : "text-sm")}>
-            <CircleDollarSign className={cn("text-primary", isLarge ? "h-6 w-6" : "h-4 w-4")} />
+      <Card className={cn("overflow-hidden border-gray-200 dark:border-white/10 shadow-sm dark:shadow-none rounded-2xl bg-white dark:bg-[#111318]", isLarge ? "w-full" : "")}>
+        <CardHeader className={cn("pb-4 px-6 pt-6 bg-gray-50 dark:bg-white/5 border-b border-gray-200 dark:border-white/10", isLarge ? "" : "")}>
+          <CardTitle className={cn("flex items-center gap-2 text-gray-900 dark:text-white/90", isLarge ? "text-xl" : "text-sm")}>
+            <CircleDollarSign className={cn("text-blue-600 dark:text-blue-400", isLarge ? "h-6 w-6" : "h-4 w-4")} strokeWidth={2} />
             Payment Status
           </CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="flex items-center gap-2 text-red-500 justify-center">
-            <AlertCircle className="h-4 w-4" />
+        <CardContent className="px-6 pb-6">
+          <div className="flex items-center gap-2 text-red-600 dark:text-red-400 justify-center">
+            <AlertCircle className="h-4 w-4" strokeWidth={2} />
             <span className="text-sm">{error}</span>
           </div>
         </CardContent>
-        <CardFooter className="justify-center">
-          <Button variant="ghost" size="sm" onClick={handleViewPayments} className="flex items-center gap-1">
+        <CardFooter className="justify-center px-6 pb-6 bg-gray-50 dark:bg-white/5 border-t border-gray-200 dark:border-white/10">
+          <Button variant="ghost" size="sm" onClick={handleViewPayments} className="flex items-center gap-1 text-gray-700 dark:text-white/70 hover:text-gray-900 dark:hover:text-white/90">
             <span>View Payments</span>
-            <ArrowRight className="h-4 w-4" />
+            <ArrowRight className="h-4 w-4" strokeWidth={2} />
           </Button>
         </CardFooter>
       </Card>
@@ -227,11 +227,11 @@ export default function PaymentStatusCard({ userId, installationId, isLarge = fa
   const paymentIsSoon = daysUntilNextPayment !== null && daysUntilNextPayment <= 5;
 
   return (
-    <Card className={cn("overflow-hidden border-0 shadow-md", isLarge ? "w-full" : "")}>
-      <CardHeader className={cn("pb-3 bg-gradient-to-r from-slate-50 to-white", isLarge ? "" : "")}>
+    <Card className={cn("overflow-hidden border-gray-200 dark:border-white/10 shadow-sm dark:shadow-none rounded-2xl bg-white dark:bg-[#111318]", isLarge ? "w-full" : "")}>
+      <CardHeader className={cn("pb-4 px-6 pt-6 bg-gray-50 dark:bg-white/5 border-b border-gray-200 dark:border-white/10", isLarge ? "" : "")}>
         <div className="flex justify-between items-center">
-          <CardTitle className={cn("flex items-center gap-2 text-slate-800", isLarge ? "text-xl" : "text-sm")}>
-            <CircleDollarSign className={cn("text-primary", isLarge ? "h-6 w-6" : "h-4 w-4")} />
+          <CardTitle className={cn("flex items-center gap-2 text-gray-900 dark:text-white/90", isLarge ? "text-xl" : "text-sm")}>
+            <CircleDollarSign className={cn("text-blue-600 dark:text-blue-400", isLarge ? "h-6 w-6" : "h-4 w-4")} strokeWidth={2} />
             Loan Status
           </CardTitle>
           {(hasOverduePayments || paymentIsSoon) && (
@@ -239,7 +239,7 @@ export default function PaymentStatusCard({ userId, installationId, isLarge = fa
               <Tooltip>
                 <TooltipTrigger asChild>
                   <div className="flex">
-                    <Bell className={`${isLarge ? "h-5 w-5" : "h-4 w-4"} ${hasOverduePayments ? 'text-red-500' : 'text-amber-500'}`} />
+                    <Bell className={`${isLarge ? "h-5 w-5" : "h-4 w-4"} ${hasOverduePayments ? 'text-red-600 dark:text-red-400' : 'text-amber-600 dark:text-amber-400'}`} strokeWidth={2} />
                     {hasOverduePayments && <span className="relative flex h-2 w-2">
                       <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
                       <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
@@ -253,24 +253,24 @@ export default function PaymentStatusCard({ userId, installationId, isLarge = fa
             </TooltipProvider>
           )}
         </div>
-        <CardDescription className={cn("text-slate-500", isLarge ? "text-base" : "")}>
+        <CardDescription className={cn("text-gray-500 dark:text-white/50", isLarge ? "text-base" : "")}>
           {paymentPlan ? `Installation #${paymentPlan.installationId}` : "Payment information"}
         </CardDescription>
       </CardHeader>
-      <CardContent className={isLarge ? "pt-5" : "pt-3"}>
+      <CardContent className={isLarge ? "pt-6 px-6 pb-6" : "pt-4 px-6 pb-4"}>
         <div className={isLarge ? "space-y-5" : "space-y-4"}>
           {paymentPlan && (
             <>
               <div className="flex justify-between items-center">
-                <span className={cn("text-slate-500", isLarge ? "text-base" : "text-sm")}>Loan:</span>
-                <span className={cn("font-semibold text-slate-800", isLarge ? "text-lg" : "")}>
+                <span className={cn("text-gray-500 dark:text-white/50", isLarge ? "text-base" : "text-sm")}>Loan:</span>
+                <span className={cn("font-semibold text-gray-900 dark:text-white/90", isLarge ? "text-lg" : "")}>
                   {paymentPlan.name || `Loan #${paymentPlan.id}`}
                 </span>
               </div>
               
               {/* Display loan description if available */}
               {paymentPlan.description && (
-                <div className={cn("text-slate-500 italic", isLarge ? "text-sm" : "text-xs")}>
+                <div className={cn("text-gray-600 dark:text-white/60 italic", isLarge ? "text-sm" : "text-xs")}>
                   {paymentPlan.description}
                 </div>
               )}
@@ -278,16 +278,16 @@ export default function PaymentStatusCard({ userId, installationId, isLarge = fa
               {/* Loan Progress Section */}
               <div className="space-y-2">
                 <div className="flex justify-between items-center">
-                  <span className={cn("text-slate-500", isLarge ? "text-base" : "text-sm")}>Loan Progress:</span>
-                  <span className={cn("font-semibold text-slate-800", isLarge ? "text-lg" : "")}>
+                  <span className={cn("text-gray-500 dark:text-white/50", isLarge ? "text-base" : "text-sm")}>Loan Progress:</span>
+                  <span className={cn("font-semibold text-gray-900 dark:text-white/90", isLarge ? "text-lg" : "")}>
                     {loanProgress.toFixed(0)}% Completed
                   </span>
                 </div>
                 <Progress 
                   value={loanProgress} 
-                  className={cn("h-2.5 rounded-full bg-slate-100", isLarge ? "h-3" : "h-2")} 
+                  className={cn("h-2.5 rounded-full bg-gray-200 dark:bg-white/10", isLarge ? "h-3" : "h-2")} 
                 />
-                <div className="flex justify-between text-slate-500">
+                <div className="flex justify-between text-gray-500 dark:text-white/50">
                   <span className={isLarge ? "text-sm" : "text-xs"}>
                     Paid: {formatCurrency(Number(paymentPlan.totalAmount ?? 0) - Number(paymentPlan.remainingAmount ?? 0))}
                   </span>
@@ -298,17 +298,17 @@ export default function PaymentStatusCard({ userId, installationId, isLarge = fa
               </div>
               
               <div className="flex justify-between items-center">
-                <span className={cn("text-slate-500", isLarge ? "text-base" : "text-sm")}>Payment Amount:</span>
-                <span className={cn("font-semibold text-primary", isLarge ? "text-lg" : "")}>
+                <span className={cn("text-gray-500 dark:text-white/50", isLarge ? "text-base" : "text-sm")}>Payment Amount:</span>
+                <span className={cn("font-semibold text-blue-600 dark:text-blue-400", isLarge ? "text-lg" : "")}>
                   {formatCurrency(paymentPlan.installmentAmount || paymentPlan.monthlyPayment)}
                 </span>
               </div>
               
               <div className="flex justify-between items-center">
-                <span className={cn("text-slate-500", isLarge ? "text-base" : "text-sm")}>Frequency:</span>
+                <span className={cn("text-gray-500 dark:text-white/50", isLarge ? "text-base" : "text-sm")}>Frequency:</span>
                 <div className="flex items-center gap-1.5">
-                  <CalendarClock className={cn("text-slate-400", isLarge ? "h-4 w-4" : "h-3.5 w-3.5")} />
-                  <span className={cn("font-medium uppercase text-slate-700", isLarge ? "text-base" : "")}>
+                  <CalendarClock className={cn("text-gray-400 dark:text-white/40", isLarge ? "h-4 w-4" : "h-3.5 w-3.5")} strokeWidth={2} />
+                  <span className={cn("font-medium uppercase text-gray-700 dark:text-white/70", isLarge ? "text-base" : "")}>
                     {paymentPlan.frequency || "Monthly"}
                   </span>
                 </div>
@@ -316,18 +316,18 @@ export default function PaymentStatusCard({ userId, installationId, isLarge = fa
               
               {/* Loan Term / End Date */}
               <div className="flex justify-between items-center">
-                <span className={cn("text-slate-500", isLarge ? "text-base" : "text-sm")}>End Date:</span>
-                <span className={cn("font-medium text-slate-800", isLarge ? "text-base" : "")}>
+                <span className={cn("text-gray-500 dark:text-white/50", isLarge ? "text-base" : "text-sm")}>End Date:</span>
+                <span className={cn("font-medium text-gray-900 dark:text-white/80", isLarge ? "text-base" : "")}>
                   {paymentPlan.endDate ? formatDate(paymentPlan.endDate) : "N/A"}
                 </span>
               </div>
               
               {Number(paymentPlan.interestRate ?? 0) > 0 && (
                 <div className="flex justify-between items-center">
-                  <span className={cn("text-slate-500", isLarge ? "text-base" : "text-sm")}>Interest Rate:</span>
+                  <span className={cn("text-gray-500 dark:text-white/50", isLarge ? "text-base" : "text-sm")}>Interest Rate:</span>
                   <div className="flex items-center gap-1.5">
-                    <Percent className={cn("text-slate-400", isLarge ? "h-4 w-4" : "h-3.5 w-3.5")} />
-                    <span className={cn("font-medium text-slate-800", isLarge ? "text-base" : "")}>
+                    <Percent className={cn("text-gray-400 dark:text-white/40", isLarge ? "h-4 w-4" : "h-3.5 w-3.5")} strokeWidth={2} />
+                    <span className={cn("font-medium text-gray-900 dark:text-white/80", isLarge ? "text-base" : "")}>
                       {Number(paymentPlan.interestRate ?? 0)}%
                     </span>
                   </div>
@@ -339,7 +339,7 @@ export default function PaymentStatusCard({ userId, installationId, isLarge = fa
           {nextPayment && (
             <>
               <div className={cn(
-                "border-t border-slate-100 pt-4", 
+                "border-t border-gray-200 dark:border-white/10 pt-4", 
                 isLarge ? "mt-5 pt-5" : "mt-3 pt-3"
               )}>
                 <div className={cn(
@@ -347,11 +347,11 @@ export default function PaymentStatusCard({ userId, installationId, isLarge = fa
                   isLarge ? "mb-4" : "mb-3"
                 )}>
                   <span className={cn(
-                    "text-slate-500 font-medium", 
+                    "text-gray-500 dark:text-white/50 font-medium", 
                     isLarge ? "text-base" : "text-sm"
                   )}>Next Payment:</span>
                   <span className={cn(
-                    "font-semibold text-slate-800", 
+                    "font-semibold text-gray-900 dark:text-white/90", 
                     isLarge ? "text-lg" : ""
                   )}>
                     {formatDate(nextPayment.dueDate)}
@@ -359,9 +359,9 @@ export default function PaymentStatusCard({ userId, installationId, isLarge = fa
                 </div>
                 
                 <div className="flex justify-between items-center mb-2">
-                  <span className={cn("text-slate-500", isLarge ? "text-base" : "text-sm")}>Amount Due:</span>
+                  <span className={cn("text-gray-500 dark:text-white/50", isLarge ? "text-base" : "text-sm")}>Amount Due:</span>
                   <span className={cn(
-                    "font-semibold text-primary", 
+                    "font-semibold text-blue-600 dark:text-blue-400", 
                     isLarge ? "text-lg" : ""
                   )}>
                     {formatCurrency(nextPayment.amount)}
@@ -369,7 +369,7 @@ export default function PaymentStatusCard({ userId, installationId, isLarge = fa
                 </div>
                 
                 <div className="flex justify-between items-center">
-                  <span className={cn("text-slate-500", isLarge ? "text-base" : "text-sm")}>Status:</span>
+                  <span className={cn("text-gray-500 dark:text-white/50", isLarge ? "text-base" : "text-sm")}>Status:</span>
                   {getStatusBadge(nextPayment.status)}
                 </div>
               </div>
@@ -378,7 +378,7 @@ export default function PaymentStatusCard({ userId, installationId, isLarge = fa
           
           {!paymentPlan && !nextPayment && (
             <div className={cn(
-              "py-6 text-center text-slate-500",
+              "py-6 text-center text-gray-500 dark:text-white/50",
               isLarge ? "text-base" : "text-sm"
             )}>
               No active payment plans found
@@ -387,18 +387,18 @@ export default function PaymentStatusCard({ userId, installationId, isLarge = fa
         </div>
       </CardContent>
       <CardFooter className={cn(
-        "flex justify-center bg-slate-50 border-t border-slate-100",
+        "flex justify-center bg-gray-50 dark:bg-white/5 border-t border-gray-200 dark:border-white/10 px-6 pb-6",
         isLarge ? "pt-4 pb-4" : "pt-3 pb-3"
       )}>
         <Button 
           onClick={handleViewPayments} 
           className={cn(
-            "rounded-full shadow-sm hover:shadow-md transition-all",
+            "rounded-xl shadow-sm hover:shadow-md transition-all bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white",
             isLarge ? "px-6" : "px-4"
           )}
         >
           <span>View Payments</span>
-          <ArrowRight className="h-4 w-4 ml-2" />
+          <ArrowRight className="h-4 w-4 ml-2" strokeWidth={2} />
         </Button>
       </CardFooter>
     </Card>

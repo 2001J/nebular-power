@@ -43,6 +43,9 @@ public class DeviceCommand {
     @Column(length = 500)
     private String responseMessage;
 
+    @Column(columnDefinition = "TEXT")
+    private String result;
+
     @Column(length = 100)
     private String initiatedBy;
 

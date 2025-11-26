@@ -6,7 +6,6 @@ import com.solar.core_services.service_control.model.ServiceStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
-import java.time.LocalDateTime;
 import java.util.List;
 
 public interface ServiceStatusService {
@@ -47,22 +46,6 @@ public interface ServiceStatusService {
     ServiceStatusDTO restoreService(Long installationId, String reason, String username);
     
     /**
-     * Schedule a service status change
-     */
-    ServiceStatusDTO scheduleStatusChange(Long installationId, ServiceStatus.ServiceState targetStatus, 
-                                         String reason, LocalDateTime scheduledTime, String username);
-    
-    /**
-     * Cancel a scheduled service status change
-     */
-    ServiceStatusDTO cancelScheduledChange(Long installationId, String username);
-    
-    /**
-     * Process all scheduled service status changes that are due
-     */
-    void processScheduledChanges();
-    
-    /**
      * Get all service statuses for installations owned by a user
      */
     List<ServiceStatusDTO> getStatusesByUserId(Long userId);
@@ -81,4 +64,13 @@ public interface ServiceStatusService {
     ServiceStatusDTO startService(Long installationId, String username);
     ServiceStatusDTO stopService(Long installationId, String username);
     ServiceStatusDTO restartService(Long installationId, String username);
+    
+    /**
+     * Process a status report received from a device.
+     * This method updates the backend state based on the device's reported status,
+     * enabling bi-directional synchronization between devices and backend.
+     * 
+     * @param statusReport the status report from the device
+     */
+    void processDeviceStatusReport(com.solar.core_services.service_control.dto.DeviceStatusReportDTO statusReport);
 } 

@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label"
 import { useToast } from "@/components/ui/use-toast"
 import { authApi } from "@/lib/api"
 import { Eye, EyeOff, RefreshCw, ShieldCheck } from "lucide-react"
+import { ModeToggle } from "@/components/mode-toggle"
 
 function ResetPasswordContent() {
   const router = useRouter()
@@ -154,6 +155,9 @@ function ResetPasswordContent() {
   
   return (
     <div className="container flex items-center justify-center min-h-screen py-10">
+      <div className="absolute top-4 right-4">
+        <ModeToggle />
+      </div>
       <Card className="w-full max-w-md">
         <CardHeader>
           <CardTitle className="text-2xl">Reset Your Password</CardTitle>

@@ -90,8 +90,6 @@ public class ServiceStatusRepositoryTest {
         status2.setUpdatedBy("ADMIN");
         status2.setUpdatedAt(LocalDateTime.now().minusDays(5));
         status2.setStatusReason("Scheduled maintenance");
-        status2.setScheduledChange(ServiceState.ACTIVE);
-        status2.setScheduledTime(LocalDateTime.now().plusDays(2));
         status2.setActive(false);
         serviceStatusRepository.save(status2);
 
@@ -173,16 +171,6 @@ public class ServiceStatusRepositoryTest {
         
         assertThat(statuses.getContent()).hasSize(1);
         assertThat(statuses.getContent().get(0).getInstallation().getId()).isEqualTo(installation2.getId());
-    }
-
-    @Test
-    @DisplayName("Should find statuses with scheduled changes")
-    void shouldFindStatusesWithScheduledChanges() {
-        LocalDateTime cutoff = LocalDateTime.now().plusDays(5);
-        List<ServiceStatus> statuses = serviceStatusRepository.findByScheduledChangeIsNotNullAndScheduledTimeBefore(cutoff);
-        
-        assertThat(statuses).hasSize(1);
-        assertThat(statuses.get(0).getScheduledChange()).isEqualTo(ServiceState.ACTIVE);
     }
 
     @Test

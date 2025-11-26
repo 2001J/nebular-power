@@ -5,14 +5,13 @@ import { ChevronLeft, ChevronRight } from "lucide-react"
 import { DayPicker } from "react-day-picker"
 
 import { cn } from "@/lib/utils"
-import { buttonVariants } from "@/components/ui/button"
 
 export type CalendarProps = React.ComponentProps<typeof DayPicker>
 
 function Calendar({
   className,
   classNames,
-  showOutsideDays = true,
+  showOutsideDays = false,
   ...props
 }: CalendarProps) {
   return (
@@ -21,42 +20,62 @@ function Calendar({
       className={cn("p-3", className)}
       classNames={{
         months: "flex flex-col sm:flex-row space-y-4 sm:space-x-4 sm:space-y-0",
-        month: "space-y-4",
-        caption: "flex justify-center pt-1 relative items-center",
-        caption_label: "text-sm font-medium",
-        nav: "space-x-1 flex items-center",
+        month: "space-y-3",
+        caption: "flex justify-between items-center px-1 py-2 relative mb-2",
+        caption_label: "text-base font-semibold text-foreground",
+        nav: "flex items-center gap-1",
         nav_button: cn(
-          buttonVariants({ variant: "outline" }),
-          "h-7 w-7 bg-transparent p-0 opacity-50 hover:opacity-100"
+          "inline-flex items-center justify-center h-8 w-8 rounded-md border-0 bg-transparent p-0",
+          "text-foreground/80 hover:bg-accent hover:text-accent-foreground",
+          "transition-colors disabled:pointer-events-none disabled:opacity-30",
+          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         ),
-        nav_button_previous: "absolute left-1",
-        nav_button_next: "absolute right-1",
-        table: "w-full border-collapse space-y-1",
+        nav_button_previous: "",
+        nav_button_next: "",
+        table: "w-max border-collapse",
         head_row: "flex",
-        head_cell:
-          "text-muted-foreground rounded-md w-9 font-normal text-[0.8rem]",
-        row: "flex w-full mt-2",
-        cell: "h-9 w-9 text-center text-sm p-0 relative [&:has([aria-selected].day-range-end)]:rounded-r-md [&:has([aria-selected].day-outside)]:bg-accent/50 [&:has([aria-selected])]:bg-accent first:[&:has([aria-selected])]:rounded-l-md last:[&:has([aria-selected])]:rounded-r-md focus-within:relative focus-within:z-20",
+        head_cell: "text-muted-foreground rounded-md w-9 font-normal text-[0.8rem]",
+        row: "flex mt-2",
+        cell: cn(
+          "h-9 w-9 text-center text-sm p-0 relative focus-within:relative focus-within:z-20",
+          "[&:has([aria-selected])]:bg-transparent"
+        ),
         day: cn(
-          buttonVariants({ variant: "ghost" }),
-          "h-9 w-9 p-0 font-normal aria-selected:opacity-100"
+          "inline-flex items-center justify-center rounded-full w-9 h-9 p-0",
+          "text-sm font-normal text-foreground",
+          "hover:bg-accent hover:text-accent-foreground transition-colors",
+          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+          "disabled:pointer-events-none aria-selected:opacity-100"
         ),
         day_range_end: "day-range-end",
-        day_selected:
-          "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground",
-        day_today: "bg-accent text-accent-foreground",
-        day_outside:
-          "day-outside text-muted-foreground aria-selected:bg-accent/50 aria-selected:text-muted-foreground",
-        day_disabled: "text-muted-foreground opacity-50",
-        day_range_middle:
+        day_selected: cn(
+          "bg-primary text-primary-foreground font-semibold",
+          "hover:bg-primary hover:text-primary-foreground",
+          "focus:bg-primary focus:text-primary-foreground",
+          "rounded-full"
+        ),
+        day_today: cn(
+          "relative font-semibold",
+          "before:absolute before:inset-0 before:rounded-full before:border-2 before:border-primary/70 before:pointer-events-none"
+        ),
+        day_outside: cn(
+          "day-outside text-muted-foreground/40",
+          "aria-selected:bg-accent/50 aria-selected:text-muted-foreground"
+        ),
+        day_disabled: "text-muted-foreground/20 cursor-not-allowed hover:bg-transparent",
+        day_range_middle: cn(
           "aria-selected:bg-accent aria-selected:text-accent-foreground",
+          "rounded-none"
+        ),
         day_hidden: "invisible",
         ...classNames,
       }}
-      // Cast to any to avoid type mismatch between react-day-picker version types
+      formatters={{
+        formatWeekdayName: (date) => date.toLocaleDateString("en-US", { weekday: "narrow" }),
+      }}
       components={{
-        IconLeft: ({ ...props }) => <ChevronLeft className="h-4 w-4" />,
-        IconRight: ({ ...props }) => <ChevronRight className="h-4 w-4" />,
+        IconLeft: ({ ...props }) => <ChevronLeft className="h-5 w-5" {...props} />,
+        IconRight: ({ ...props }) => <ChevronRight className="h-5 w-5" {...props} />,
       } as any}
       {...props}
     />

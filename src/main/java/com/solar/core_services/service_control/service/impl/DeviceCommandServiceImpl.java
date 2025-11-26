@@ -4,12 +4,15 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.solar.core_services.energy_monitoring.model.SolarInstallation;
 import com.solar.core_services.energy_monitoring.repository.SolarInstallationRepository;
+import com.solar.core_services.service_control.config.CommandSchedulerConfig;
 import com.solar.core_services.service_control.dto.BatchCommandRequest;
 import com.solar.core_services.service_control.dto.CommandResponseRequest;
 import com.solar.core_services.service_control.dto.DeviceCommandDTO;
 import com.solar.core_services.service_control.model.DeviceCommand;
 import com.solar.core_services.service_control.repository.DeviceCommandRepository;
+import com.solar.core_services.service_control.service.CommandValidationService;
 import com.solar.core_services.service_control.service.DeviceCommandService;
+import com.solar.core_services.service_control.service.DeviceTransmissionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -29,14 +32,25 @@ public class DeviceCommandServiceImpl implements DeviceCommandService {
     private final DeviceCommandRepository deviceCommandRepository;
     private final SolarInstallationRepository installationRepository;
     private final ObjectMapper objectMapper;
+    private final DeviceTransmissionService transmissionService;
+    private final CommandValidationService validationService;
+    private final CommandSchedulerConfig schedulerConfig;
 
     @Override
-    @Transactional
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
     public DeviceCommandDTO sendCommand(Long installationId, String command, Map<String, Object> parameters, String initiatedBy) {
         log.info("Sending command {} to installation {}", command, installationId);
         
         SolarInstallation installation = installationRepository.findById(installationId)
                 .orElseThrow(() -> new RuntimeException("Installation not found with ID: " + installationId));
+        
+        // Validate command type and parameters
+        try {
+            validationService.validateCommand(command, parameters);
+        } catch (IllegalArgumentException e) {
+            log.error("Command validation failed: {}", e.getMessage());
+            throw new RuntimeException("Invalid command or parameters: " + e.getMessage(), e);
+        }
         
         DeviceCommand deviceCommand = new DeviceCommand();
         deviceCommand.setInstallation(installation);
@@ -57,9 +71,18 @@ public class DeviceCommandServiceImpl implements DeviceCommandService {
         deviceCommand = deviceCommandRepository.save(deviceCommand);
         log.info("Command saved with ID: {}", deviceCommand.getId());
         
-        // In a real implementation, you would send the command to the device here
-        // For now, we'll just update the status to SENT
-        deviceCommand.setStatus(DeviceCommand.CommandStatus.SENT);
+        // Transmit command to device via HTTP
+        boolean transmitted = transmissionService.transmitCommand(deviceCommand);
+        
+        if (transmitted) {
+            deviceCommand.setStatus(DeviceCommand.CommandStatus.SENT);
+            log.info("Command successfully transmitted to device");
+        } else {
+            deviceCommand.setStatus(DeviceCommand.CommandStatus.FAILED);
+            deviceCommand.setResponseMessage("Failed to transmit command to device");
+            log.error("Failed to transmit command to device");
+        }
+        
         deviceCommand = deviceCommandRepository.save(deviceCommand);
         
         return DeviceCommandDTO.fromEntity(deviceCommand);
@@ -111,6 +134,14 @@ public class DeviceCommandServiceImpl implements DeviceCommandService {
         if (response.getSuccess()) {
             command.setStatus(DeviceCommand.CommandStatus.EXECUTED);
             command.setResponseMessage(response.getMessage());
+            // Store the result as JSON if present
+            if (response.getResult() != null && !response.getResult().isEmpty()) {
+                try {
+                    command.setResult(new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(response.getResult()));
+                } catch (Exception e) {
+                    log.error("Failed to serialize result to JSON", e);
+                }
+            }
         } else {
             command.setStatus(DeviceCommand.CommandStatus.FAILED);
             command.setResponseMessage(response.getErrorDetails() != null ? 
@@ -221,9 +252,18 @@ public class DeviceCommandServiceImpl implements DeviceCommandService {
         command.setResponseMessage("Retried by " + retriedBy);
         command = deviceCommandRepository.save(command);
         
-        // In a real implementation, you would send the command to the device here
-        // For now, we'll just update the status to SENT
-        command.setStatus(DeviceCommand.CommandStatus.SENT);
+        // Transmit command to device via HTTP
+        boolean transmitted = transmissionService.transmitCommand(command);
+        
+        if (transmitted) {
+            command.setStatus(DeviceCommand.CommandStatus.SENT);
+            log.info("Command successfully retransmitted to device");
+        } else {
+            command.setStatus(DeviceCommand.CommandStatus.FAILED);
+            command.setResponseMessage("Failed to retransmit command to device (retry by " + retriedBy + ")");
+            log.error("Failed to retransmit command to device");
+        }
+        
         command = deviceCommandRepository.save(command);
         
         return DeviceCommandDTO.fromEntity(command);
@@ -234,9 +274,12 @@ public class DeviceCommandServiceImpl implements DeviceCommandService {
     public void processExpiredCommands() {
         log.info("Processing expired commands");
         
+        // Include DELIVERED status in expiration check as commands that were delivered
+        // but never executed should also expire
         List<DeviceCommand.CommandStatus> activeStatuses = Arrays.asList(
                 DeviceCommand.CommandStatus.PENDING,
                 DeviceCommand.CommandStatus.SENT,
+                DeviceCommand.CommandStatus.DELIVERED,
                 DeviceCommand.CommandStatus.QUEUED
         );
         
@@ -247,8 +290,10 @@ public class DeviceCommandServiceImpl implements DeviceCommandService {
         
         for (DeviceCommand command : expiredCommands) {
             command.setStatus(DeviceCommand.CommandStatus.EXPIRED);
-            command.setResponseMessage("Command expired");
+            command.setResponseMessage("Command expired after " + schedulerConfig.getExpiration().getHours() + " hours");
             deviceCommandRepository.save(command);
+            log.debug("Expired command {} (Installation: {}, Command: {})", 
+                command.getId(), command.getInstallation().getId(), command.getCommand());
         }
     }
 
@@ -257,24 +302,41 @@ public class DeviceCommandServiceImpl implements DeviceCommandService {
     public void processCommandRetries() {
         log.info("Processing command retries");
         
-        // Define retry parameters
-        int maxRetries = 3;
-        LocalDateTime retryAfter = LocalDateTime.now().minusMinutes(5); // Only retry commands that failed at least 5 minutes ago
+        // Use configured retry parameters
+        int maxRetries = schedulerConfig.getRetry().getMaxAttempts();
+        int delayMinutes = schedulerConfig.getRetry().getDelayMinutes();
+        LocalDateTime retryAfter = LocalDateTime.now().minusMinutes(delayMinutes);
         
         List<DeviceCommand> commandsToRetry = deviceCommandRepository.findCommandsForRetry(maxRetries, retryAfter);
         
-        log.info("Found {} commands to retry", commandsToRetry.size());
+        log.info("Found {} commands to retry (max attempts: {}, delay: {} minutes)", 
+            commandsToRetry.size(), maxRetries, delayMinutes);
         
         for (DeviceCommand command : commandsToRetry) {
+            int attemptNumber = command.getRetryCount() + 1;
             command.setStatus(DeviceCommand.CommandStatus.PENDING);
-            command.setRetryCount(command.getRetryCount() + 1);
+            command.setRetryCount(attemptNumber);
             command.setLastRetryAt(LocalDateTime.now());
-            command.setResponseMessage("Automatically retried");
+            command.setResponseMessage("Automatically retried (attempt " + attemptNumber + "/" + maxRetries + ")");
             deviceCommandRepository.save(command);
             
-            // In a real implementation, you would send the command to the device here
-            // For now, we'll just update the status to SENT
-            command.setStatus(DeviceCommand.CommandStatus.SENT);
+            // Transmit command to device via HTTP
+            boolean transmitted = transmissionService.transmitCommand(command);
+            
+            if (transmitted) {
+                command.setStatus(DeviceCommand.CommandStatus.SENT);
+                log.info("Command {} successfully retransmitted automatically (attempt {}/{})", 
+                    command.getId(), attemptNumber, maxRetries);
+            } else {
+                command.setStatus(DeviceCommand.CommandStatus.FAILED);
+                String failureMessage = attemptNumber >= maxRetries 
+                    ? "Automatic retry failed - maximum attempts (" + maxRetries + ") reached"
+                    : "Automatic retry failed (attempt " + attemptNumber + "/" + maxRetries + ")";
+                command.setResponseMessage(failureMessage);
+                log.error("Failed to retransmit command {} automatically (attempt {}/{})", 
+                    command.getId(), attemptNumber, maxRetries);
+            }
+            
             deviceCommandRepository.save(command);
         }
     }

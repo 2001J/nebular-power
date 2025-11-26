@@ -93,12 +93,23 @@ class EnergySimulator:
                 # Send the data
                 self._send_energy_data(energy_data)
                 
-                # Wait for the next interval
-                time.sleep(self.interval)
+                # Wait for the next interval with interruptible sleep
+                # Check every 0.5 seconds if we should stop
+                sleep_remaining = self.interval
+                while sleep_remaining > 0 and is_running():
+                    sleep_time = min(0.5, sleep_remaining)
+                    time.sleep(sleep_time)
+                    sleep_remaining -= sleep_time
                 
             except Exception as e:
                 logger.error(f"Error in energy simulation: {e}", exc_info=True)
-                time.sleep(5)  # Wait a bit before retrying
+                # Even error recovery sleep should be interruptible
+                for _ in range(10):  # 5 seconds total
+                    if not is_running():
+                        break
+                    time.sleep(0.5)
+        
+        logger.info("Energy data simulation stopped gracefully")
     
     def _generate_energy_data(self, service_status="ACTIVE"):
         """Generate realistic energy data based on time of day and simulated weather."""
@@ -265,23 +276,39 @@ class EnergySimulator:
             self.weather_condition = new_condition
     
     def _send_energy_data(self, energy_data):
-        """Send energy data to the server."""
-        try:
-            # Get authentication headers
-            from auth_helper import get_auth_helper
-            headers = get_auth_helper().get_auth_headers()
-            
-            response = requests.post(
-                self.energy_endpoint,
-                json=energy_data,
-                headers=headers,
-                timeout=10
-            )
-            
-            if response.status_code == 200 or response.status_code == 201:
-                logger.debug(f"Energy data sent successfully: {energy_data['timestamp']}")
-            else:
-                logger.warning(f"Failed to send energy data: {response.status_code} - {response.text}")
+        """Send energy data to the server with retry logic."""
+        max_retries = 2
+        timeout = 5  # Reduced from 10 seconds for faster failure detection
         
-        except RequestException as e:
-            logger.error(f"Error sending energy data: {e}")
+        for attempt in range(max_retries):
+            try:
+                # Get authentication headers
+                from auth_helper import get_auth_helper
+                headers = get_auth_helper().get_auth_headers()
+                
+                response = requests.post(
+                    self.energy_endpoint,
+                    json=energy_data,
+                    headers=headers,
+                    timeout=timeout
+                )
+                
+                if response.status_code == 200 or response.status_code == 201:
+                    logger.debug(f"Energy data sent successfully: {energy_data['timestamp']}")
+                    return True
+                else:
+                    logger.warning(f"Failed to send energy data: {response.status_code} - {response.text}")
+                    if attempt < max_retries - 1:
+                        time.sleep(1)  # Brief delay before retry
+            
+            except requests.Timeout:
+                logger.warning(f"Request timeout sending energy data (attempt {attempt + 1}/{max_retries})")
+                if attempt == max_retries - 1:
+                    logger.error("All retry attempts failed - continuing simulation")
+            except RequestException as e:
+                logger.error(f"Error sending energy data: {e}")
+                if attempt < max_retries - 1:
+                    time.sleep(1)
+                break
+        
+        return False

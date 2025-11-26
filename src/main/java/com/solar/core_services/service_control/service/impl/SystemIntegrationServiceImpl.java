@@ -6,6 +6,7 @@ import com.solar.core_services.service_control.dto.DeviceHeartbeatRequest;
 import com.solar.core_services.service_control.dto.SystemOverviewResponse;
 import com.solar.core_services.service_control.model.OperationalLog;
 import com.solar.core_services.service_control.service.DeviceCommandService;
+import com.solar.core_services.service_control.service.DeviceTransmissionService;
 import com.solar.core_services.service_control.service.OperationalLogService;
 import com.solar.core_services.service_control.service.SystemIntegrationService;
 import com.solar.core_services.service_control.service.SystemMonitoringService;
@@ -31,6 +32,7 @@ public class SystemIntegrationServiceImpl implements SystemIntegrationService {
     private final SystemMonitoringService systemMonitoringService;
     private final DeviceCommandService deviceCommandService;
     private final OperationalLogService operationalLogService;
+    private final DeviceTransmissionService deviceTransmissionService;
     
     // In-memory cache for device registration and last communication time
     private final Map<String, DeviceRegistration> deviceRegistry = new ConcurrentHashMap<>();
@@ -43,6 +45,13 @@ public class SystemIntegrationServiceImpl implements SystemIntegrationService {
         
         // Update device registry with last communication time
         updateDeviceLastCommunication(heartbeat.getDeviceId());
+        
+        // Update device transmission service heartbeat tracking
+        if (heartbeat.getInstallationId() != null) {
+            deviceTransmissionService.updateDeviceHeartbeat(heartbeat.getInstallationId());
+            log.info("Updated transmission service heartbeat for installation: {}", 
+                    heartbeat.getInstallationId());
+        }
         
         // Delegate to system monitoring service
         systemMonitoringService.processHeartbeat(heartbeat);

@@ -1,5 +1,13 @@
 import { apiClient, makeApiRequest } from './client';
 
+const ensureReason = (reason: string, errorMessage: string): string => {
+  const trimmedReason = (reason ?? '').trim();
+  if (!trimmedReason) {
+    throw new Error(errorMessage);
+  }
+  return trimmedReason;
+};
+
 // Service Status endpoints
 export const serviceControlApi = {
   async getCurrentStatus(installationId: string): Promise<any> {
@@ -31,22 +39,34 @@ export const serviceControlApi = {
       status,
       statusReason: statusData.statusReason || '',
       updatedBy: statusData.updatedBy || 'SYSTEM',
-      scheduledChange: statusData.scheduledChange ?? null,
-      scheduledTime: statusData.scheduledTime ?? null,
     };
 
     return makeApiRequest(() => apiClient.put(`/api/service/status/${installationId}`, payload));
   },
 
   async suspendServiceForPayment(installationId: string, reason: string): Promise<any> {
+    const validatedReason = ensureReason(
+      reason,
+      'A reason is required to suspend a service for payment issues.'
+    );
+
     return makeApiRequest(() =>
-      apiClient.post(`/api/service/status/${installationId}/suspend/payment`, null, { params: { reason } })
+      apiClient.post(`/api/service/status/${installationId}/suspend/payment`, null, {
+        params: { reason: validatedReason },
+      })
     );
   },
 
   async suspendServiceForSecurity(installationId: string, reason: string): Promise<any> {
+    const validatedReason = ensureReason(
+      reason,
+      'A reason is required to suspend a service for security concerns.'
+    );
+
     return makeApiRequest(() =>
-      apiClient.post(`/api/service/status/${installationId}/suspend/security`, null, { params: { reason } })
+      apiClient.post(`/api/service/status/${installationId}/suspend/security`, null, {
+        params: { reason: validatedReason },
+      })
     );
   },
 
@@ -60,23 +80,6 @@ export const serviceControlApi = {
     return makeApiRequest(() =>
       apiClient.post(`/api/service/status/${installationId}/restore`, null, { params: { reason } })
     );
-  },
-
-  async scheduleStatusChange(
-    installationId: string,
-    targetStatus: string,
-    reason: string,
-    scheduledTime: string
-  ): Promise<any> {
-    return makeApiRequest(() =>
-      apiClient.post(`/api/service/status/${installationId}/schedule`, null, {
-        params: { targetStatus, reason, scheduledTime },
-      })
-    );
-  },
-
-  async cancelScheduledChange(installationId: string): Promise<any> {
-    return makeApiRequest(() => apiClient.delete(`/api/service/status/${installationId}/schedule`));
   },
 
   async getInstallationsByStatus(status: string, page = 0, size = 20): Promise<any> {

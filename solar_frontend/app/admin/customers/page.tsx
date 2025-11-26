@@ -445,10 +445,10 @@ export default function CustomersPage() {
         </BreadcrumbList>
       </Breadcrumb>
 
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Customer Management</h1>
-          <p className="text-muted-foreground">Manage all customer accounts and installations.</p>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Customer Management</h1>
+          <p className="text-sm sm:text-base text-muted-foreground">Manage all customer accounts and installations.</p>
         </div>
 
         <div className="flex items-center gap-2">
@@ -458,50 +458,51 @@ export default function CustomersPage() {
 
           <Button onClick={() => router.push("/admin/customers/create")}>
             <Plus className="h-4 w-4 mr-2" />
-            Add Customer
+            <span className="hidden sm:inline">Add Customer</span>
+            <span className="sm:hidden">Add</span>
           </Button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-        <Card>
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6 mb-6">
+        <Card className="border border-border/50 shadow-soft bg-card">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Customers</CardTitle>
-            <div className="h-8 w-8 flex items-center justify-center rounded-full bg-blue-100">
-              <User className="h-4 w-4 text-blue-600" />
+            <CardTitle className="text-xs sm:text-sm font-medium">Total Customers</CardTitle>
+            <div className="h-8 w-8 flex items-center justify-center rounded-full bg-blue-100 dark:bg-blue-500/20">
+              <User className="h-4 w-4 text-blue-600 dark:text-blue-400" />
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{pagination.totalElements || customers.length}</div>
+            <div className="text-xl sm:text-2xl font-bold">{pagination.totalElements || customers.length}</div>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="border border-border/50 shadow-soft bg-card">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Active Customers</CardTitle>
-            <div className="h-8 w-8 flex items-center justify-center rounded-full bg-green-100">
-              <CheckCircle className="h-4 w-4 text-green-600" />
+            <CardTitle className="text-xs sm:text-sm font-medium">Active Customers</CardTitle>
+            <div className="h-8 w-8 flex items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-500/20">
+              <CheckCircle className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{customers.filter(c => c.status === "ACTIVE").length}</div>
+            <div className="text-xl sm:text-2xl font-bold">{customers.filter(c => c.status === "ACTIVE").length}</div>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="border border-border/50 shadow-soft bg-card">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Pending Verification</CardTitle>
-            <div className="h-8 w-8 flex items-center justify-center rounded-full bg-amber-100">
-              <Clock className="h-4 w-4 text-amber-600" />
+            <CardTitle className="text-xs sm:text-sm font-medium">Pending Verification</CardTitle>
+            <div className="h-8 w-8 flex items-center justify-center rounded-full bg-amber-100 dark:bg-amber-500/20">
+              <Clock className="h-4 w-4 text-amber-600 dark:text-amber-400" />
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{customers.filter(c => c.status === "PENDING_VERIFICATION").length}</div>
+            <div className="text-xl sm:text-2xl font-bold">{customers.filter(c => c.status === "PENDING_VERIFICATION").length}</div>
           </CardContent>
         </Card>
       </div>
 
-      <Card>
+      <Card className="border border-border/50 shadow-soft bg-card">
         <CardHeader>
           <CardTitle>Customers</CardTitle>
           <CardDescription>
@@ -783,16 +784,19 @@ export default function CustomersPage() {
                           <Badge
                             variant={
                               customer.status === "ACTIVE"
-                                ? "default"
+                                ? "success"
                                 : customer.status === "PENDING_VERIFICATION"
-                                  ? "outline"
+                                  ? "warning"
                                   : customer.status === "LOCKED"
                                     ? "destructive"
-                                    : "secondary"
+                                    : customer.status === "SUSPENDED"
+                                      ? "destructive"
+                                      : "secondary"
                             }
+                            className="rounded-full font-medium"
                           >
                             {customer.status === "ACTIVE" ? "Active" :
-                              customer.status === "PENDING_VERIFICATION" ? "Pending Verification" :
+                              customer.status === "PENDING_VERIFICATION" ? "Pending" :
                                 customer.status === "SUSPENDED" ? "Suspended" :
                                   customer.status === "LOCKED" ? "Locked" : customer.status || "N/A"}
                           </Badge>

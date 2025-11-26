@@ -18,9 +18,16 @@ describe('energyApi fallbacks', () => {
 
   test('getSystemOverview falls back to integration endpoint on error', async () => {
     getMock.mockRejectedValueOnce(new Error('down'));
-    getMock.mockResolvedValueOnce({ data: { ok: true } });
+    getMock.mockResolvedValueOnce({ 
+      data: { 
+        totalActiveInstallations: 0,
+        todayTotalGenerationKWh: 0,
+        todayTotalConsumptionKWh: 0
+      } 
+    });
     const res = await energyApi.getSystemOverview();
-    expect(res.ok).toBe(true);
+    expect(res).toBeDefined();
+    expect(res.totalActiveInstallations).toBe(0);
     expect(getMock).toHaveBeenCalledTimes(2);
   });
 
@@ -69,6 +76,8 @@ describe('energyApi fallbacks', () => {
     expect(v1).toBe(42);
 
     // getInstallationDashboard error -> 0
+    // Reset mock and set up error case
+    getMock.mockReset();
     getMock.mockRejectedValueOnce(new Error('down'));
     const v2 = await energyApi.calculateInstallationAverageEfficiency('i1');
     expect(v2).toBe(0);

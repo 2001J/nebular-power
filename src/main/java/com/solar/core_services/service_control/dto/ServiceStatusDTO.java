@@ -19,8 +19,6 @@ public class ServiceStatusDTO {
     private ServiceStatus.ServiceState status;
     private LocalDateTime updatedAt;
     private String updatedBy;
-    private ServiceStatus.ServiceState scheduledChange;
-    private LocalDateTime scheduledTime;
     private String statusReason;
     private boolean active;
     
@@ -39,8 +37,6 @@ public class ServiceStatusDTO {
                 .status(serviceStatus.getStatus())
                 .updatedAt(serviceStatus.getUpdatedAt())
                 .updatedBy(serviceStatus.getUpdatedBy())
-                .scheduledChange(serviceStatus.getScheduledChange())
-                .scheduledTime(serviceStatus.getScheduledTime())
                 .statusReason(serviceStatus.getStatusReason())
                 .active(serviceStatus.isActive())
                 .build();

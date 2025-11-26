@@ -81,12 +81,22 @@ class HeartbeatSimulator:
                 # Generate and send heartbeat
                 self._send_heartbeat()
                 
-                # Wait for the next interval
-                time.sleep(self.interval)
+                # Wait for the next interval with interruptible sleep
+                sleep_remaining = self.interval
+                while sleep_remaining > 0 and is_running():
+                    sleep_time = min(0.5, sleep_remaining)
+                    time.sleep(sleep_time)
+                    sleep_remaining -= sleep_time
                 
             except Exception as e:
                 logger.error(f"Error in heartbeat simulation: {e}", exc_info=True)
-                time.sleep(5)  # Wait a bit before retrying
+                # Interruptible error recovery sleep
+                for _ in range(10):  # 5 seconds total
+                    if not is_running():
+                        break
+                    time.sleep(0.5)
+        
+        logger.info("Heartbeat simulation stopped gracefully")
     
     def _update_device_state(self):
         """Update the internal state of the device."""
@@ -167,24 +177,40 @@ class HeartbeatSimulator:
             
             heartbeat_data["diagnostics"] = diagnostics
         
-        # Send the heartbeat
-        try:
-            # Get authentication headers
-            from auth_helper import get_auth_helper
-            headers = get_auth_helper().get_auth_headers()
-            
-            response = requests.post(
-                self.heartbeat_endpoint,
-                json=heartbeat_data,
-                headers=headers,
-                timeout=10
-            )
-            
-            if response.status_code == 200 or response.status_code == 201:
-                logger.debug(f"Heartbeat sent successfully for device {self.device_id}")
-            else:
-                logger.warning(f"Failed to send heartbeat for device {self.device_id}: "
-                             f"{response.status_code} - {response.text}")
+        # Send the heartbeat with retry logic
+        max_retries = 2
+        timeout = 5  # Reduced from 10 seconds
         
-        except RequestException as e:
-            logger.error(f"Error sending heartbeat for device {self.device_id}: {e}")
+        for attempt in range(max_retries):
+            try:
+                # Get authentication headers
+                from auth_helper import get_auth_helper
+                headers = get_auth_helper().get_auth_headers()
+                
+                response = requests.post(
+                    self.heartbeat_endpoint,
+                    json=heartbeat_data,
+                    headers=headers,
+                    timeout=timeout
+                )
+                
+                if response.status_code == 200 or response.status_code == 201:
+                    logger.debug(f"Heartbeat sent successfully for device {self.device_id}")
+                    return True
+                else:
+                    logger.warning(f"Failed to send heartbeat for device {self.device_id}: "
+                                 f"{response.status_code} - {response.text}")
+                    if attempt < max_retries - 1:
+                        time.sleep(1)
+            
+            except requests.Timeout:
+                logger.warning(f"Heartbeat request timeout (attempt {attempt + 1}/{max_retries})")
+                if attempt == max_retries - 1:
+                    logger.error("Heartbeat failed after all retries - continuing simulation")
+            except RequestException as e:
+                logger.error(f"Error sending heartbeat for device {self.device_id}: {e}")
+                if attempt < max_retries - 1:
+                    time.sleep(1)
+                break
+        
+        return False

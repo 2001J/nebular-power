@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, use } from "react"
 import { useRouter } from "next/navigation"
 import React from "react"
 import {
@@ -52,6 +52,7 @@ interface PaymentPlan {
   endDate: string;
   status: string;
   interestRate: number;
+  downPayment: number;
   lateFeeAmount: number;
   gracePeriodDays: number;
   payments: Payment[];
@@ -75,9 +76,9 @@ interface LoanParams {
   id: string;
 }
 
-export default function LoanDetailsPage({ params }: { params: LoanParams }) {
+export default function LoanDetailsPage({ params }: { params: Promise<LoanParams> }) {
   const router = useRouter()
-  const loanId = params.id
+  const { id: loanId } = use(params)
   const [loan, setLoan] = useState<PaymentPlan | null>(null)
   const [loading, setLoading] = useState(true)
   const [payments, setPayments] = useState<Payment[]>([])
@@ -663,16 +664,30 @@ export default function LoanDetailsPage({ params }: { params: LoanParams }) {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium">Total Amount</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">${(loanData.totalAmount ?? 0).toLocaleString()}</div>
+              <p className="text-xs text-muted-foreground">
+                Original loan amount
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium">Amount Paid</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-green-600 dark:text-green-400">
+                ${((loanData.totalAmount ?? 0) - (loanData.remainingAmount ?? 0)).toLocaleString()}
+              </div>
               <div className="mt-2">
                 <div className="flex items-center justify-between mb-1">
-                  <span className="text-sm font-medium">Repayment Progress</span>
+                  <span className="text-sm font-medium">Progress</span>
                   <span className="text-sm font-medium">{getProgressPercentage()}%</span>
                 </div>
                 <Progress value={getProgressPercentage()} className="h-2" />
@@ -682,12 +697,12 @@ export default function LoanDetailsPage({ params }: { params: LoanParams }) {
           
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">Monthly Payment</CardTitle>
+              <CardTitle className="text-sm font-medium">Payment Amount</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">${(loanData.monthlyPayment ?? loanData.installmentAmount ?? 0).toLocaleString()}</div>
+              <div className="text-2xl font-bold">${(loanData.installmentAmount ?? loanData.monthlyPayment ?? 0).toLocaleString()}</div>
               <p className="text-xs text-muted-foreground">
-                {formatFrequency(loanData.frequency)} installments
+                Per {formatFrequency(loanData.frequency).toLowerCase()} payment
               </p>
             </CardContent>
           </Card>
@@ -721,6 +736,11 @@ export default function LoanDetailsPage({ params }: { params: LoanParams }) {
                 <div>
                   <h4 className="text-sm font-medium">Interest Rate</h4>
                   <p className="mt-1">{loanData.interestRate || 0}%</p>
+                </div>
+                
+                <div>
+                  <h4 className="text-sm font-medium">Down Payment</h4>
+                  <p className="mt-1">${(loanData.downPayment || 0).toLocaleString()}</p>
                 </div>
                 
                 <div>

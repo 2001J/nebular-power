@@ -531,15 +531,15 @@ export default function AdminPaymentsPage() {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'OVERDUE':
-        return <Badge variant="destructive">Overdue</Badge>
+        return <Badge variant="destructive" className="rounded-full font-medium">Overdue</Badge>
       case 'PARTIALLY_PAID':
-        return <Badge variant="outline" className="bg-amber-100 text-amber-800 border-amber-300">Partially Paid</Badge>
+        return <Badge variant="warning" className="rounded-full font-medium">Partially Paid</Badge>
       case 'PENDING':
-        return <Badge variant="outline">Pending</Badge>
+        return <Badge variant="default" className="rounded-full font-medium">Pending</Badge>
       case 'PAID':
-        return <Badge variant="outline" className="bg-green-100 text-green-800 border-green-300">Paid</Badge>
+        return <Badge variant="success" className="rounded-full font-medium">Paid</Badge>
       default:
-        return <Badge variant="secondary">{status}</Badge>
+        return <Badge variant="secondary" className="rounded-full font-medium">{status}</Badge>
     }
   }
 
@@ -548,20 +548,34 @@ export default function AdminPaymentsPage() {
     let isValid = true;
     const errors: string[] = [];
 
+    // Check for empty required fields
+    if ((updatedGracePeriodConfig.numberOfDays as any) === "" || updatedGracePeriodConfig.numberOfDays === undefined) {
+      isValid = false;
+      errors.push("Grace period duration is required");
+    }
+
+    if ((updatedGracePeriodConfig.reminderFrequency as any) === "" || updatedGracePeriodConfig.reminderFrequency === undefined) {
+      isValid = false;
+      errors.push("Reminder frequency is required");
+    }
+
     // Convert string inputs to numbers for validation
-    const gracePeriodDays = parseInt(updatedGracePeriodConfig.numberOfDays?.toString() || '7');
-    const reminderFrequency = parseInt(updatedGracePeriodConfig.reminderFrequency?.toString() || '2');
+    const gracePeriodDays = parseInt(updatedGracePeriodConfig.numberOfDays?.toString() || '0');
+    const reminderFrequency = parseInt(updatedGracePeriodConfig.reminderFrequency?.toString() || '0');
 
     // Validate grace period days
-    if (isNaN(gracePeriodDays) || gracePeriodDays < 1 || gracePeriodDays > 30) {
+    if (!isNaN(gracePeriodDays) && (gracePeriodDays < 0 || gracePeriodDays > 30)) {
       isValid = false;
-      errors.push("Grace period must be between 1 and 30 days");
+      errors.push("Grace period must be between 0 and 30 days");
     }
 
     // Validate reminder frequency
-    if (isNaN(reminderFrequency) || reminderFrequency < 1 || reminderFrequency > gracePeriodDays) {
-      isValid = false;
-      errors.push(`Reminder frequency must be between 1 and ${gracePeriodDays} days`);
+    if (!isNaN(reminderFrequency) && (reminderFrequency < 1 || reminderFrequency > gracePeriodDays)) {
+      // Only validate frequency if grace period is valid and > 0
+      if (gracePeriodDays > 0) {
+        isValid = false;
+        errors.push(`Reminder frequency must be between 1 and ${gracePeriodDays} days`);
+      }
     }
 
     // Validate late fee settings
@@ -621,23 +635,37 @@ export default function AdminPaymentsPage() {
     let isValid = true;
     const errors: string[] = [];
 
+    // Check for empty required fields
+    if ((updatedReminderConfig.firstReminderDays as any) === "" || updatedReminderConfig.firstReminderDays === undefined) {
+      isValid = false;
+      errors.push("First reminder day is required");
+    }
+    if ((updatedReminderConfig.secondReminderDays as any) === "" || updatedReminderConfig.secondReminderDays === undefined) {
+      isValid = false;
+      errors.push("Second reminder day is required");
+    }
+    if ((updatedReminderConfig.finalReminderDays as any) === "" || updatedReminderConfig.finalReminderDays === undefined) {
+      isValid = false;
+      errors.push("Final reminder day is required");
+    }
+
     // Convert string inputs to numbers for validation
-    const firstDays = parseInt(updatedReminderConfig.firstReminderDays?.toString() || '1');
-    const secondDays = parseInt(updatedReminderConfig.secondReminderDays?.toString() || '3');
-    const finalDays = parseInt(updatedReminderConfig.finalReminderDays?.toString() || '7');
+    const firstDays = parseInt(updatedReminderConfig.firstReminderDays?.toString() || '0');
+    const secondDays = parseInt(updatedReminderConfig.secondReminderDays?.toString() || '0');
+    const finalDays = parseInt(updatedReminderConfig.finalReminderDays?.toString() || '0');
 
     // Validate that all reminder days are positive integers (days BEFORE due date)
-    if (isNaN(firstDays) || firstDays < 1) {
+    if (firstDays < 1) {
       isValid = false;
       errors.push("First reminder must be at least 1 day before due date");
     }
 
-    if (isNaN(secondDays) || secondDays < 1) {
+    if (secondDays < 1) {
       isValid = false;
       errors.push("Second reminder must be at least 1 day before due date");
     }
 
-    if (isNaN(finalDays) || finalDays < 1) {
+    if (finalDays < 1) {
       isValid = false;
       errors.push("Final reminder must be at least 1 day before due date");
     }
@@ -684,7 +712,7 @@ export default function AdminPaymentsPage() {
         <div className="flex justify-between items-center gap-3">
           <dt className="text-sm font-medium">Grace Period</dt>
           <dd className="text-sm">
-            <Badge variant={gracePeriodConfig.numberOfDays > 0 ? "default" : "destructive"} className={gracePeriodConfig.numberOfDays > 0 ? "bg-green-100 text-green-800 border-green-300" : ""}>
+            <Badge variant={gracePeriodConfig.numberOfDays > 0 ? "success" : "destructive"} className="rounded-full font-medium">
               {gracePeriodConfig.numberOfDays} days
             </Badge>
           </dd>
@@ -693,9 +721,9 @@ export default function AdminPaymentsPage() {
           <dt className="text-sm font-medium">Auto-Suspension</dt>
           <dd className="text-sm">
             {gracePeriodConfig.autoSuspendEnabled ? (
-              <Badge variant="destructive" className="bg-red-100 text-red-800 border-red-300">Enabled</Badge>
+              <Badge variant="destructive" className="rounded-full font-medium">Enabled</Badge>
             ) : (
-              <Badge variant="outline">Disabled</Badge>
+              <Badge variant="secondary" className="rounded-full font-medium">Disabled</Badge>
             )}
           </dd>
         </div>
@@ -707,9 +735,9 @@ export default function AdminPaymentsPage() {
           <dt className="text-sm font-medium">Late Fee Status</dt>
           <dd className="text-sm">
             {gracePeriodConfig.lateFeesEnabled ? (
-              <Badge variant="default">Enabled</Badge>
+              <Badge variant="success" className="rounded-full font-medium">Enabled</Badge>
             ) : (
-              <Badge variant="outline">Disabled</Badge>
+              <Badge variant="secondary" className="rounded-full font-medium">Disabled</Badge>
             )}
           </dd>
         </div>
@@ -1263,12 +1291,16 @@ export default function AdminPaymentsPage() {
                     min="0"
                     max="30"
                     value={updatedGracePeriodConfig.numberOfDays}
-                    onChange={(e) => setUpdatedGracePeriodConfig({
-                      ...updatedGracePeriodConfig,
-                      numberOfDays: parseInt(e.target.value) || 0,
-                      gracePeriodDays: parseInt(e.target.value) || 0
-                    })}
-                    className="pr-12" // Add padding to the right to make room for the "days" label
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setUpdatedGracePeriodConfig({
+                        ...updatedGracePeriodConfig,
+                        numberOfDays: value === '' ? '' : parseInt(value),
+                        gracePeriodDays: value === '' ? '' : parseInt(value)
+                      } as any);
+                    }}
+                    onWheel={(e) => e.currentTarget.blur()}
+                    className="pr-12 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                   />
                   <span className="absolute right-3 top-2.5 text-sm text-muted-foreground">days</span>
                 </div>
@@ -1286,11 +1318,15 @@ export default function AdminPaymentsPage() {
                     min="1"
                     max="14"
                     value={updatedGracePeriodConfig.reminderFrequency}
-                    onChange={(e) => setUpdatedGracePeriodConfig({
-                      ...updatedGracePeriodConfig,
-                      reminderFrequency: parseInt(e.target.value) || 1
-                    })}
-                    className="pr-12" // Add padding to the right to make room for the "days" label
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setUpdatedGracePeriodConfig({
+                        ...updatedGracePeriodConfig,
+                        reminderFrequency: value === '' ? '' : parseInt(value)
+                      } as any);
+                    }}
+                    onWheel={(e) => e.currentTarget.blur()}
+                    className="pr-12 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                   />
                   <span className="absolute right-3 top-2.5 text-sm text-muted-foreground">days</span>
                 </div>
@@ -1302,7 +1338,7 @@ export default function AdminPaymentsPage() {
               <p className="text-sm font-medium mb-3">System Behavior After Grace Period</p>
               <div className="flex items-center justify-between mb-3 bg-muted/30 p-3 rounded-md">
                 <div className="flex items-center space-x-2">
-                  <Badge variant="outline" className={updatedGracePeriodConfig.autoSuspendEnabled ? "bg-red-100 text-red-800 border-red-300" : ""}>
+                  <Badge variant={updatedGracePeriodConfig.autoSuspendEnabled ? "destructive" : "secondary"} className="rounded-full font-medium">
                     Auto-Suspension
                   </Badge>
                   <span className="text-xs text-muted-foreground">
@@ -1476,7 +1512,7 @@ export default function AdminPaymentsPage() {
                 <span>Due Date</span>
               </div>
               {/* Legend to clarify marker colors and reduce confusion */}
-              <div className="mt-3 grid grid-cols-3 gap-2 text-xs text-muted-foreground">
+              <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs text-muted-foreground">
                 <div className="flex items-center space-x-2">
                   <span className="inline-block w-2.5 h-2.5 rounded-full bg-blue-400" />
                   <span>First</span>
@@ -1498,21 +1534,20 @@ export default function AdminPaymentsPage() {
               <div className="relative">
                   <Input
                     id="firstReminderDays"
-                    type="text"
-                    inputMode="numeric"
-                    pattern="[0-9]*"
+                    type="number"
                     min={Math.max(1, parseInt(updatedReminderConfig.secondReminderDays?.toString() || '0') + 1)}
                     max={60}
                     value={updatedReminderConfig.firstReminderDays}
                     onChange={(e) => {
-                      const value = parseInt(e.target.value);
-                    setUpdatedReminderConfig({
-                      ...updatedReminderConfig,
-                      firstReminderDays: isNaN(value) ? 1 : value
-                    });
-                  }}
-                  className="pr-16"
-                />
+                      const value = e.target.value;
+                      setUpdatedReminderConfig({
+                        ...updatedReminderConfig,
+                        firstReminderDays: value === '' ? '' : parseInt(value)
+                      } as any);
+                    }}
+                    onWheel={(e) => e.currentTarget.blur()}
+                    className="pr-16 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  />
                 <span className="absolute right-3 top-2.5 text-sm text-muted-foreground select-none pointer-events-none">days</span>
               </div>
                 <p className="text-xs text-muted-foreground">
@@ -1525,21 +1560,20 @@ export default function AdminPaymentsPage() {
               <div className="relative">
                   <Input
                     id="secondReminderDays"
-                    type="text"
-                    inputMode="numeric"
-                    pattern="[0-9]*"
+                    type="number"
                     min={Math.max(1, parseInt(updatedReminderConfig.finalReminderDays?.toString() || '0') + 1)}
                     max={Math.max(1, parseInt(updatedReminderConfig.firstReminderDays?.toString() || '60') - 1)}
                     value={updatedReminderConfig.secondReminderDays}
                     onChange={(e) => {
-                      const value = parseInt(e.target.value);
-                    setUpdatedReminderConfig({
-                      ...updatedReminderConfig,
-                      secondReminderDays: isNaN(value) ? 3 : value
-                    });
-                  }}
-                  className="pr-16"
-                />
+                      const value = e.target.value;
+                      setUpdatedReminderConfig({
+                        ...updatedReminderConfig,
+                        secondReminderDays: value === '' ? '' : parseInt(value)
+                      } as any);
+                    }}
+                    onWheel={(e) => e.currentTarget.blur()}
+                    className="pr-16 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  />
                 <span className="absolute right-3 top-2.5 text-sm text-muted-foreground select-none pointer-events-none">days</span>
               </div>
                 <p className="text-xs text-muted-foreground">
@@ -1552,21 +1586,20 @@ export default function AdminPaymentsPage() {
               <div className="relative">
                   <Input
                     id="finalReminderDays"
-                    type="text"
-                    inputMode="numeric"
-                    pattern="[0-9]*"
+                    type="number"
                     min={1}
                     max={Math.max(1, parseInt(updatedReminderConfig.secondReminderDays?.toString() || '2') - 1)}
                     value={updatedReminderConfig.finalReminderDays}
                     onChange={(e) => {
-                      const value = parseInt(e.target.value);
-                    setUpdatedReminderConfig({
-                      ...updatedReminderConfig,
-                      finalReminderDays: isNaN(value) ? 7 : value
-                    });
-                  }}
-                  className="pr-16"
-                />
+                      const value = e.target.value;
+                      setUpdatedReminderConfig({
+                        ...updatedReminderConfig,
+                        finalReminderDays: value === '' ? '' : parseInt(value)
+                      } as any);
+                    }}
+                    onWheel={(e) => e.currentTarget.blur()}
+                    className="pr-16 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  />
                 <span className="absolute right-3 top-2.5 text-sm text-muted-foreground select-none pointer-events-none">days</span>
               </div>
                 <p className="text-xs text-muted-foreground">

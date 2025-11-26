@@ -746,47 +746,43 @@ export default function AnalyticsPage() {
                   <Chart>
                     <ChartContainer>
                       <ResponsiveContainer width="100%" height={400}>
-                        <AreaChart data={chartData.data} margin={{ top: 10, right: 30, left: 10, bottom: 20 }}>
+                        <AreaChart data={chartData.data} margin={{ top: 20, right: 20, left: 20, bottom: 20 }}>
                           <defs>
                             <linearGradient id="colorProduction" x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="5%" stopColor="#4ade80" stopOpacity={0.8} />
-                              <stop offset="95%" stopColor="#4ade80" stopOpacity={0.1} />
+                              <stop offset="5%" stopColor="hsl(var(--chart-2))" stopOpacity={0.8} />
+                              <stop offset="95%" stopColor="hsl(var(--chart-2))" stopOpacity={0.1} />
                             </linearGradient>
                             <linearGradient id="colorConsumption" x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="5%" stopColor="#f87171" stopOpacity={0.8} />
-                              <stop offset="95%" stopColor="#f87171" stopOpacity={0.1} />
+                              <stop offset="5%" stopColor="hsl(var(--chart-5))" stopOpacity={0.8} />
+                              <stop offset="95%" stopColor="hsl(var(--chart-5))" stopOpacity={0.1} />
                             </linearGradient>
                             <linearGradient id="colorSelfConsumption" x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="5%" stopColor="#60a5fa" stopOpacity={0.8} />
-                              <stop offset="95%" stopColor="#60a5fa" stopOpacity={0.1} />
+                              <stop offset="5%" stopColor="hsl(var(--chart-3))" stopOpacity={0.8} />
+                              <stop offset="95%" stopColor="hsl(var(--chart-3))" stopOpacity={0.1} />
                             </linearGradient>
                             <linearGradient id="colorExport" x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="5%" stopColor="#34d399" stopOpacity={0.8} />
-                              <stop offset="95%" stopColor="#34d399" stopOpacity={0.1} />
+                              <stop offset="5%" stopColor="hsl(var(--chart-4))" stopOpacity={0.8} />
+                              <stop offset="95%" stopColor="hsl(var(--chart-4))" stopOpacity={0.1} />
                             </linearGradient>
                             <linearGradient id="colorImport" x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="5%" stopColor="#fb7185" stopOpacity={0.8} />
-                              <stop offset="95%" stopColor="#fb7185" stopOpacity={0.1} />
+                              <stop offset="5%" stopColor="hsl(var(--chart-1))" stopOpacity={0.8} />
+                              <stop offset="95%" stopColor="hsl(var(--chart-1))" stopOpacity={0.1} />
                             </linearGradient>
                           </defs>
-                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="currentColor" opacity={0.1} />
+                          <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                           <XAxis
                             dataKey={chartData.xKey}
-                            tick={{ fontSize: 12 }}
-                            tickLine={{ stroke: "currentColor", opacity: 0.2 }}
-                            axisLine={{ stroke: "currentColor", opacity: 0.2 }}
+                            className="text-xs"
+                            tickLine={false}
+                            axisLine={false}
+                            {...(selectedPeriod === 'day' ? { interval: 2 } : selectedPeriod === 'month' ? { interval: 2 } : {})}
                           />
                           <YAxis
                             yAxisId="left"
-                            tick={{ fontSize: 12 }}
-                            tickLine={{ stroke: "currentColor", opacity: 0.2 }}
-                            axisLine={{ stroke: "currentColor", opacity: 0.2 }}
-                            label={{
-                              value: `Power (${chartData.unit})`,
-                              angle: -90,
-                              position: "insideLeft",
-                              fontSize: 12,
-                            }}
+                            width={60}
+                            className="text-xs"
+                            tickLine={false}
+                            axisLine={false}
                             domain={['auto', 'auto']}
                             allowDataOverflow={false}
                           />
@@ -794,16 +790,11 @@ export default function AnalyticsPage() {
                             <YAxis
                               yAxisId="right"
                               orientation="right"
+                              width={60}
                               domain={[0, 36]}
-                              tick={{ fontSize: 12 }}
-                              tickLine={{ stroke: "currentColor", opacity: 0.2 }}
-                              axisLine={{ stroke: "currentColor", opacity: 0.2 }}
-                              label={{
-                                value: "Temperature (°C)",
-                                angle: 90,
-                                position: "insideRight",
-                                fontSize: 12,
-                              }}
+                              className="text-xs"
+                              tickLine={false}
+                              axisLine={false}
                             />
                           )}
                           <Tooltip
@@ -825,7 +816,7 @@ export default function AnalyticsPage() {
                               yAxisId="left"
                               type="monotone"
                               dataKey="production"
-                              stroke="#4ade80"
+                              stroke="hsl(var(--chart-2))"
                               strokeWidth={2}
                               fillOpacity={1}
                               fill="url(#colorProduction)"
@@ -837,7 +828,7 @@ export default function AnalyticsPage() {
                               yAxisId="left"
                               type="monotone"
                               dataKey="consumption"
-                              stroke="#f87171"
+                              stroke="hsl(var(--chart-5))"
                               strokeWidth={2}
                               fillOpacity={1}
                               fill="url(#colorConsumption)"
@@ -849,7 +840,7 @@ export default function AnalyticsPage() {
                               yAxisId="left"
                               type="monotone"
                               dataKey="selfConsumption"
-                              stroke="#60a5fa"
+                              stroke="hsl(var(--chart-3))"
                               strokeWidth={2}
                               fillOpacity={1}
                               fill="url(#colorSelfConsumption)"
@@ -861,7 +852,7 @@ export default function AnalyticsPage() {
                               yAxisId="left"
                               type="monotone"
                               dataKey="export"
-                              stroke="#34d399"
+                              stroke="hsl(var(--chart-4))"
                               strokeWidth={2}
                               fillOpacity={1}
                               fill="url(#colorExport)"
@@ -873,7 +864,7 @@ export default function AnalyticsPage() {
                               yAxisId="left"
                               type="monotone"
                               dataKey="import"
-                              stroke="#fb7185"
+                              stroke="hsl(var(--chart-1))"
                               strokeWidth={2}
                               fillOpacity={1}
                               fill="url(#colorImport)"
@@ -885,9 +876,9 @@ export default function AnalyticsPage() {
                               yAxisId="right"
                               type="monotone"
                               dataKey="temperature"
-                              stroke="#f59e0b"
+                              stroke="hsl(var(--chart-5))"
                               strokeWidth={2}
-                              dot={{ r: 2, fill: "#f59e0b" }}
+                              dot={{ r: 2, fill: "hsl(var(--chart-5))" }}
                               name="Temperature"
                             />
                           )}
@@ -907,30 +898,21 @@ export default function AnalyticsPage() {
                       <Chart>
                         <ChartContainer>
                           <ResponsiveContainer width="100%" height={200}>
-                            <LineChart data={chartData.data} margin={{ top: 10, right: 30, left: 10, bottom: 20 }}>
-                              <CartesianGrid
-                                strokeDasharray="3 3"
-                                vertical={false}
-                                stroke="currentColor"
-                                opacity={0.1}
-                              />
+                            <LineChart data={chartData.data} margin={{ top: 20, right: 20, left: 20, bottom: 20 }}>
+                              <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                               <XAxis
                                 dataKey={chartData.xKey}
-                                tick={{ fontSize: 12 }}
-                                tickLine={{ stroke: "currentColor", opacity: 0.2 }}
-                                axisLine={{ stroke: "currentColor", opacity: 0.2 }}
+                                className="text-xs"
+                                tickLine={false}
+                                axisLine={false}
+                                {...(selectedPeriod === 'day' ? { interval: 2 } : selectedPeriod === 'month' ? { interval: 2 } : {})}
                               />
                               <YAxis
+                                width={60}
                                 domain={[0, 100]}
-                                tick={{ fontSize: 12 }}
-                                tickLine={{ stroke: "currentColor", opacity: 0.2 }}
-                                axisLine={{ stroke: "currentColor", opacity: 0.2 }}
-                                label={{
-                                  value: "Battery (%)",
-                                  angle: -90,
-                                  position: "insideLeft",
-                                  fontSize: 12,
-                                }}
+                                className="text-xs"
+                                tickLine={false}
+                                axisLine={false}
                               />
                               <Tooltip
                                 contentStyle={{
@@ -950,9 +932,9 @@ export default function AnalyticsPage() {
                               <Line
                                 type="monotone"
                                 dataKey="batteryLevel"
-                                stroke="#6366f1"
+                                stroke="hsl(var(--chart-1))"
                                 strokeWidth={2}
-                                dot={{ r: 2, fill: "#6366f1" }}
+                                dot={{ r: 2, fill: "hsl(var(--chart-1))" }}
                                 name="Battery Level"
                               />
                               {visibleSeries.production && visibleSeries.consumption && (
@@ -960,22 +942,17 @@ export default function AnalyticsPage() {
                                   <YAxis
                                     yAxisId="right"
                                     orientation="right"
+                                    width={60}
                                     domain={['auto', 'auto']}
-                                    tick={{ fontSize: 12 }}
-                                    tickLine={{ stroke: "currentColor", opacity: 0.2 }}
-                                    axisLine={{ stroke: "currentColor", opacity: 0.2 }}
-                                    label={{
-                                      value: `Energy (${chartData.unit})`,
-                                      angle: 90,
-                                      position: "insideRight",
-                                      fontSize: 12,
-                                    }}
+                                    className="text-xs"
+                                    tickLine={false}
+                                    axisLine={false}
                                   />
                                   <Line
                                     yAxisId="right"
                                     type="monotone"
                                     dataKey="production"
-                                    stroke="#4ade80"
+                                    stroke="hsl(var(--chart-2))"
                                     strokeWidth={1.5}
                                     strokeDasharray="4 4"
                                     dot={false}
@@ -985,7 +962,7 @@ export default function AnalyticsPage() {
                                     yAxisId="right"
                                     type="monotone"
                                     dataKey="consumption"
-                                    stroke="#f87171"
+                                    stroke="hsl(var(--chart-5))"
                                     strokeWidth={1.5}
                                     strokeDasharray="4 4"
                                     dot={false}

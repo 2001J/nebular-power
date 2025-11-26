@@ -9,8 +9,7 @@
       "type": "jwt",
       "username": "customer1@solar.com",
       "password": "password123",
-      "token": "",
-      "token_url": "http://localhost:8080/api/auth/login"
+      "token": ""
     }
   },
   "energy": {
@@ -43,5 +42,10 @@
     "enabled": true,
     "polling_interval": 15,
     "success_rate": 0.98
+  },
+  "status_reporter": {
+    "enabled": true,
+    "interval": 30,
+    "force_report_interval": 300
   }
 }

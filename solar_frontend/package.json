@@ -1,7 +1,9 @@
 {
-  "name": "my-v0-project",
-  "version": "0.1.0",
+  "name": "nebulapower-solar-frontend",
+  "version": "1.0.0",
   "private": true,
+  "author": "Joseph Koyi",
+  "description": "Solar Energy Monitoring & Management System - Frontend",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -17,7 +19,11 @@
     "e2e:report": "playwright show-report"
   },
   "dependencies": {
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.1",
     "@hookform/resolvers": "latest",
+    "@mui/material": "^7.3.5",
+    "@mui/x-date-pickers": "^8.19.0",
     "@radix-ui/react-accordion": "^1.2.2",
     "@radix-ui/react-alert-dialog": "^1.1.4",
     "@radix-ui/react-aspect-ratio": "^1.1.1",
@@ -52,6 +58,7 @@
     "clsx": "^2.1.1",
     "cmdk": "1.0.4",
     "date-fns": "4.1.0",
+    "dayjs": "^1.11.19",
     "embla-carousel-react": "8.5.1",
     "input-otp": "1.4.1",
     "lucide-react": "^0.454.0",

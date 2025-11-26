@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Clock, PlayCircle, StopCircle, RefreshCw, Settings, AlertTriangle, CheckCircle, Clock4 } from "lucide-react";
+import { Clock, RefreshCw, AlertTriangle, CheckCircle, Clock4 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import {
   Pagination,
@@ -31,13 +31,9 @@ interface ServiceStatusTableProps {
   totalItems: number;
   onChangePage: (page: number) => void;
   onChangePageSize: (size: number) => void;
-  onStartService: (installationId: string) => Promise<void>;
-  onStopService: (installationId: string) => Promise<void>;
   onRestartService: (installationId: string) => Promise<void>;
-  onUpdateStatus: (installation: any) => void;
   onSuspendService: (installation: any) => void;
   onRestoreService: (installation: any) => void;
-  onScheduleChange: (installation: any) => void;
 }
 
 export function ServiceStatusTable({ 
@@ -49,13 +45,9 @@ export function ServiceStatusTable({
   totalItems,
   onChangePage,
   onChangePageSize,
-  onStartService,
-  onStopService,
   onRestartService,
-  onUpdateStatus,
   onSuspendService,
-  onRestoreService,
-  onScheduleChange
+  onRestoreService
 }: ServiceStatusTableProps) {
   
   const getStatusBadge = (status: string) => {
@@ -127,17 +119,17 @@ export function ServiceStatusTable({
 
   return (
     <div className="w-full space-y-4">
-      <div className="rounded-md border">
+      <div className="rounded-md border overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-[80px]">ID</TableHead>
-              <TableHead>Installation</TableHead>
-              <TableHead>Customer</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Last Updated</TableHead>
-              <TableHead>Reason</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
+              <TableHead className="w-[60px] sm:w-[80px]">ID</TableHead>
+              <TableHead className="min-w-[150px]">Installation</TableHead>
+              <TableHead className="hidden md:table-cell min-w-[150px]">Customer</TableHead>
+              <TableHead className="min-w-[120px]">Status</TableHead>
+              <TableHead className="hidden lg:table-cell min-w-[150px]">Last Updated</TableHead>
+              <TableHead className="hidden xl:table-cell min-w-[200px]">Reason</TableHead>
+              <TableHead className="text-right min-w-[200px]">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -178,113 +170,80 @@ export function ServiceStatusTable({
                 
                 return (
                   <TableRow key={statusData.id || `status-${installationId}-${index}`}>
-                    <TableCell className="font-medium">{installationId || 'N/A'}</TableCell>
-                    <TableCell>
-                      {installation.name || `Installation #${installationId}` || 'Unknown'}
+                    <TableCell className="font-medium text-xs sm:text-sm">{installationId || 'N/A'}</TableCell>
+                    <TableCell className="text-sm">
+                      <div className="font-medium">
+                        {installation.name || `Installation #${installationId}` || 'Unknown'}
+                      </div>
+                      {/* Show customer on mobile */}
+                      <div className="md:hidden text-xs text-muted-foreground mt-1">
+                        {installation.username || installation.customerName || "N/A"}
+                      </div>
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="hidden md:table-cell text-sm">
                       {installation.username || installation.customerName || "N/A"}
                     </TableCell>
                     <TableCell>
                       {getStatusBadge(statusData.status || 'UNKNOWN')}
                     </TableCell>
-                    <TableCell>
-                      <div className="flex items-center space-x-2">
-                        <Clock className="h-4 w-4 text-muted-foreground" />
-                        <span>{formattedDate}</span>
+                    <TableCell className="hidden lg:table-cell">
+                      <div className="flex items-center space-x-2 text-sm">
+                        <Clock className="h-3.5 w-3.5 text-muted-foreground" />
+                        <span className="whitespace-nowrap">{formattedDate}</span>
                       </div>
                     </TableCell>
-                    <TableCell>
-                      <span className="text-sm line-clamp-1">{statusData.statusReason || "N/A"}</span>
+                    <TableCell className="hidden xl:table-cell">
+                      <span className="text-xs sm:text-sm line-clamp-1">{statusData.statusReason || "N/A"}</span>
                     </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end space-x-2">
-                        <div className="flex space-x-1">
-                          <Button
-                            variant="outline"
-                            size="icon"
-                            title="Start Service"
-                            onClick={() => onStartService(installationId)}
-                            disabled={statusData.status === 'ACTIVE'}
-                          >
-                            <PlayCircle className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="icon"
-                            title="Stop Service"
-                            onClick={() => onStopService(installationId)}
-                            disabled={statusData.status === 'SUSPENDED_PAYMENT' || statusData.status === 'SUSPENDED_SECURITY'}
-                          >
-                            <StopCircle className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="icon"
-                            title="Restart Service"
-                            onClick={() => onRestartService(installationId)}
-                            disabled={statusData.status !== 'ACTIVE'}
-                          >
-                            <RefreshCw className="h-4 w-4" />
-                          </Button>
-                        </div>
+                    <TableCell>
+                      <div className="flex items-center justify-end gap-1">
+                        {/* Only show restart if service is ACTIVE */}
+                        {statusData.status === 'ACTIVE' && (
+                          <>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              title="Restart Service"
+                              onClick={() => onRestartService(installationId)}
+                            >
+                              <RefreshCw className="h-4 w-4" />
+                            </Button>
+                            <div className="h-6 w-px bg-border mx-1" />
+                          </>
+                        )}
                         
-                        <div className="flex space-x-1">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => onUpdateStatus({
-                              ...installation,
-                              id: installationId,
-                              status: statusData.status,
-                            })}
-                          >
-                            <Settings className="h-4 w-4 mr-1" />
-                            Update
-                          </Button>
-
-                          {(!isSuspended) && (
+                        {/* Main action buttons */}
+                        <div className="flex items-center gap-1">
+                          {(!isSuspended) ? (
                             <Button
                               variant="outline"
                               size="sm"
+                              className="h-8"
                               onClick={() => onSuspendService({
                                 ...installation,
                                 id: installationId,
                                 status: statusData.status,
                               })}
                             >
-                              <AlertTriangle className="h-4 w-4 mr-1" />
-                              Suspend
+                              <AlertTriangle className="h-3.5 w-3.5 sm:mr-1" />
+                              <span className="hidden sm:inline">Suspend</span>
                             </Button>
-                          )}
-
-                          {isSuspended && (
+                          ) : (
                             <Button
                               variant="outline"
                               size="sm"
+                              className="h-8"
                               onClick={() => onRestoreService({
                                 ...installation,
                                 id: installationId,
                                 status: statusData.status,
                               })}
                             >
-                              <CheckCircle className="h-4 w-4 mr-1" />
-                              Restore
+                              <CheckCircle className="h-3.5 w-3.5 sm:mr-1" />
+                              <span className="hidden sm:inline">Restore</span>
                             </Button>
                           )}
-
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => onScheduleChange({
-                              ...installation,
-                              id: installationId,
-                              status: statusData.status,
-                            })}
-                          >
-                            <Clock4 className="h-4 w-4 mr-1" />
-                            Schedule
-                          </Button>
                         </div>
                       </div>
                     </TableCell>
@@ -298,9 +257,11 @@ export function ServiceStatusTable({
 
       {/* Pagination Controls */}
       {!loading && statuses.length > 0 && (
-        <div className="flex items-center justify-between">
-          <div className="text-sm text-muted-foreground">
-            Showing {page * pageSize + 1} to {Math.min((page + 1) * pageSize, totalItems)} of {totalItems} results
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="text-xs sm:text-sm text-muted-foreground">
+            Showing <span className="font-medium">{page * pageSize + 1}</span> to{' '}
+            <span className="font-medium">{Math.min((page + 1) * pageSize, totalItems)}</span> of{' '}
+            <span className="font-medium">{totalItems}</span> results
           </div>
           
           <Pagination>
@@ -309,17 +270,19 @@ export function ServiceStatusTable({
                 <PaginationPrevious 
                   onClick={() => onChangePage(Math.max(0, page - 1))} 
                   aria-disabled={page === 0}
+                  className="h-8 px-2 sm:px-4"
                 />
               </PaginationItem>
               
               {getPageNumbers().map((pageNum, idx) => (
-                <PaginationItem key={`page-${idx}`}>
+                <PaginationItem key={pageNum >= 0 ? `page-${pageNum}` : `ellipsis-${idx}`}>
                   {pageNum === -1 || pageNum === -2 ? (
                     <PaginationEllipsis />
                   ) : (
                     <PaginationLink
                       onClick={() => onChangePage(pageNum)}
                       isActive={page === pageNum}
+                      className="h-8 w-8 sm:h-9 sm:w-9"
                     >
                       {pageNum + 1}
                     </PaginationLink>
@@ -331,15 +294,16 @@ export function ServiceStatusTable({
                 <PaginationNext 
                   onClick={() => onChangePage(Math.min(totalPages - 1, page + 1))} 
                   aria-disabled={page >= totalPages - 1}
+                  className="h-8 px-2 sm:px-4"
                 />
               </PaginationItem>
             </PaginationContent>
           </Pagination>
           
-          <div className="flex items-center space-x-2">
-            <span className="text-sm text-muted-foreground">Rows per page:</span>
+          <div className="flex items-center gap-2">
+            <span className="text-xs sm:text-sm text-muted-foreground whitespace-nowrap">Rows per page:</span>
             <select
-              className="h-8 rounded-md border border-input bg-background px-2 text-sm"
+              className="h-8 rounded-md border border-input bg-background px-2 text-xs sm:text-sm min-w-[60px]"
               value={pageSize}
               onChange={(e) => onChangePageSize(Number(e.target.value))}
             >

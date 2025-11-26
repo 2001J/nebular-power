@@ -8,7 +8,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -46,11 +45,6 @@ public interface ServiceStatusRepository extends JpaRepository<ServiceStatus, Lo
      * Find all service status records by status
      */
     Page<ServiceStatus> findByStatusAndActiveTrue(ServiceStatus.ServiceState status, Pageable pageable);
-    
-    /**
-     * Find all service status records with scheduled changes
-     */
-    List<ServiceStatus> findByScheduledChangeIsNotNullAndScheduledTimeBefore(LocalDateTime time);
     
     /**
      * Find all service status records for installations owned by a user

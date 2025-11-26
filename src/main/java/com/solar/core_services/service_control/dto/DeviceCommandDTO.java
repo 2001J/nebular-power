@@ -23,6 +23,7 @@ public class DeviceCommandDTO {
     private LocalDateTime processedAt;
     private LocalDateTime expiresAt;
     private String responseMessage;
+    private String result;  // JSON string containing command result details
     private String initiatedBy;
     private Integer retryCount;
     private LocalDateTime lastRetryAt;
@@ -47,6 +48,7 @@ public class DeviceCommandDTO {
                 .processedAt(deviceCommand.getProcessedAt())
                 .expiresAt(deviceCommand.getExpiresAt())
                 .responseMessage(deviceCommand.getResponseMessage())
+                .result(deviceCommand.getResult())
                 .initiatedBy(deviceCommand.getInitiatedBy())
                 .retryCount(deviceCommand.getRetryCount())
                 .lastRetryAt(deviceCommand.getLastRetryAt())

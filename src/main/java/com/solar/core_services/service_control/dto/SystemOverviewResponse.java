@@ -85,11 +85,6 @@ public class SystemOverviewResponse {
     private Long failedCommands;
     
     /**
-     * Number of scheduled changes
-     */
-    private Long scheduledChanges;
-    
-    /**
      * Total number of devices in the system
      */
     private int totalDevices;

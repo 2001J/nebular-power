@@ -32,13 +32,15 @@ describe('serviceControlApi', () => {
 
   test('updateServiceStatus normalizes payload and validates status', async () => {
     api.put.mockResolvedValueOnce({ data: { ok: true } });
-    const result = await serviceControlApi.updateServiceStatus('1', { status: 'active', statusReason: 'x' });
-    expect(api.put).toHaveBeenCalledWith('/api/service/status/1', {
+    const result = await serviceControlApi.updateServiceStatus('inst1', { 
+      status: 'active', 
+      statusReason: 'Test reason',
+      updatedBy: 'test-user' 
+    });
+    expect(api.put).toHaveBeenCalledWith('/api/service/status/inst1', {
       status: 'ACTIVE',
-      statusReason: 'x',
-      updatedBy: 'SYSTEM',
-      scheduledChange: null,
-      scheduledTime: null,
+      statusReason: 'Test reason',
+      updatedBy: 'test-user',
     });
     expect(result).toEqual({ ok: true });
   });
@@ -49,18 +51,5 @@ describe('serviceControlApi', () => {
     expect(api.get).toHaveBeenCalledWith('/api/service/logs/time-range', {
       params: { start: '2024-01-01', end: '2024-01-02', page: 0, size: 20 },
     });
-  });
-
-  test('scheduleStatusChange sends query parameters', async () => {
-    api.post.mockResolvedValueOnce({ data: { scheduled: true } });
-    const res = await serviceControlApi.scheduleStatusChange('2', 'ACTIVE', 'reason', '2024-01-01T00:00:00Z');
-    expect(api.post).toHaveBeenCalledWith('/api/service/status/2/schedule', null, {
-      params: {
-        targetStatus: 'ACTIVE',
-        reason: 'reason',
-        scheduledTime: '2024-01-01T00:00:00Z',
-      },
-    });
-    expect(res).toEqual({ scheduled: true });
   });
 });

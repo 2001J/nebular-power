@@ -3,11 +3,12 @@
 import { useEffect, useState, useRef } from "react"
 import { Chart, ChartContainer } from "@/components/ui/chart"
 import { BarChart3 } from "lucide-react"
-import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, XAxis, YAxis, Tooltip, Line, LineChart } from "@/components/ui/direct-recharts"
+import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, XAxis, YAxis, Tooltip, Line, LineChart, Area, AreaChart } from "@/components/ui/direct-recharts"
 import { energyApi } from "@/lib/api/energy"
 import { energyWebSocket } from "@/lib/energyWebSocket"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { formatChartYAxis, formatChartTooltip } from "@/lib/energyUtils"
 
 interface InstallationDetails {
   id: number;
@@ -360,33 +361,57 @@ export function AdminEnergyChart({ type = "production" }: AdminEnergyChartProps)
       <Chart>
         <ChartContainer>
           <ResponsiveContainer width="100%" height={350}>
-            {type === "production" || type === "consumption" ? (
-              <LineChart data={energyData}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
+            {type === "production" ? (
+              <AreaChart data={energyData} margin={{ top: 20, right: 20, left: 20, bottom: 20 }}>
+                <defs>
+                  <linearGradient id="productionGradientAdmin" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="hsl(142, 76%, 46%)" stopOpacity={0.9} />
+                    <stop offset="50%" stopColor="hsl(142, 76%, 36%)" stopOpacity={0.8} />
+                    <stop offset="100%" stopColor="hsl(142, 76%, 26%)" stopOpacity={0.6} />
+                  </linearGradient>
+                  <filter id="productionGlowAdmin">
+                    <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+                    <feMerge>
+                      <feMergeNode in="coloredBlur"/>
+                      <feMergeNode in="SourceGraphic"/>
+                    </feMerge>
+                  </filter>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" className="stroke-muted/30" vertical={false} />
                 <XAxis
                   dataKey="time"
-                  stroke="hsl(var(--muted-foreground))"
-                  fontSize={12}
+                  className="text-xs"
                   tickLine={false}
                   axisLine={false}
+                  tick={{ fill: 'hsl(var(--muted-foreground))' }}
                 />
                 <YAxis
-                  stroke="hsl(var(--muted-foreground))"
-                  fontSize={12}
+                  className="text-xs"
                   tickLine={false}
                   axisLine={false}
-                  tickFormatter={(value) => `${value} kW`}
+                  tick={{ fill: 'hsl(var(--muted-foreground))' }}
+                  tickFormatter={(value) => `${formatChartYAxis(value)} kW`}
                 />
                 <Tooltip
-                  content={({ active, payload }) => {
+                  content={({ active, payload, label }) => {
                     if (active && payload && payload.length) {
                       return (
-                        <div className="rounded-md border bg-background p-2 shadow-md">
-                          <p className="text-sm font-medium">{payload[0]?.payload.time}</p>
-                          {payload.map((entry, index) => (
-                            <p key={index} className="text-sm">
-                              {`${entry.name}: ${Number(entry.value).toFixed(2)} kW`}
-                            </p>
+                        <div className="rounded-lg border bg-background/95 backdrop-blur-sm p-3 shadow-lg">
+                          <p className="font-semibold text-sm mb-2">{label}</p>
+                          {payload.map((entry: any, index: number) => (
+                            <div key={index} className="flex items-center gap-2">
+                              <div
+                                className="w-3 h-3 rounded-full"
+                                style={{
+                                  backgroundColor: entry.color,
+                                  boxShadow: `0 0 8px ${entry.color}40`
+                                }}
+                              />
+                              <span className="text-xs text-muted-foreground">{entry.name}:</span>
+                              <span className="text-sm font-medium">
+                                {formatChartTooltip(entry.value)}
+                              </span>
+                            </div>
                           ))}
                         </div>
                       )
@@ -394,28 +419,94 @@ export function AdminEnergyChart({ type = "production" }: AdminEnergyChartProps)
                     return null
                   }}
                 />
-                <Legend />
-                {type === "production" && (
-                  <Line 
-                    type="monotone" 
-                    dataKey="production" 
-                    stroke="hsl(var(--primary))" 
-                    name="Production" 
-                    strokeWidth={2}
-                    dot={false}
-                  />
-                )}
-                {type === "consumption" && (
-                  <Line 
-                    type="monotone" 
-                    dataKey="consumption" 
-                    stroke="hsl(var(--destructive))" 
-                    name="Consumption" 
-                    strokeWidth={2}
-                    dot={false}
-                  />
-                )}
-              </LineChart>
+                <Legend 
+                  wrapperStyle={{ paddingTop: '20px' }}
+                  iconType="circle"
+                />
+                <Area
+                  type="monotone"
+                  dataKey="production"
+                  name="Production"
+                  fill="url(#productionGradientAdmin)"
+                  stroke="hsl(142, 76%, 36%)"
+                  strokeWidth={2}
+                  fillOpacity={0.7}
+                  style={{ filter: 'url(#productionGlowAdmin)' }}
+                />
+              </AreaChart>
+            ) : type === "consumption" ? (
+              <AreaChart data={energyData} margin={{ top: 20, right: 20, left: 20, bottom: 20 }}>
+                <defs>
+                  <linearGradient id="consumptionGradientAdmin" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="hsl(0, 84%, 70%)" stopOpacity={0.9} />
+                    <stop offset="50%" stopColor="hsl(0, 84%, 60%)" stopOpacity={0.7} />
+                    <stop offset="100%" stopColor="hsl(0, 84%, 50%)" stopOpacity={0.2} />
+                  </linearGradient>
+                  <filter id="consumptionGlowAdmin">
+                    <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+                    <feMerge>
+                      <feMergeNode in="coloredBlur"/>
+                      <feMergeNode in="SourceGraphic"/>
+                    </feMerge>
+                  </filter>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" className="stroke-muted/30" vertical={false} />
+                <XAxis
+                  dataKey="time"
+                  className="text-xs"
+                  tickLine={false}
+                  axisLine={false}
+                  tick={{ fill: 'hsl(var(--muted-foreground))' }}
+                />
+                <YAxis
+                  className="text-xs"
+                  tickLine={false}
+                  axisLine={false}
+                  tick={{ fill: 'hsl(var(--muted-foreground))' }}
+                  tickFormatter={(value) => `${formatChartYAxis(value)} kW`}
+                />
+                <Tooltip
+                  content={({ active, payload, label }) => {
+                    if (active && payload && payload.length) {
+                      return (
+                        <div className="rounded-lg border bg-background/95 backdrop-blur-sm p-3 shadow-lg">
+                          <p className="font-semibold text-sm mb-2">{label}</p>
+                          {payload.map((entry: any, index: number) => (
+                            <div key={index} className="flex items-center gap-2">
+                              <div
+                                className="w-3 h-3 rounded-full"
+                                style={{
+                                  backgroundColor: entry.color,
+                                  boxShadow: `0 0 8px ${entry.color}40`
+                                }}
+                              />
+                              <span className="text-xs text-muted-foreground">{entry.name}:</span>
+                              <span className="text-sm font-medium">
+                                {formatChartTooltip(entry.value)}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )
+                    }
+                    return null
+                  }}
+                />
+                <Legend 
+                  wrapperStyle={{ paddingTop: '20px' }}
+                  iconType="circle"
+                />
+                <Area
+                  type="monotone"
+                  dataKey="consumption"
+                  name="Consumption"
+                  fill="url(#consumptionGradientAdmin)"
+                  stroke="hsl(0, 84%, 60%)"
+                  strokeWidth={2}
+                  fillOpacity={1}
+                  style={{ filter: 'url(#consumptionGlowAdmin)' }}
+                />
+              </AreaChart>
             ) : (
               <BarChart data={[
                 { name: "Mon", revenue: 24000 },
@@ -425,35 +516,68 @@ export function AdminEnergyChart({ type = "production" }: AdminEnergyChartProps)
                 { name: "Fri", revenue: 31000 },
                 { name: "Sat", revenue: 33500 },
                 { name: "Sun", revenue: 35800 },
-              ]}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
+              ]} margin={{ top: 20, right: 20, left: 20, bottom: 20 }}>
+                <defs>
+                  <linearGradient id="revenueGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="hsl(217, 91%, 70%)" stopOpacity={1} />
+                    <stop offset="100%" stopColor="hsl(217, 91%, 50%)" stopOpacity={0.8} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" className="stroke-muted/30" vertical={false} />
                 <XAxis
                   dataKey="name"
-                  stroke="hsl(var(--muted-foreground))"
-                  fontSize={12}
+                  className="text-xs"
                   tickLine={false}
                   axisLine={false}
+                  tick={{ fill: 'hsl(var(--muted-foreground))' }}
                 />
                 <YAxis
-                  stroke="hsl(var(--muted-foreground))"
-                  fontSize={12}
+                  className="text-xs"
                   tickLine={false}
                   axisLine={false}
+                  tick={{ fill: 'hsl(var(--muted-foreground))' }}
                   tickFormatter={(value) => `$${value}`}
                 />
                 <Tooltip
-                  content={({ active, payload }) => {
+                  content={({ active, payload, label }) => {
                     if (active && payload && payload.length) {
                       return (
-                        <div className="rounded-md border bg-background p-2 shadow-md">
-                          <p className="text-sm font-medium">{`$${payload[0].value}`}</p>
+                        <div className="rounded-lg border bg-background/95 backdrop-blur-sm p-3 shadow-lg">
+                          <p className="font-semibold text-sm mb-2">{label}</p>
+                          {payload.map((entry: any, index: number) => (
+                            <div key={index} className="flex items-center gap-2">
+                              <div
+                                className="w-3 h-3 rounded-full"
+                                style={{
+                                  backgroundColor: entry.color,
+                                  boxShadow: `0 0 8px ${entry.color}40`
+                                }}
+                              />
+                              <span className="text-xs text-muted-foreground">{entry.name}:</span>
+                              <span className="text-sm font-medium">
+                                ${Number(entry.value).toLocaleString()}
+                              </span>
+                            </div>
+                          ))}
                         </div>
                       )
                     }
                     return null
                   }}
                 />
-                <Bar dataKey="revenue" fill="hsl(var(--primary))" name="Revenue" />
+                <Legend 
+                  wrapperStyle={{ paddingTop: '20px' }}
+                  iconType="circle"
+                />
+                <Bar 
+                  dataKey="revenue" 
+                  fill="url(#revenueGradient)" 
+                  name="Revenue"
+                  radius={[6, 6, 0, 0]}
+                  style={{ 
+                    filter: 'drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1))'
+                  }}
+                />
               </BarChart>
             )}
           </ResponsiveContainer>

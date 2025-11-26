@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { ChevronLeft, CreditCard, Calendar, DollarSign, Info, Loader2 } from "lucide-react"
+import { ChevronLeft, DollarSign, Loader2 } from "lucide-react"
+import { useTheme } from "next-themes"
 import {
   Card,
   CardContent,
@@ -13,7 +14,6 @@ import {
 } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import {
   Select,
   SelectContent,
@@ -38,16 +38,8 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form"
-import { Separator } from "@/components/ui/separator"
 import { Checkbox } from "@/components/ui/checkbox"
-import { Calendar as CalendarComponent } from "@/components/ui/calendar"
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover"
 import { toast } from "@/components/ui/use-toast"
-import { cn } from "@/lib/utils"
 import { format } from "date-fns"
 import { customerApi } from "@/lib/api/customers"
 import { installationApi } from "@/lib/api/installations"
@@ -55,9 +47,32 @@ import { paymentComplianceApi } from "@/lib/api/paymentCompliance"
 import { z } from "zod"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
+import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
+import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+import dayjs from 'dayjs';
+import { createTheme, ThemeProvider } from '@mui/material/styles';
+
+interface GracePeriodConfig {
+  gracePeriodDays?: number;
+  numberOfDays?: number;
+  lateFeePercentage?: number;
+  lateFeeFixedAmount?: number;
+  lateFeesEnabled?: boolean;
+}
+
+interface ReminderConfig {
+  autoSendReminders?: boolean;
+  firstReminderDays?: number;
+  secondReminderDays?: number;
+  finalReminderDays?: number;
+  reminderMethod?: string;
+}
 
 // Payment frequency options
 const paymentFrequencies = [
+  { value: "WEEKLY", label: "Weekly" },
+  { value: "BI_WEEKLY", label: "Bi-Weekly" },
   { value: "MONTHLY", label: "Monthly" },
   { value: "QUARTERLY", label: "Quarterly" },
   { value: "SEMI_ANNUALLY", label: "Semi-Annually" },
@@ -88,13 +103,50 @@ const loanFormSchema = z.object({
   path: ["installmentAmount"],
 });
 
+// Helper function to convert frequency to readable label
+function getFrequencyLabel(frequency: string): string {
+  const labels = {
+    WEEKLY: "weekly",
+    BI_WEEKLY: "bi-weekly",
+    MONTHLY: "monthly",
+    QUARTERLY: "quarterly",
+    SEMI_ANNUALLY: "semi-annually",
+    ANNUALLY: "annually",
+  };
+  return labels[frequency] || "monthly";
+}
+
+// Helper to get muted className based on enabled state
+function getMutedClassName(isEnabled: boolean): string {
+  return isEnabled ? "" : "text-muted-foreground";
+}
+
+// Helper to get reminder description based on settings
+function getReminderDescription(loadingSettings: boolean, autoSendEnabled: boolean): string {
+  if (loadingSettings) return "Loading settings...";
+  if (autoSendEnabled) return "Automatically notify customer about upcoming payments (controlled by global settings)";
+  return "Payment reminders are disabled in global payment settings";
+}
+
+// Helper to get late fee description based on settings
+function getLateFeeDescription(loadingSettings: boolean, lateFeesEnabled: boolean): string {
+  if (loadingSettings) return "Loading settings...";
+  if (lateFeesEnabled) return "Charge additional fees for late payments (controlled by global settings)";
+  return "Late fees are disabled in global payment settings";
+}
+
 // Calculate number of payments based on frequency and dates
 function getNumberOfPayments(startDate, endDate, frequency) {
   const start = new Date(startDate);
   const end = new Date(endDate);
   const diffInMonths = (end.getFullYear() - start.getFullYear()) * 12 + end.getMonth() - start.getMonth();
+  const diffInWeeks = Math.floor((end.getTime() - start.getTime()) / (7 * 24 * 60 * 60 * 1000));
 
   switch (frequency) {
+    case "WEEKLY":
+      return diffInWeeks;
+    case "BI_WEEKLY":
+      return Math.floor(diffInWeeks / 2);
     case "MONTHLY":
       return diffInMonths;
     case "QUARTERLY":
@@ -108,37 +160,88 @@ function getNumberOfPayments(startDate, endDate, frequency) {
   }
 }
 
+// Calculate end date from amounts, frequency, and start date
+function calculateEndDateFromAmounts(startDate, frequency, totalAmount, installmentAmount) {
+  if (!startDate || !frequency || !totalAmount || !installmentAmount) return null;
+  if (installmentAmount <= 0) return null;
+
+  const paymentsNeeded = Math.ceil(totalAmount / installmentAmount);
+  if (!Number.isFinite(paymentsNeeded) || paymentsNeeded <= 0) return null;
+
+  const start = new Date(startDate);
+  const end = new Date(start);
+
+  switch (frequency) {
+    case "WEEKLY":
+      end.setDate(end.getDate() + paymentsNeeded * 7);
+      break;
+    case "BI_WEEKLY":
+      end.setDate(end.getDate() + paymentsNeeded * 14);
+      break;
+    case "MONTHLY":
+      end.setMonth(end.getMonth() + paymentsNeeded);
+      break;
+    case "QUARTERLY":
+      end.setMonth(end.getMonth() + paymentsNeeded * 3);
+      break;
+    case "SEMI_ANNUALLY":
+      end.setMonth(end.getMonth() + paymentsNeeded * 6);
+      break;
+    case "ANNUALLY":
+      end.setFullYear(end.getFullYear() + paymentsNeeded);
+      break;
+    default:
+      end.setMonth(end.getMonth() + paymentsNeeded);
+  }
+
+  return end;
+}
+
 export default function NewLoanPage() {
   const router = useRouter();
+  const { resolvedTheme } = useTheme();
   const [customers, setCustomers] = useState<any[]>([]);
   const [installations, setInstallations] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadingCustomers, setLoadingCustomers] = useState(true);
   const [loadingInstallations, setLoadingInstallations] = useState(false);
-  const [selectedCustomer, setSelectedCustomer] = useState<any | null>(null);
   const [globalPaymentSettings, setGlobalPaymentSettings] = useState({
     gracePeriodDays: 7, // Default fallback value
     lateFeePercentage: 0,
     lateFeeFixedAmount: 0,
     lateFeesEnabled: false
   });
+  const [reminderSettings, setReminderSettings] = useState({
+    autoSendReminders: true,
+    firstReminderDays: 1,
+    secondReminderDays: 3,
+    finalReminderDays: 7,
+    reminderMethod: "EMAIL"
+  });
   const [loadingSettings, setLoadingSettings] = useState(true);
 
+  // Create MUI theme based on resolved theme (respects system preferences)
+  const muiTheme = createTheme({
+    palette: {
+      mode: resolvedTheme === 'dark' ? 'dark' : 'light',
+    },
+  });
+
   // Set up form with validation
-  const form = useForm({
+  const form = useForm<any>({
     resolver: zodResolver(loanFormSchema),
     defaultValues: {
       customerId: "",
       installationId: "",
-      totalAmount: 0,
-      installmentAmount: 0,
+      totalAmount: "" as any,
+      installmentAmount: "" as any,
       frequency: "MONTHLY",
       startDate: new Date(),
       endDate: new Date(new Date().setFullYear(new Date().getFullYear() + 5)),
-      interestRate: 0,
-      downPayment: 0,
-      lateFeeAmount: 0,
-      gracePeriodDays: 7, // Will be updated when global settings load
+      interestRate: "" as any,
+      downPayment: "" as any,
+      lateFeeAmount: "" as any,
+      gracePeriodDays: "" as any, // Will be updated when global settings load
       includeLateFees: false,
       sendPaymentReminders: true,
       description: ""
@@ -148,29 +251,78 @@ export default function NewLoanPage() {
   // Watch customerId changes once per render
   const watchedCustomerId = form.watch("customerId");
 
+  // Watch core payment fields for auto end-date calculation
+  const watchedTotalAmount = form.watch("totalAmount");
+  const watchedInstallmentAmount = form.watch("installmentAmount");
+  const watchedFrequency = form.watch("frequency");
+  const watchedStartDate = form.watch("startDate");
+
+  // Automatically update end date based on amounts and frequency
+  useEffect(() => {
+    const autoEndDate = calculateEndDateFromAmounts(
+      watchedStartDate,
+      watchedFrequency,
+      Number(watchedTotalAmount),
+      Number(watchedInstallmentAmount)
+    );
+
+    if (!autoEndDate) return;
+
+    const currentEndDate: Date | undefined = form.getValues("endDate");
+    if (currentEndDate && autoEndDate.getTime() === currentEndDate.getTime()) return;
+
+    form.setValue("endDate", autoEndDate, { shouldValidate: true, shouldDirty: true });
+  }, [
+    watchedStartDate,
+    watchedFrequency,
+    watchedTotalAmount,
+    watchedInstallmentAmount,
+    form,
+  ]);
+
   // Load global payment settings on component mount
   useEffect(() => {
     const fetchGlobalSettings = async () => {
       setLoadingSettings(true);
       try {
-        const settings = await paymentComplianceApi.getGracePeriodConfig();
-        console.log("Loaded global payment settings:", settings);
+        // Fetch grace period config (late fees)
+        const gracePeriodSettings = await paymentComplianceApi.getGracePeriodConfig() as GracePeriodConfig;
+        console.log("Loaded grace period settings:", gracePeriodSettings);
 
-        // Update state with fetched settings
+        // Fetch reminder config
+        const reminderConfigData = await paymentComplianceApi.getReminderConfig() as ReminderConfig;
+        console.log("Loaded reminder settings:", reminderConfigData);
+
+        // Update grace period state
         setGlobalPaymentSettings({
-          gracePeriodDays: settings.gracePeriodDays || settings.numberOfDays || 7,
-          lateFeePercentage: settings.lateFeePercentage || 0,
-          lateFeeFixedAmount: settings.lateFeeFixedAmount || 0,
-          lateFeesEnabled: settings.lateFeesEnabled || false
+          gracePeriodDays: gracePeriodSettings.gracePeriodDays || gracePeriodSettings.numberOfDays || 7,
+          lateFeePercentage: gracePeriodSettings.lateFeePercentage || 0,
+          lateFeeFixedAmount: gracePeriodSettings.lateFeeFixedAmount || 0,
+          lateFeesEnabled: gracePeriodSettings.lateFeesEnabled || false
+        });
+
+        // Update reminder state
+        setReminderSettings({
+          autoSendReminders: reminderConfigData.autoSendReminders !== false,
+          firstReminderDays: reminderConfigData.firstReminderDays || 1,
+          secondReminderDays: reminderConfigData.secondReminderDays || 3,
+          finalReminderDays: reminderConfigData.finalReminderDays || 7,
+          reminderMethod: reminderConfigData.reminderMethod || "EMAIL"
         });
 
         // Update form default values with global settings
-        form.setValue("gracePeriodDays", settings.gracePeriodDays || settings.numberOfDays || 7);
+        form.setValue("gracePeriodDays", gracePeriodSettings.gracePeriodDays || gracePeriodSettings.numberOfDays || 7);
 
-        if (settings.lateFeesEnabled) {
+        // Set late fees based on global setting
+        if (gracePeriodSettings.lateFeesEnabled) {
           form.setValue("includeLateFees", true);
-          form.setValue("lateFeeAmount", settings.lateFeeFixedAmount || 0);
+          form.setValue("lateFeeAmount", gracePeriodSettings.lateFeeFixedAmount || 0);
+        } else {
+          form.setValue("includeLateFees", false);
         }
+
+        // Set payment reminders based on global setting
+        form.setValue("sendPaymentReminders", reminderConfigData.autoSendReminders !== false);
       } catch (error) {
         console.error("Error loading global payment settings:", error);
         toast({
@@ -266,10 +418,8 @@ export default function NewLoanPage() {
       // Convert IDs to strings for consistent comparison
       const customer = customers.find(c => String(c.id) === String(customerId));
       console.log("Selected customer:", customer);
-      setSelectedCustomer(customer || null);
     } else {
       setInstallations([]);
-      setSelectedCustomer(null);
     }
   }, [watchedCustomerId, customers]);
 
@@ -304,7 +454,7 @@ export default function NewLoanPage() {
       console.log(`Creating payment plan for customer ID: ${data.customerId}`, paymentPlanData);
 
       // Call API to create payment plan
-      const response = await paymentComplianceApi.createPaymentPlan(data.customerId, paymentPlanData);
+      await paymentComplianceApi.createPaymentPlan(data.customerId, paymentPlanData);
 
       toast({
         title: "Payment Plan Created",
@@ -475,9 +625,10 @@ export default function NewLoanPage() {
                             type="number" 
                             step="0.01" 
                             placeholder="0.00" 
-                            value={Number(field.value ?? 0)}
-                            onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
-                            className="pl-9" 
+                            value={field.value}
+                            onChange={field.onChange}
+                            onWheel={(e) => e.currentTarget.blur()}
+                            className="pl-9 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" 
                           />
                         </div>
                       </FormControl>
@@ -492,7 +643,7 @@ export default function NewLoanPage() {
                   name="installmentAmount"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Monthly Payment ($)</FormLabel>
+                      <FormLabel>Payment Amount per Period ($)</FormLabel>
                       <FormControl>
                         <div className="relative">
                           <DollarSign className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
@@ -500,14 +651,15 @@ export default function NewLoanPage() {
                             type="number" 
                             step="0.01" 
                             placeholder="0.00" 
-                            value={Number(field.value ?? 0)}
-                            onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
-                            className="pl-9" 
+                            value={field.value}
+                            onChange={field.onChange}
+                            onWheel={(e) => e.currentTarget.blur()}
+                            className="pl-9 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" 
                           />
                         </div>
                       </FormControl>
                       <FormDescription>
-                        Amount of each recurring payment
+                        Amount paid {getFrequencyLabel(form.watch("frequency"))} towards solar system financing
                       </FormDescription>
                       <FormMessage />
                     </FormItem>
@@ -547,17 +699,19 @@ export default function NewLoanPage() {
                   name="interestRate"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Interest Rate (%)</FormLabel>
+                      <FormLabel>Annual Interest Rate (%)</FormLabel>
                       <FormControl>
                         <Input 
                           type="number" 
                           step="0.01" 
                           placeholder="0.00" 
-                          value={Number(field.value ?? 0)}
-                          onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                          value={field.value}
+                          onChange={field.onChange}
+                          onWheel={(e) => e.currentTarget.blur()}
+                          className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                         />
                       </FormControl>
-                      <FormDescription>Annual interest rate (optional)</FormDescription>
+                      <FormDescription>Annual interest rate applied per payment period (e.g., 5% annual = ~0.42% monthly for monthly payments)</FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -569,40 +723,47 @@ export default function NewLoanPage() {
                   control={form.control}
                   name="startDate"
                   render={({ field }) => (
-                    <FormItem className="flex flex-col">
+                    <FormItem className="flex flex-col gap-2">
                       <FormLabel>Start Date</FormLabel>
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <FormControl>
-                            <Button
-                              variant={"outline"}
-                              className={cn(
-                                "pl-3 text-left font-normal",
-                                !field.value && "text-muted-foreground"
-                              )}
-                            >
-                              {field.value ? (
-                                format(field.value, "PPP")
-                              ) : (
-                                <span>Pick a date</span>
-                              )}
-                              <Calendar className="ml-auto h-4 w-4 opacity-50" />
-                            </Button>
-                          </FormControl>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0" align="start">
-                          <CalendarComponent
-                            mode="single"
-                            selected={field.value}
-                            onSelect={field.onChange}
-                            disabled={(date) =>
-                              date < new Date(new Date().setDate(new Date().getDate() - 1))
-                            }
-                            initialFocus
-                          />
-                        </PopoverContent>
-                      </Popover>
-                      <FormDescription>When the first payment is due</FormDescription>
+                      <FormControl>
+                        <ThemeProvider theme={muiTheme}>
+                          <LocalizationProvider dateAdapter={AdapterDayjs}>
+                            <DatePicker
+                              label={undefined}
+                              value={field.value ? dayjs(field.value) : null}
+                              onChange={(date) => field.onChange(date ? date.toDate() : null)}
+                              slotProps={{
+                                textField: {
+                                  fullWidth: true,
+                                  variant: "outlined",
+                                  error: !!form.formState.errors.startDate,
+                                  helperText: form.formState.errors.startDate?.message as string,
+                                  InputProps: {
+                                    sx: {
+                                      borderRadius: '0.75rem',
+                                      boxShadow: 'inset 0 2px 4px rgba(15, 23, 42, 0.08)', // shadow-inner
+                                      '& .MuiOutlinedInput-input': {
+                                        padding: '0.5rem 2.5rem 0.5rem 1rem',
+                                        fontSize: '0.875rem',
+                                      },
+                                      '& .MuiOutlinedInput-notchedOutline': {
+                                        borderColor: 'rgba(148, 163, 184, 0.35)', // border-border/70
+                                      },
+                                      '&:hover .MuiOutlinedInput-notchedOutline': {
+                                        borderColor: 'rgba(148, 163, 184, 0.45)',
+                                      },
+                                      '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                                        borderColor: 'rgba(59, 130, 246, 0.8)', // ring-ring
+                                      },
+                                    },
+                                  },
+                                },
+                              }}
+                            />
+                          </LocalizationProvider>
+                        </ThemeProvider>
+                      </FormControl>
+                      <FormDescription className="mt-1">When the first payment is due</FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -612,41 +773,47 @@ export default function NewLoanPage() {
                   control={form.control}
                   name="endDate"
                   render={({ field }) => (
-                    <FormItem className="flex flex-col">
+                    <FormItem className="flex flex-col gap-2">
                       <FormLabel>End Date</FormLabel>
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <FormControl>
-                            <Button
-                              variant={"outline"}
-                              className={cn(
-                                "pl-3 text-left font-normal",
-                                !field.value && "text-muted-foreground"
-                              )}
-                            >
-                              {field.value ? (
-                                format(field.value, "PPP")
-                              ) : (
-                                <span>Pick a date</span>
-                              )}
-                              <Calendar className="ml-auto h-4 w-4 opacity-50" />
-                            </Button>
-                          </FormControl>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0" align="start">
-                          <CalendarComponent
-                            mode="single"
-                            selected={field.value}
-                            onSelect={field.onChange}
-                            disabled={(date) =>
-                              date <= form.watch("startDate") ||
-                              date < new Date(new Date().setDate(new Date().getDate()))
-                            }
-                            initialFocus
-                          />
-                        </PopoverContent>
-                      </Popover>
-                      <FormDescription>When the final payment is due</FormDescription>
+                      <FormControl>
+                        <ThemeProvider theme={muiTheme}>
+                          <LocalizationProvider dateAdapter={AdapterDayjs}>
+                            <DatePicker
+                              label={undefined}
+                              value={field.value ? dayjs(field.value) : null}
+                              onChange={(date) => field.onChange(date ? date.toDate() : null)}
+                              slotProps={{
+                                textField: {
+                                  fullWidth: true,
+                                  variant: "outlined",
+                                  error: !!form.formState.errors.endDate,
+                                  helperText: form.formState.errors.endDate?.message as string,
+                                  InputProps: {
+                                    sx: {
+                                      borderRadius: '0.75rem',
+                                      boxShadow: 'inset 0 2px 4px rgba(15, 23, 42, 0.08)',
+                                      '& .MuiOutlinedInput-input': {
+                                        padding: '0.5rem 2.5rem 0.5rem 1rem',
+                                        fontSize: '0.875rem',
+                                      },
+                                      '& .MuiOutlinedInput-notchedOutline': {
+                                        borderColor: 'rgba(148, 163, 184, 0.35)',
+                                      },
+                                      '&:hover .MuiOutlinedInput-notchedOutline': {
+                                        borderColor: 'rgba(148, 163, 184, 0.45)',
+                                      },
+                                      '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                                        borderColor: 'rgba(59, 130, 246, 0.8)',
+                                      },
+                                    },
+                                  },
+                                },
+                              }}
+                            />
+                          </LocalizationProvider>
+                        </ThemeProvider>
+                      </FormControl>
+                      <FormDescription className="mt-1">When the final payment is due</FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -675,9 +842,10 @@ export default function NewLoanPage() {
                             type="number" 
                             step="0.01" 
                             placeholder="0.00" 
-                            value={Number(field.value ?? 0)}
-                            onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
-                            className="pl-9" 
+                            value={field.value}
+                            onChange={field.onChange}
+                            onWheel={(e) => e.currentTarget.blur()}
+                            className="pl-9 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" 
                           />
                         </div>
                       </FormControl>
@@ -696,14 +864,15 @@ export default function NewLoanPage() {
                         <Checkbox
                           checked={field.value}
                           onCheckedChange={field.onChange}
+                          disabled={loadingSettings || !globalPaymentSettings.lateFeesEnabled}
                         />
                       </FormControl>
                       <div className="space-y-1 leading-none">
-                        <FormLabel>
+                        <FormLabel className={getMutedClassName(globalPaymentSettings.lateFeesEnabled)}>
                           Apply Late Fees
                         </FormLabel>
                         <FormDescription>
-                          Charge additional fees for late payments
+                          {getLateFeeDescription(loadingSettings, globalPaymentSettings.lateFeesEnabled)}
                         </FormDescription>
                       </div>
                     </FormItem>
@@ -726,9 +895,10 @@ export default function NewLoanPage() {
                               type="number"
                               step="0.01"
                               placeholder={loadingSettings ? "Loading..." : `Global default: $${globalPaymentSettings.lateFeeFixedAmount}`}
-                              value={Number(field.value ?? 0)}
-                              onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
-                              className="pl-9"
+                              value={field.value}
+                              onChange={field.onChange}
+                              onWheel={(e) => e.currentTarget.blur()}
+                              className="pl-9 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                             />
                           </div>
                         </FormControl>
@@ -752,9 +922,11 @@ export default function NewLoanPage() {
                         <FormControl>
                           <Input
                             type="number"
-                            value={Number(field.value ?? 0)}
-                            onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                            value={field.value}
+                            onChange={field.onChange}
+                            onWheel={(e) => e.currentTarget.blur()}
                             placeholder={loadingSettings ? "Loading..." : `Global default: ${globalPaymentSettings.gracePeriodDays}`}
+                            className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                           />
                         </FormControl>
                         <FormDescription>
@@ -779,14 +951,15 @@ export default function NewLoanPage() {
                       <Checkbox
                         checked={field.value}
                         onCheckedChange={field.onChange}
+                        disabled={loadingSettings || !reminderSettings.autoSendReminders}
                       />
                     </FormControl>
                     <div className="space-y-1 leading-none">
-                      <FormLabel>
+                      <FormLabel className={getMutedClassName(reminderSettings.autoSendReminders)}>
                         Send Payment Reminders
                       </FormLabel>
                       <FormDescription>
-                        Automatically notify customer about upcoming payments
+                        {getReminderDescription(loadingSettings, reminderSettings.autoSendReminders)}
                       </FormDescription>
                     </div>
                   </FormItem>

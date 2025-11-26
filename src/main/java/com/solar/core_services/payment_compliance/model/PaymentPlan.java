@@ -62,6 +62,10 @@ public class PaymentPlan {
     @Column(nullable = false)
     private BigDecimal interestRate;
 
+    @Column(nullable = false)
+    @Builder.Default
+    private BigDecimal downPayment = BigDecimal.ZERO;
+
     private BigDecimal lateFeeAmount;
 
     private Integer gracePeriodDays;

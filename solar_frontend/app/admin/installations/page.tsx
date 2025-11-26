@@ -220,11 +220,11 @@ export default function InstallationsPage() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <Card>
+        <Card className="border border-border/50 shadow-soft bg-card">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Installations</CardTitle>
-            <div className="h-8 w-8 flex items-center justify-center rounded-full bg-blue-100">
-              <Sun className="h-4 w-4 text-blue-600" />
+            <div className="h-8 w-8 flex items-center justify-center rounded-full bg-blue-100 dark:bg-blue-500/20">
+              <Sun className="h-4 w-4 text-blue-600 dark:text-blue-400" />
             </div>
           </CardHeader>
           <CardContent>
@@ -232,11 +232,11 @@ export default function InstallationsPage() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="border border-border/50 shadow-soft bg-card">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Capacity</CardTitle>
-            <div className="h-8 w-8 flex items-center justify-center rounded-full bg-green-100">
-              <Zap className="h-4 w-4 text-green-600" />
+            <div className="h-8 w-8 flex items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-500/20">
+              <Zap className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
             </div>
           </CardHeader>
           <CardContent>
@@ -248,7 +248,7 @@ export default function InstallationsPage() {
         </Card>
       </div>
 
-      <Card>
+      <Card className="border border-border/50 shadow-soft bg-card">
         <CardHeader>
           <CardTitle>All Installations</CardTitle>
           <CardDescription>
@@ -358,17 +358,17 @@ export default function InstallationsPage() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Badge variant="outline" className="bg-slate-100">{installation.type || "Unknown"}</Badge>
+                        <Badge variant="secondary" className="rounded-full font-medium">{installation.type || "Unknown"}</Badge>
                       </TableCell>
                       <TableCell>
                         <Badge
-                          variant="outline"
-                          className={
-                            installation.status === "ACTIVE" || installation.status === "Active" ? "bg-green-100 text-green-700 border-green-200" :
-                            installation.status === "MAINTENANCE" || installation.status === "Maintenance" ? "bg-amber-100 text-amber-700 border-amber-200" :
-                            installation.status === "PENDING" || installation.status === "Pending" ? "bg-blue-100 text-blue-700 border-blue-200" :
-                            "bg-red-100 text-red-700 border-red-200"
+                          variant={
+                            installation.status === "ACTIVE" || installation.status === "Active" ? "success" :
+                            installation.status === "MAINTENANCE" || installation.status === "Maintenance" ? "warning" :
+                            installation.status === "PENDING" || installation.status === "Pending" ? "default" :
+                            "destructive"
                           }
+                          className="rounded-full font-medium"
                         >
                           {installation.status}
                         </Badge>

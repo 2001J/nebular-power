@@ -63,7 +63,12 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
         paymentPlan.setStartDate(request.getStartDate().atStartOfDay());
         paymentPlan.setEndDate(request.getEndDate().atStartOfDay());
         paymentPlan.setTotalAmount(request.getTotalAmount());
-        paymentPlan.setRemainingAmount(request.getTotalAmount());
+        paymentPlan.setDownPayment(request.getDownPayment() != null ? request.getDownPayment() : BigDecimal.ZERO);
+        // Calculate remaining amount: total - down payment
+        BigDecimal initialRemaining = request.getTotalAmount().subtract(
+            request.getDownPayment() != null ? request.getDownPayment() : BigDecimal.ZERO
+        );
+        paymentPlan.setRemainingAmount(initialRemaining);
         paymentPlan.setStatus(PaymentPlan.PaymentPlanStatus.ACTIVE);
         paymentPlan.setInterestRate(request.getInterestRate() != null ? request.getInterestRate() : BigDecimal.ZERO);
 
@@ -108,20 +113,40 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
                     gracePeriodConfigService.getGracePeriodDays());
         }
 
-        // Calculate number of payments based on the total amount and installment amount
+        // Calculate the principal amount (total - down payment)
+        BigDecimal downPaymentAmount = request.getDownPayment() != null ? request.getDownPayment() : BigDecimal.ZERO;
+        BigDecimal principal = request.getTotalAmount().subtract(downPaymentAmount);
+
+        // Calculate periodic interest rate from annual rate
+        BigDecimal periodicRate = calculatePeriodicInterestRate(paymentPlan.getInterestRate(), request.getFrequency());
+
+        // Calculate number of payments and installment amount
         int numberOfPayments;
         if (request.getInstallmentAmount() != null && request.getInstallmentAmount().compareTo(BigDecimal.ZERO) > 0) {
-            // If installment amount is provided, calculate number of payments by dividing total by installment
-            numberOfPayments = request.getTotalAmount().divide(request.getInstallmentAmount(), 0, RoundingMode.CEILING).intValue();
-            log.info("Calculated {} payments based on total amount {} and installment amount {}", 
-                     numberOfPayments, request.getTotalAmount(), request.getInstallmentAmount());
-        } else {
-            // Otherwise, calculate based on date range and frequency
+            // If installment amount is provided, use it
+            numberOfPayments = principal.divide(request.getInstallmentAmount(), 0, RoundingMode.CEILING).intValue();
+            paymentPlan.setInstallmentAmount(request.getInstallmentAmount());
+            log.info("Calculated {} payments based on principal {} and installment amount {}", 
+                     numberOfPayments, principal, request.getInstallmentAmount());
+        } else if (paymentPlan.getInterestRate().compareTo(BigDecimal.ZERO) > 0) {
+            // Calculate amortized payment with interest
             numberOfPayments = calculateNumberOfPayments(
                     paymentPlan.getStartDate().toLocalDate(),
                     paymentPlan.getEndDate().toLocalDate(),
                     paymentPlan.getFrequency());
-            log.info("Calculated {} payments based on date range and frequency", numberOfPayments);
+            BigDecimal amortizedPayment = calculateAmortizedPayment(principal, periodicRate, numberOfPayments);
+            paymentPlan.setInstallmentAmount(amortizedPayment);
+            log.info("Calculated {} payments with amortized payment {} (principal: {}, annual rate: {}%, periodic rate: {}%)",
+                     numberOfPayments, amortizedPayment, principal, paymentPlan.getInterestRate(), 
+                     periodicRate.multiply(BigDecimal.valueOf(100)).setScale(4, RoundingMode.HALF_UP));
+        } else {
+            // No interest - simple division
+            numberOfPayments = calculateNumberOfPayments(
+                    paymentPlan.getStartDate().toLocalDate(),
+                    paymentPlan.getEndDate().toLocalDate(),
+                    paymentPlan.getFrequency());
+            paymentPlan.setInstallmentAmount(principal.divide(BigDecimal.valueOf(numberOfPayments), 2, RoundingMode.HALF_UP));
+            log.info("Calculated {} payments with simple division (no interest)", numberOfPayments);
         }
 
         paymentPlan.setNumberOfPayments(numberOfPayments);
@@ -167,21 +192,47 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
         paymentPlan.setFrequency(request.getFrequency());
         paymentPlan.setEndDate(request.getEndDate().atStartOfDay());
         paymentPlan.setTotalAmount(request.getTotalAmount());
+        paymentPlan.setInterestRate(request.getInterestRate() != null ? request.getInterestRate() : BigDecimal.ZERO);
+        paymentPlan.setDownPayment(request.getDownPayment() != null ? request.getDownPayment() : BigDecimal.ZERO);
+        
+        // Update optional fields
+        if (request.getDescription() != null) {
+            paymentPlan.setDescription(request.getDescription());
+        }
 
-        // Recalculate number of payments based on the new values
+        // Calculate the principal amount (total - down payment)
+        BigDecimal downPaymentAmount = request.getDownPayment() != null ? request.getDownPayment() : BigDecimal.ZERO;
+        BigDecimal principal = request.getTotalAmount().subtract(downPaymentAmount);
+
+        // Calculate periodic interest rate from annual rate
+        BigDecimal periodicRate = calculatePeriodicInterestRate(paymentPlan.getInterestRate(), request.getFrequency());
+
+        // Recalculate number of payments and installment amount based on the new values
         int numberOfPayments;
         if (request.getInstallmentAmount() != null && request.getInstallmentAmount().compareTo(BigDecimal.ZERO) > 0) {
-            // If installment amount is provided, calculate number of payments by dividing total by installment
-            numberOfPayments = request.getTotalAmount().divide(request.getInstallmentAmount(), 0, RoundingMode.CEILING).intValue();
-            log.info("Recalculated {} payments based on total amount {} and installment amount {}", 
-                     numberOfPayments, request.getTotalAmount(), request.getInstallmentAmount());
-        } else {
-            // Otherwise, calculate based on date range and frequency
+            // If installment amount is provided, use it
+            numberOfPayments = principal.divide(request.getInstallmentAmount(), 0, RoundingMode.CEILING).intValue();
+            log.info("Recalculated {} payments based on principal {} and installment amount {}", 
+                     numberOfPayments, principal, request.getInstallmentAmount());
+        } else if (paymentPlan.getInterestRate().compareTo(BigDecimal.ZERO) > 0) {
+            // Calculate amortized payment with interest
             numberOfPayments = calculateNumberOfPayments(
                     paymentPlan.getStartDate().toLocalDate(),
                     paymentPlan.getEndDate().toLocalDate(),
                     paymentPlan.getFrequency());
-            log.info("Recalculated {} payments based on date range and frequency", numberOfPayments);
+            BigDecimal amortizedPayment = calculateAmortizedPayment(principal, periodicRate, numberOfPayments);
+            paymentPlan.setInstallmentAmount(amortizedPayment);
+            log.info("Recalculated {} payments with amortized payment {} (principal: {}, annual rate: {}%, periodic rate: {}%)",
+                     numberOfPayments, amortizedPayment, principal, paymentPlan.getInterestRate(), 
+                     periodicRate.multiply(BigDecimal.valueOf(100)).setScale(4, RoundingMode.HALF_UP));
+        } else {
+            // No interest - simple division
+            numberOfPayments = calculateNumberOfPayments(
+                    paymentPlan.getStartDate().toLocalDate(),
+                    paymentPlan.getEndDate().toLocalDate(),
+                    paymentPlan.getFrequency());
+            paymentPlan.setInstallmentAmount(principal.divide(BigDecimal.valueOf(numberOfPayments), 2, RoundingMode.HALF_UP));
+            log.info("Recalculated {} payments with simple division (no interest)", numberOfPayments);
         }
 
         // Update the number of payments
@@ -228,8 +279,9 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
                 .map(Payment::getAmount)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        // Set the new remaining amount based on the new total amount and the actual paid amount
-        BigDecimal newRemainingAmount = request.getTotalAmount().subtract(paidAmount);
+        // Set the new remaining amount based on: total - down payment - paid amount
+        // downPaymentAmount already calculated above
+        BigDecimal newRemainingAmount = request.getTotalAmount().subtract(downPaymentAmount).subtract(paidAmount);
 
         // Ensure the remaining amount doesn't go below zero
         if (newRemainingAmount.compareTo(BigDecimal.ZERO) < 0) {
@@ -490,6 +542,7 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
                 .endDate(plan.getEndDate())
                 .status(plan.getStatus())
                 .interestRate(plan.getInterestRate())
+                .downPayment(plan.getDownPayment())
                 .lateFeeAmount(plan.getLateFeeAmount())
                 .gracePeriodDays(plan.getGracePeriodDays())
                 .payments(plan.getPayments().stream()
@@ -513,6 +566,72 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
                 .build();
 
         return payment;
+    }
+
+    /**
+     * Calculate the periodic interest rate from annual rate based on payment frequency
+     * Annual rate is divided by the number of periods per year
+     */
+    private BigDecimal calculatePeriodicInterestRate(BigDecimal annualRate, PaymentPlan.PaymentFrequency frequency) {
+        if (annualRate == null || annualRate.compareTo(BigDecimal.ZERO) == 0) {
+            return BigDecimal.ZERO;
+        }
+
+        // Convert percentage to decimal (e.g., 5% -> 0.05)
+        BigDecimal rateDecimal = annualRate.divide(BigDecimal.valueOf(100), 10, RoundingMode.HALF_UP);
+
+        int periodsPerYear;
+        switch (frequency) {
+            case WEEKLY:
+                periodsPerYear = 52;
+                break;
+            case BI_WEEKLY:
+                periodsPerYear = 26;
+                break;
+            case MONTHLY:
+                periodsPerYear = 12;
+                break;
+            case QUARTERLY:
+                periodsPerYear = 4;
+                break;
+            case SEMI_ANNUALLY:
+                periodsPerYear = 2;
+                break;
+            case ANNUALLY:
+                periodsPerYear = 1;
+                break;
+            default:
+                periodsPerYear = 12; // Default to monthly
+        }
+
+        return rateDecimal.divide(BigDecimal.valueOf(periodsPerYear), 10, RoundingMode.HALF_UP);
+    }
+
+    /**
+     * Calculate fixed payment amount using amortization formula when interest is applied
+     * PMT = P * [r(1+r)^n] / [(1+r)^n - 1]
+     * where P = principal, r = periodic rate, n = number of payments
+     */
+    private BigDecimal calculateAmortizedPayment(BigDecimal principal, BigDecimal periodicRate, int numberOfPayments) {
+        if (periodicRate.compareTo(BigDecimal.ZERO) == 0) {
+            // No interest - simple division
+            return principal.divide(BigDecimal.valueOf(numberOfPayments), 2, RoundingMode.HALF_UP);
+        }
+
+        // Calculate (1 + r)^n
+        BigDecimal onePlusRate = BigDecimal.ONE.add(periodicRate);
+        BigDecimal onePlusRatePowerN = onePlusRate.pow(numberOfPayments);
+
+        // Calculate numerator: r * (1+r)^n
+        BigDecimal numerator = periodicRate.multiply(onePlusRatePowerN);
+
+        // Calculate denominator: (1+r)^n - 1
+        BigDecimal denominator = onePlusRatePowerN.subtract(BigDecimal.ONE);
+
+        // Calculate payment: P * [numerator / denominator]
+        BigDecimal payment = principal.multiply(numerator.divide(denominator, 10, RoundingMode.HALF_UP));
+
+        return payment.setScale(2, RoundingMode.HALF_UP);
     }
 
     /**

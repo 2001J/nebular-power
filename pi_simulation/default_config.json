@@ -3,7 +3,15 @@
     "simulation_name": "Solar Installation Simulator",
     "installation_id": "SIM-6933",
     "server_url": "http://localhost:8080",
-    "simulation_speed": 1.0
+    "simulation_speed": 1.0,
+    "auth": {
+      "enabled": true,
+      "type": "jwt",
+      "username": "customer1@solar.com",
+      "password": "password123",
+      "token": "",
+      "token_url": "http://localhost:8080/api/auth/login"
+    }
   },
   "energy": {
     "enabled": true,
@@ -35,5 +43,10 @@
     "enabled": true,
     "polling_interval": 10,
     "success_rate": 0.95
+  },
+  "status_reporter": {
+    "enabled": true,
+    "interval": 30,
+    "force_report_interval": 300
   }
 }

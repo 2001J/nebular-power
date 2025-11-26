@@ -5,15 +5,11 @@ import type React from "react"
 import { useState, useEffect } from "react"
 import {
   ArrowUp,
-  DollarSign,
   ShieldAlert,
   Sun,
   Users,
-  Download,
-  Filter,
   CheckCircle,
   XCircle,
-  ArrowDown,
   BarChart3,
   Settings,
   RefreshCw,
@@ -21,41 +17,13 @@ import {
   Zap,
   MapPin,
 } from "lucide-react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { useAuth } from "@/components/auth-provider"
-import { Chart, ChartContainer } from "@/components/ui/chart"
-import {
-  Area,
-  AreaChart,
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Legend,
-  Pie,
-  PieChart,
-  Cell,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "@/components/ui/direct-recharts"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import { Input } from "@/components/ui/input"
 import { Progress } from "@/components/ui/progress"
 import { useToast } from "@/components/ui/use-toast"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -137,8 +105,19 @@ export default function AdminDashboardPage() {
             try {
               const overview = await energyApi.getSystemOverview();
               setSystemOverview(overview);
-              if (overview?.installations && Array.isArray(overview.installations)) {
-                fetchedInstallations = overview.installations;
+              if (overview?.recentlyActiveInstallations && Array.isArray(overview.recentlyActiveInstallations)) {
+                fetchedInstallations = overview.recentlyActiveInstallations.map((inst: any) => ({
+                  id: inst.id?.toString() || String(inst.id),
+                  name: inst.name || inst.address || `Installation ${inst.id}`,
+                  location: inst.location || inst.address || '',
+                  installedCapacityKW: inst.installedCapacityKW || inst.systemSize || 0,
+                  status: inst.status || 'active',
+                  type: inst.type || inst.installationType || 'RESIDENTIAL',
+                  userId: inst.userId || inst.customerId || '',
+                  installationDate: inst.installationDate || new Date().toISOString(),
+                  tamperDetected: inst.tamperDetected || false,
+                  lastTamperCheck: inst.lastTamperCheck || new Date().toISOString()
+                }));
               }
             } catch (overviewError) {
               console.error("Error fetching system overview:", overviewError);
@@ -451,113 +430,154 @@ export default function AdminDashboardPage() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div className="space-y-2">
-          <Breadcrumb className="mb-2">
-            <BreadcrumbList>
-              <BreadcrumbItem>
-                <BreadcrumbLink href="/admin">Admin</BreadcrumbLink>
-              </BreadcrumbItem>
-              <BreadcrumbSeparator />
-              <BreadcrumbItem>
-                <BreadcrumbPage>Dashboard</BreadcrumbPage>
-              </BreadcrumbItem>
-            </BreadcrumbList>
-          </Breadcrumb>
+    <div className="space-y-8 animate-fade-in px-4 md:px-6 py-6">
+      {/* Header Section */}
+      <div className="flex flex-col gap-3">
+        <Breadcrumb>
+          <BreadcrumbList className="text-sm">
+            <BreadcrumbItem>
+              <BreadcrumbLink href="/admin" className="text-gray-500 dark:text-white/50 hover:text-gray-900 dark:hover:text-white/80 transition-colors">
+                Admin
+              </BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator className="text-gray-300 dark:text-white/30" />
+            <BreadcrumbItem>
+              <BreadcrumbPage className="text-gray-900 dark:text-white/90 font-medium">Dashboard</BreadcrumbPage>
+            </BreadcrumbItem>
+          </BreadcrumbList>
+        </Breadcrumb>
 
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Admin Dashboard</h1>
-          <p className="text-muted-foreground">Welcome back, {user.name}! Here's an overview of the system.</p>
+        <div className="space-y-1">
+          <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-gray-900 dark:text-white/90">Dashboard</h1>
+          <p className="text-gray-600 dark:text-white/60 text-xs sm:text-sm">
+            Welcome back, {user.name}. Here's what's happening with your system today.
+          </p>
         </div>
       </div>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Customers</CardTitle>
-            <div className="h-8 w-8 flex items-center justify-center rounded-full bg-blue-100">
-              <Users className="h-4 w-4 text-blue-600" />
+      {/* Stats Overview Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+        <Card className="bg-white dark:bg-[#111318] border-gray-200 dark:border-white/10 rounded-2xl shadow-sm dark:shadow-none hover:shadow-md dark:hover:shadow-none transition-shadow duration-200">
+          <CardHeader className="flex flex-row items-center justify-between pb-3 pt-6 px-6">
+            <div className="space-y-2">
+              <CardTitle className="text-xs sm:text-sm font-medium text-gray-500 dark:text-white/50">Total Customers</CardTitle>
+              <div className="text-2xl sm:text-3xl font-semibold tracking-tight text-gray-900 dark:text-white/90">{customers.length}</div>
+            </div>
+            <div className="h-10 w-10 sm:h-12 sm:w-12 flex items-center justify-center rounded-xl bg-blue-50 dark:bg-blue-500/10">
+              <Users className="h-5 w-5 sm:h-6 sm:w-6 text-blue-600 dark:text-blue-400" strokeWidth={2} />
             </div>
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{customers.length}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Today's Energy Production</CardTitle>
-            <div className="h-8 w-8 flex items-center justify-center rounded-full bg-amber-100">
-              <Sun className="h-4 w-4 text-amber-600" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {calculateTotalEnergyProduction()}
+          <CardContent className="px-6 pb-6">
+            <div className="flex items-center text-xs text-gray-600 dark:text-white/60">
+              <ArrowUp className="h-3 w-3 mr-1 text-emerald-600 dark:text-emerald-400" strokeWidth={2} />
+              <span className="text-emerald-600 dark:text-emerald-400 font-medium">12% </span>
+              <span className="ml-1">from last month</span>
             </div>
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Installations</CardTitle>
-            <div className="h-8 w-8 flex items-center justify-center rounded-full bg-green-100">
-              <BarChart3 className="h-4 w-4 text-green-600" />
+
+        <Card className="bg-white dark:bg-[#111318] border-gray-200 dark:border-white/10 rounded-2xl shadow-sm dark:shadow-none hover:shadow-md dark:hover:shadow-none transition-shadow duration-200">
+          <CardHeader className="flex flex-row items-center justify-between pb-3 pt-6 px-6">
+            <div className="space-y-2">
+              <CardTitle className="text-xs sm:text-sm font-medium text-gray-500 dark:text-white/50">Energy Today</CardTitle>
+              <div className="text-2xl sm:text-3xl font-semibold tracking-tight text-gray-900 dark:text-white/90">
+                {calculateTotalEnergyProduction()}
+              </div>
+            </div>
+            <div className="h-10 w-10 sm:h-12 sm:w-12 flex items-center justify-center rounded-xl bg-amber-50 dark:bg-amber-500/10">
+              <Sun className="h-5 w-5 sm:h-6 sm:w-6 text-amber-600 dark:text-amber-400" strokeWidth={2} />
             </div>
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{installations.length}</div>
+          <CardContent className="px-6 pb-6">
+            <div className="flex items-center text-xs text-gray-600 dark:text-white/60">
+              <ArrowUp className="h-3 w-3 mr-1 text-emerald-600 dark:text-emerald-400" strokeWidth={2} />
+              <span className="text-emerald-600 dark:text-emerald-400 font-medium">8% </span>
+              <span className="ml-1">from yesterday</span>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-white dark:bg-[#111318] border-gray-200 dark:border-white/10 rounded-2xl shadow-sm dark:shadow-none hover:shadow-md dark:hover:shadow-none transition-shadow duration-200">
+          <CardHeader className="flex flex-row items-center justify-between pb-3 pt-6 px-6">
+            <div className="space-y-2">
+              <CardTitle className="text-xs sm:text-sm font-medium text-gray-500 dark:text-white/50">Installations</CardTitle>
+              <div className="text-2xl sm:text-3xl font-semibold tracking-tight text-gray-900 dark:text-white/90">{installations.length}</div>
+            </div>
+            <div className="h-10 w-10 sm:h-12 sm:w-12 flex items-center justify-center rounded-xl bg-emerald-50 dark:bg-emerald-500/10">
+              <BarChart3 className="h-5 w-5 sm:h-6 sm:w-6 text-emerald-600 dark:text-emerald-400" strokeWidth={2} />
+            </div>
+          </CardHeader>
+          <CardContent className="px-6 pb-6">
+            <div className="flex items-center text-xs text-gray-600 dark:text-white/60">
+              <span className="font-medium">
+                {installations.filter(i => i?.status === 'ACTIVE' || i?.status === 'Active').length} active
+              </span>
+            </div>
           </CardContent>
         </Card>
       </div>
 
+      {/* Main Content Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader className="flex flex-row justify-between items-center">
-            <div className="flex flex-col items-start">
-              <CardTitle className="text-left">Recent Customers</CardTitle>
-              <CardDescription className="text-left">Recently added customers and their status</CardDescription>
+        {/* Recent Customers Card */}
+        <Card className="bg-white dark:bg-[#111318] border-gray-200 dark:border-white/10 rounded-2xl shadow-sm dark:shadow-none overflow-hidden">
+          <CardHeader className="flex flex-row justify-between items-start pb-4 px-6 pt-6">
+            <div className="space-y-1.5">
+              <CardTitle className="text-lg font-semibold text-gray-900 dark:text-white/90">Recent Customers</CardTitle>
+              <CardDescription className="text-sm text-gray-500 dark:text-white/50">
+                Latest customer registrations
+              </CardDescription>
             </div>
-            <div className="flex justify-end">
-              <Button onClick={() => router.push('/admin/customers/create')}>Add Customer</Button>
-            </div>
+            <Button 
+              onClick={() => router.push('/admin/customers/create')}
+              size="sm"
+              className="rounded-xl bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white shadow-sm hover:shadow-md transition-all duration-200"
+            >
+              Add Customer
+            </Button>
           </CardHeader>
           <CardContent className="p-0">
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
-                  <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="hidden md:table-cell">Joined</TableHead>
-                    <TableHead className="hidden lg:table-cell">Email</TableHead>
+                  <TableRow className="border-b border-gray-200 dark:border-white/10 hover:bg-transparent">
+                    <TableHead className="text-xs font-medium text-gray-500 dark:text-white/50 h-11">Name</TableHead>
+                    <TableHead className="text-xs font-medium text-gray-500 dark:text-white/50 h-11">Status</TableHead>
+                    <TableHead className="hidden md:table-cell text-xs font-medium text-gray-500 dark:text-white/50 h-11">Joined</TableHead>
+                    <TableHead className="hidden lg:table-cell text-xs font-medium text-gray-500 dark:text-white/50 h-11">Email</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {loading ? (
                     <TableRow>
-                      <TableCell colSpan={4} className="text-center py-8">
+                      <TableCell colSpan={4} className="text-center py-12">
                         <div className="flex justify-center">
-                          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                          <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary border-t-transparent"></div>
                         </div>
                       </TableCell>
                     </TableRow>
                   ) : Array.isArray(customers) && customers.length > 0 ? (
                     customers.slice(0, 5).map((customer) => (
-                      <TableRow key={customer.id} className="cursor-pointer" onClick={() => navigateToCustomerDetails(customer.id)}>
-                        <TableCell className="font-medium">{customer.fullName || customer.email || "Unknown"}</TableCell>
+                      <TableRow 
+                        key={customer.id} 
+                        className="cursor-pointer border-b border-gray-100 dark:border-white/5 last:border-0 hover:bg-gray-50/50 dark:hover:bg-white/5 transition-colors duration-150"
+                        onClick={() => navigateToCustomerDetails(customer.id)}
+                      >
+                        <TableCell className="font-medium text-sm text-gray-900 dark:text-white/80">{customer.fullName || customer.email || "Unknown"}</TableCell>
                         <TableCell>
                           <Badge
                             variant={
                               customer.status === "ACTIVE" || customer.status === "Active"
-                                ? "default"
+                                ? "success"
                                 : customer.status === "PENDING_VERIFICATION" || customer.status === "Pending"
-                                  ? "outline"
+                                  ? "warning"
                                   : customer.status === "SUSPENDED" || customer.status === "Suspended"
                                     ? "destructive"
                                     : customer.status === "LOCKED" || customer.status === "Locked"
-                                      ? "secondary"
-                                      : "outline"
+                                      ? "destructive"
+                                      : "secondary"
                             }
+                            className="rounded-full text-xs font-medium"
                           >
                             {customer.status === "ACTIVE" || customer.status === "Active"
                               ? "Active"
@@ -570,18 +590,18 @@ export default function AdminDashboardPage() {
                                     : customer.status || "Unknown"}
                           </Badge>
                         </TableCell>
-                        <TableCell className="hidden md:table-cell">
+                        <TableCell className="hidden md:table-cell text-sm text-gray-600 dark:text-white/60">
                           {customer.createdAt ? new Date(customer.createdAt).toLocaleDateString() :
                             customer.joinDate ? new Date(customer.joinDate).toLocaleDateString() : "N/A"}
                         </TableCell>
-                        <TableCell className="hidden lg:table-cell text-muted-foreground">
+                        <TableCell className="hidden lg:table-cell text-sm text-gray-600 dark:text-white/60">
                           {customer.email || "N/A"}
                         </TableCell>
                       </TableRow>
                     ))
                   ) : (
                     <TableRow>
-                      <TableCell colSpan={4} className="text-center py-8">
+                      <TableCell colSpan={4} className="text-center py-12 text-sm text-gray-500 dark:text-white/50">
                         No customers found
                       </TableCell>
                     </TableRow>
@@ -589,24 +609,34 @@ export default function AdminDashboardPage() {
                 </TableBody>
               </Table>
             </div>
-            <div className="p-4 flex justify-center border-t">
-              <Button variant="outline" size="sm" onClick={() => router.push("/admin/customers")}>
+            <div className="px-6 py-4 flex justify-center border-t border-gray-200 dark:border-white/10 bg-gray-50/50 dark:bg-white/5">
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={() => router.push("/admin/customers")}
+                className="text-sm font-medium text-gray-700 dark:text-white/70 hover:text-gray-900 dark:hover:text-white/90 hover:bg-gray-100 dark:hover:bg-white/10 transition-colors duration-150"
+              >
                 View All Customers
               </Button>
             </div>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Security Alerts</CardTitle>
-            <CardDescription>Recent security alerts across all systems</CardDescription>
+        {/* Security Alerts Card */}
+        <Card className="bg-white dark:bg-[#111318] border-gray-200 dark:border-white/10 rounded-2xl shadow-sm dark:shadow-none overflow-hidden">
+          <CardHeader className="pb-4 px-6 pt-6">
+            <div className="space-y-1.5">
+              <CardTitle className="text-lg font-semibold text-gray-900 dark:text-white/90">Security Alerts</CardTitle>
+              <CardDescription className="text-sm text-gray-500 dark:text-white/50">
+                Recent security events and notifications
+              </CardDescription>
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
+            <div className="space-y-3">
               {loading ? (
-                <div className="flex justify-center py-8">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                <div className="flex justify-center py-12">
+                  <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary border-t-transparent"></div>
                 </div>
               ) : displaySecurityAlerts.length > 0 ? (
                 displaySecurityAlerts.slice(0, 3).map((alert) => {
@@ -654,141 +684,158 @@ export default function AdminDashboardPage() {
                   // Get badge based on severity
                   const getBadge = () => {
                     if (severity === "critical" || severity === "high") {
-                      return <Badge variant="destructive">Critical</Badge>;
+                      return <Badge variant="destructive" className="rounded-full">Critical</Badge>;
                     }
                     if (severity === "warning" || severity === "medium") {
-                      return <Badge className="bg-amber-500">Warning</Badge>;
+                      return <Badge variant="warning" className="rounded-full">Warning</Badge>;
                     }
-                    return <Badge variant="outline">Info</Badge>;
+                    return <Badge variant="secondary" className="rounded-full">Info</Badge>;
                   };
                   
                   return (
-                    <div key={alert.id} className="flex items-start gap-4 rounded-lg border p-4">
+                    <div key={alert.id} className="flex items-start gap-4 rounded-xl bg-gray-50 dark:bg-white/5 p-4 hover:bg-gray-100 dark:hover:bg-white/10 transition-colors duration-150">
                       <div
-                        className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${
+                        className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
                           severity === "critical" || severity === "high"
-                            ? "bg-destructive/10 text-destructive"
-                            : "bg-amber-500/10 text-amber-500"
+                            ? "bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400"
+                            : "bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400"
                         }`}
                       >
                         {/* Use different icons based on alert type */}
                         {alertType.toUpperCase().includes("PHYSICAL") || 
                          alertType.toUpperCase().includes("INTRUSION") ? (
-                          <ShieldAlert className="h-5 w-5" />
+                          <ShieldAlert className="h-5 w-5" strokeWidth={2} />
                         ) : alertType.toUpperCase().includes("VOLTAGE") || 
                            alertType.toUpperCase().includes("POWER") ? (
-                          <AlertTriangle className="h-5 w-5" />
+                          <AlertTriangle className="h-5 w-5" strokeWidth={2} />
                         ) : alertType.toUpperCase().includes("CONNECTION") || 
                            alertType.toUpperCase().includes("NETWORK") ? (
-                          <Zap className="h-5 w-5" />
+                          <Zap className="h-5 w-5" strokeWidth={2} />
                         ) : alertType.toUpperCase().includes("LOCATION") || 
                            alertType.toUpperCase().includes("GPS") ? (
-                          <MapPin className="h-5 w-5" />
+                          <MapPin className="h-5 w-5" strokeWidth={2} />
                         ) : (
-                          <ShieldAlert className="h-5 w-5" />
+                          <ShieldAlert className="h-5 w-5" strokeWidth={2} />
                         )}
                       </div>
-                      <div className="flex-1 space-y-1">
-                        <p className="font-medium">{simplifyAlertMessage(alert.description || alert.message)}</p>
-                        <p className="text-sm text-muted-foreground">
+                      <div className="flex-1 space-y-1.5">
+                        <p className="text-sm font-medium leading-tight text-gray-900 dark:text-white/80">{simplifyAlertMessage(alert.description || alert.message)}</p>
+                        <p className="text-xs text-gray-500 dark:text-white/50">
                           {alert.installationLocation || alert.location || `Installation #${alert.installationId}`}
                         </p>
-                        <div className="flex items-center gap-2 mt-1">
+                        <div className="flex items-center gap-2 mt-2">
                           {getBadge()}
-                          <span className="text-sm font-medium">{formatAlertType(alertType)}</span>
+                          <span className="text-xs font-medium text-gray-500 dark:text-white/50">{formatAlertType(alertType)}</span>
                         </div>
                       </div>
                     </div>
                   );
                 })
               ) : (
-                <div className="text-center py-8 text-muted-foreground">
+                <div className="text-center py-12 text-sm text-gray-500 dark:text-white/50">
                   No security alerts found
                 </div>
               )}
-              <div className="mt-4 flex justify-center">
-                <Button variant="outline" size="sm" onClick={() => router.push("/admin/security/alerts")}>
-                  View All Alerts
-                </Button>
-              </div>
+            </div>
+            <div className="mt-6 flex justify-center pt-4 border-t border-gray-200 dark:border-white/10">
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={() => router.push("/admin/security/alerts")}
+                className="text-sm font-medium text-gray-700 dark:text-white/70 hover:text-gray-900 dark:hover:text-white/90 hover:bg-gray-100 dark:hover:bg-white/10 transition-colors duration-150"
+              >
+                View All Alerts
+              </Button>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      <Card className="mt-6">
-        <CardHeader>
+      {/* Installations Section */}
+      <Card className="bg-white dark:bg-[#111318] border-gray-200 dark:border-white/10 rounded-2xl shadow-sm dark:shadow-none overflow-hidden">
+        <CardHeader className="px-6 pt-6 pb-4">
           <div className="flex items-center justify-between">
-            <div>
-              <CardTitle>All Installations</CardTitle>
-              <CardDescription>Overview of all solar installations in the system</CardDescription>
+            <div className="space-y-1.5">
+              <CardTitle className="text-lg font-semibold text-gray-900 dark:text-white/90">All Installations</CardTitle>
+              <CardDescription className="text-sm text-gray-500 dark:text-white/50">
+                Overview of all solar installations
+              </CardDescription>
             </div>
-            <Button variant="outline" size="sm" onClick={() => router.push("/admin/installations")}>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => router.push("/admin/installations")}
+              className="rounded-xl border-gray-200 dark:border-white/10 text-gray-700 dark:text-white/70 hover:bg-gray-50 dark:hover:bg-white/10 transition-all duration-150"
+            >
               View All
             </Button>
           </div>
         </CardHeader>
-        <CardContent>
-          <div className="rounded-md border">
+        <CardContent className="p-0">
+          <div className="overflow-x-auto">
             <Table>
               <TableHeader>
-                <TableRow>
-                  <TableHead className="w-[100px]">ID</TableHead>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Customer</TableHead>
-                  <TableHead>Location</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                <TableRow className="border-b border-gray-200 dark:border-white/10 hover:bg-transparent">
+                  <TableHead className="w-[100px] text-xs font-medium text-gray-500 dark:text-white/50 h-11">ID</TableHead>
+                  <TableHead className="text-xs font-medium text-gray-500 dark:text-white/50 h-11">Name</TableHead>
+                  <TableHead className="text-xs font-medium text-gray-500 dark:text-white/50 h-11">Customer</TableHead>
+                  <TableHead className="text-xs font-medium text-gray-500 dark:text-white/50 h-11">Location</TableHead>
+                  <TableHead className="text-xs font-medium text-gray-500 dark:text-white/50 h-11">Status</TableHead>
+                  <TableHead className="text-right text-xs font-medium text-gray-500 dark:text-white/50 h-11">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center py-8">
+                    <TableCell colSpan={6} className="text-center py-12">
                       <div className="flex justify-center">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                        <div className="animate-spin rounded-full h-8 w-8 border-2 border-blue-600 dark:border-blue-400 border-t-transparent"></div>
                       </div>
                     </TableCell>
                   </TableRow>
                 ) : installations.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="h-24 text-center">
+                    <TableCell colSpan={6} className="h-24 text-center text-sm text-gray-500 dark:text-white/50">
                       No installations found
                     </TableCell>
                   </TableRow>
                 ) : (
                   installations.slice(0, 5).map((installation) => (
-                    <TableRow key={installation.id}>
-                      <TableCell className="font-medium">{installation.id}</TableCell>
-                      <TableCell>
+                    <TableRow key={installation.id} className="border-b border-gray-100 dark:border-white/5 last:border-0 hover:bg-gray-50/50 dark:hover:bg-white/5 transition-colors duration-150">
+                      <TableCell className="font-medium text-sm text-gray-900 dark:text-white/80">{installation.id}</TableCell>
+                      <TableCell className="text-sm text-gray-700 dark:text-white/70">
                         {installation.name || `Installation #${installation.id}`}
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="text-sm text-gray-600 dark:text-white/60">
                         {installation.username || installation.customerName || "N/A"}
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="text-sm text-gray-600 dark:text-white/60">
                         {installation.location || "N/A"}
                       </TableCell>
                       <TableCell>
-                        <Badge variant={
-                          installation.status === "ACTIVE" || installation.status === "Active" || installation.status === "OPERATIONAL"
-                            ? "default"
-                            : installation.status === "PENDING" || installation.status === "Pending"
-                              ? "outline"
-                              : installation.status === "MAINTENANCE"
+                        <Badge 
+                          variant={
+                            installation.status === "ACTIVE" || installation.status === "Active" || installation.status === "OPERATIONAL"
+                              ? "success"
+                              : installation.status === "PENDING" || installation.status === "Pending"
                                 ? "warning"
-                                : installation.status === "OFFLINE" || installation.status === "Inactive"
-                                  ? "destructive"
-                                  : "secondary"
-                        }>
+                                : installation.status === "MAINTENANCE"
+                                  ? "warning"
+                                  : installation.status === "OFFLINE" || installation.status === "Inactive"
+                                    ? "destructive"
+                                    : "secondary"
+                          }
+                          className="rounded-full text-xs font-medium"
+                        >
                           {installation.status || "Unknown"}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">
                         <Button
-                          variant="outline"
+                          variant="ghost"
                           size="sm"
                           onClick={() => router.push(`/admin/installations/${installation.id}`)}
+                          className="rounded-lg text-sm text-gray-700 dark:text-white/70 hover:text-gray-900 dark:hover:text-white/90 hover:bg-gray-100 dark:hover:bg-white/10 transition-colors duration-150"
                         >
                           View
                         </Button>
@@ -802,28 +849,32 @@ export default function AdminDashboardPage() {
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-1 lg:grid-cols-1 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>System Health</CardTitle>
-            <CardDescription>Current status of system components</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <div className="flex justify-center py-8">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-              </div>
-            ) : !systemHealth ? (
+      {/* System Health Section */}
+      <Card className="bg-white dark:bg-[#111318] border-gray-200 dark:border-white/10 rounded-2xl shadow-sm dark:shadow-none overflow-hidden">
+        <CardHeader className="px-6 pt-6 pb-4">
+          <div className="space-y-1.5">
+            <CardTitle className="text-lg font-semibold text-gray-900 dark:text-white/90">System Health</CardTitle>
+            <CardDescription className="text-sm text-gray-500 dark:text-white/50">
+              Current status of system components
+            </CardDescription>
+          </div>
+        </CardHeader>
+        <CardContent className="px-6 pb-6">
+          {loading ? (
+            <div className="flex justify-center py-12">
+              <div className="animate-spin rounded-full h-8 w-8 border-2 border-blue-600 dark:border-blue-400 border-t-transparent"></div>
+            </div>
+          ) : !systemHealth ? (
               <div className="flex flex-col items-center justify-center py-12 text-center">
-                <Settings className="h-16 w-16 text-muted-foreground mb-4" />
-                <h3 className="text-lg font-medium">No System Health Data Available</h3>
-                <p className="text-sm text-muted-foreground max-w-md mt-2">
+                <Settings className="h-16 w-16 text-gray-300 dark:text-white/30 mb-4" strokeWidth={1.5} />
+                <h3 className="text-lg font-medium text-gray-900 dark:text-white/90">No System Health Data Available</h3>
+                <p className="text-sm text-gray-500 dark:text-white/50 max-w-md mt-2">
                   System health metrics are not available at this time.
                 </p>
                 <Button 
                   variant="outline" 
                   size="sm" 
-                  className="mt-4"
+                  className="mt-4 rounded-xl border-gray-200 dark:border-white/10 text-gray-700 dark:text-white/70 hover:bg-gray-50 dark:hover:bg-white/10"
                   onClick={async () => {
                     try {
                       setLoading(true);
@@ -842,21 +893,28 @@ export default function AdminDashboardPage() {
                     }
                   }}
                 >
-                  <RefreshCw className="h-4 w-4 mr-2" />
+                  <RefreshCw className="h-4 w-4 mr-2" strokeWidth={2} />
                   Refresh Data
                 </Button>
               </div>
             ) : systemHealth.systemHealth && systemHealth.systemHealth.length > 0 ? (
               <div className="space-y-6">
                 {systemHealth.systemHealth.map((item, index) => (
-                  <div key={item.name || index} className="space-y-2">
+                  <div key={item.name || index} className="space-y-3 p-5 rounded-xl bg-gray-50 dark:bg-white/5 hover:bg-gray-100 dark:hover:bg-white/10 transition-colors duration-150">
                     <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium">{item.name}</span>
-                      <span className="text-sm font-medium">{item.value}%</span>
+                      <span className="text-sm font-medium text-gray-700 dark:text-white/70">{item.name}</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-2xl font-semibold tracking-tight text-gray-900 dark:text-white/90">{item.value}%</span>
+                        {item.value >= item.target ? (
+                          <CheckCircle className="h-5 w-5 text-emerald-600 dark:text-emerald-400" strokeWidth={2} />
+                        ) : (
+                          <XCircle className="h-5 w-5 text-amber-600 dark:text-amber-400" strokeWidth={2} />
+                        )}
+                      </div>
                     </div>
                     <Progress
                       value={item.value}
-                      className="h-2"
+                      className="h-2.5"
                       style={
                         {
                           backgroundColor: "var(--muted)",
@@ -864,56 +922,53 @@ export default function AdminDashboardPage() {
                         } as React.CSSProperties
                       }
                     />
-                    <div className="flex items-center justify-between text-xs text-muted-foreground">
-                      <span>Target: {item.target}%</span>
-                      <span className={item.value >= item.target ? "text-green-500" : "text-amber-500"}>
-                        {item.value >= item.target ? (
-                          <CheckCircle className="inline h-3 w-3 mr-1" />
-                        ) : (
-                          <XCircle className="inline h-3 w-3 mr-1" />
-                        )}
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-gray-500 dark:text-white/50">Target: {item.target}%</span>
+                      <span className={item.value >= item.target ? "text-emerald-600 dark:text-emerald-400 font-medium" : "text-amber-600 dark:text-amber-400 font-medium"}>
                         {item.value >= item.target ? "Meeting target" : "Below target"}
                       </span>
                     </div>
                   </div>
                 ))}
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  className="mt-4"
-                  onClick={async () => {
-                    try {
-                      setLoading(true);
-                      const healthData = await serviceApi.getSystemHealth();
-                      console.log("Refreshed system health data:", healthData);
-                      setSystemHealth(healthData);
-                    } catch (error) {
-                      console.error("Error refreshing system health:", error);
-                      toast({
-                        title: "Error",
-                        description: "Failed to refresh system health data",
-                        variant: "destructive",
-                      });
-                    } finally {
-                      setLoading(false);
-                    }
-                  }}
-                >
-                  <RefreshCw className="h-4 w-4 mr-2" />
-                  Refresh Data
-                </Button>
+                <div className="mt-6 pt-4 border-t border-gray-200 dark:border-white/10 flex justify-center">
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="rounded-xl text-gray-700 dark:text-white/70 hover:text-gray-900 dark:hover:text-white/90 hover:bg-gray-100 dark:hover:bg-white/10 transition-colors duration-150"
+                    onClick={async () => {
+                      try {
+                        setLoading(true);
+                        const healthData = await serviceApi.getSystemHealth();
+                        console.log("Refreshed system health data:", healthData);
+                        setSystemHealth(healthData);
+                      } catch (error) {
+                        console.error("Error refreshing system health:", error);
+                        toast({
+                          title: "Error",
+                          description: "Failed to refresh system health data",
+                          variant: "destructive",
+                        });
+                      } finally {
+                        setLoading(false);
+                      }
+                    }}
+                  >
+                    <RefreshCw className="h-4 w-4 mr-2" strokeWidth={2} />
+                    Refresh Data
+                  </Button>
+                </div>
               </div>
             ) : (
               <div className="flex flex-col items-center justify-center py-12 text-center">
-                <Settings className="h-16 w-16 text-muted-foreground mb-4" />
-                <h3 className="text-lg font-medium">System Health Data Format Error</h3>
-                <p className="text-sm text-muted-foreground max-w-md mt-2">
+                <Settings className="h-16 w-16 text-gray-300 dark:text-white/30 mb-4" strokeWidth={1.5} />
+                <h3 className="text-lg font-medium text-gray-900 dark:text-white/90">System Health Data Format Error</h3>
+                <p className="text-sm text-gray-500 dark:text-white/50 max-w-md mt-2">
                   The system health data was received but in an unexpected format.
                 </p>
                 <Button 
                   variant="outline" 
                   size="sm" 
-                  className="mt-4"
+                  className="mt-4 rounded-xl border-gray-200 dark:border-white/10 text-gray-700 dark:text-white/70 hover:bg-gray-50 dark:hover:bg-white/10"
                   onClick={async () => {
                     try {
                       setLoading(true);
@@ -932,14 +987,13 @@ export default function AdminDashboardPage() {
                     }
                   }}
                 >
-                  <RefreshCw className="h-4 w-4 mr-2" />
+                  <RefreshCw className="h-4 w-4 mr-2" strokeWidth={2} />
                   Refresh Data
                 </Button>
               </div>
             )}
           </CardContent>
         </Card>
-      </div>
     </div>
   )
 }

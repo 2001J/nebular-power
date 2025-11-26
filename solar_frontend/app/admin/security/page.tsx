@@ -402,11 +402,11 @@ export default function SecurityPage() {
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label className="text-right">
+            <div className="grid grid-cols-1 sm:grid-cols-4 items-center gap-4">
+              <Label className="sm:text-right">
                 Selected Installation
               </Label>
-              <div className="col-span-3">
+              <div className="sm:col-span-3">
                 {selectedInstallation ? (
                   <span>{selectedInstallation.name || `Installation #${selectedInstallation.id}`}</span>
                 ) : (
@@ -415,11 +415,11 @@ export default function SecurityPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="physical-movement" className="text-right">
+            <div className="grid grid-cols-1 sm:grid-cols-4 items-center gap-4">
+              <Label htmlFor="physical-movement" className="sm:text-right">
                 Physical Movement
               </Label>
-              <div className="col-span-3 flex items-center gap-2">
+              <div className="sm:col-span-3 flex items-center gap-2">
                   <Slider
                   id="physical-movement"
                   value={[sensitivitySettings.PHYSICAL_MOVEMENT]}
@@ -435,11 +435,11 @@ export default function SecurityPage() {
                 </div>
               </div>
 
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="voltage-fluctuation" className="text-right">
+            <div className="grid grid-cols-1 sm:grid-cols-4 items-center gap-4">
+              <Label htmlFor="voltage-fluctuation" className="sm:text-right">
                 Voltage Fluctuation
               </Label>
-              <div className="col-span-3 flex items-center gap-2">
+              <div className="sm:col-span-3 flex items-center gap-2">
                   <Slider
                   id="voltage-fluctuation"
                   value={[sensitivitySettings.VOLTAGE_FLUCTUATION]}
@@ -455,11 +455,11 @@ export default function SecurityPage() {
                 </div>
               </div>
 
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="connection-interruption" className="text-right">
+            <div className="grid grid-cols-1 sm:grid-cols-4 items-center gap-4">
+              <Label htmlFor="connection-interruption" className="sm:text-right">
                 Connection Interruption
               </Label>
-              <div className="col-span-3 flex items-center gap-2">
+              <div className="sm:col-span-3 flex items-center gap-2">
                   <Slider
                   id="connection-interruption"
                   value={[sensitivitySettings.CONNECTION_INTERRUPTION]}
@@ -475,11 +475,11 @@ export default function SecurityPage() {
                 </div>
               </div>
 
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="location-change" className="text-right">
+            <div className="grid grid-cols-1 sm:grid-cols-4 items-center gap-4">
+              <Label htmlFor="location-change" className="sm:text-right">
                 Location Change
               </Label>
-              <div className="col-span-3 flex items-center gap-2">
+              <div className="sm:col-span-3 flex items-center gap-2">
                   <Slider
                   id="location-change"
                   value={[sensitivitySettings.LOCATION_CHANGE]}

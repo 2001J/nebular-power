@@ -117,7 +117,6 @@ public class ServiceStatusControllerTest {
         ServiceStatusUpdateRequest request = new ServiceStatusUpdateRequest();
         request.setStatus(ServiceStatus.ServiceState.SUSPENDED_MAINTENANCE);
         request.setStatusReason("Planned maintenance");
-        request.setScheduledTime(LocalDateTime.now().plusHours(2));
 
         // Create sample status DTO with matching SUSPENDED_MAINTENANCE status
         ServiceStatusDTO updatedStatus = new ServiceStatusDTO();
@@ -284,83 +283,6 @@ public class ServiceStatusControllerTest {
     }
 
     @Test
-    @DisplayName("Should schedule status change")
-    @WithMockUser(username = "admin")
-    void shouldScheduleStatusChange() throws Exception {
-        // Arrange
-        LocalDateTime scheduledTime = testTime.plusDays(1);
-        String scheduledTimeStr = scheduledTime.format(DateTimeFormatter.ISO_DATE_TIME);
-        
-        ServiceStatusDTO scheduledStatus = new ServiceStatusDTO();
-        scheduledStatus.setId(1L);
-        scheduledStatus.setStatus(ServiceStatus.ServiceState.ACTIVE);
-        scheduledStatus.setScheduledChange(ServiceStatus.ServiceState.SUSPENDED_MAINTENANCE);
-        scheduledStatus.setScheduledTime(scheduledTime);
-        scheduledStatus.setStatusReason("Upcoming maintenance");
-        scheduledStatus.setUpdatedBy("admin");
-        scheduledStatus.setActive(true);
-        scheduledStatus.setInstallationId(1L);
-
-        when(serviceStatusService.scheduleStatusChange(
-                eq(1L), 
-                eq(ServiceStatus.ServiceState.SUSPENDED_MAINTENANCE), 
-                anyString(), 
-                any(LocalDateTime.class), 
-                eq("admin")))
-                .thenReturn(scheduledStatus);
-
-        // Act & Assert
-        mockMvc.perform(post("/api/service/status/1/schedule")
-                .with(csrf())
-                .param("targetStatus", "SUSPENDED_MAINTENANCE")
-                .param("reason", "Upcoming maintenance")
-                .param("scheduledTime", scheduledTimeStr))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value(1))
-                .andExpect(jsonPath("$.scheduledChange").value("SUSPENDED_MAINTENANCE"))
-                .andExpect(jsonPath("$.status").value("ACTIVE"));
-
-        verify(serviceStatusService).scheduleStatusChange(
-                eq(1L), 
-                eq(ServiceStatus.ServiceState.SUSPENDED_MAINTENANCE), 
-                anyString(), 
-                any(LocalDateTime.class), 
-                eq("admin"));
-        verify(operationalLogService).logOperation(
-                anyLong(), eq(OperationalLog.OperationType.STATUS_CHANGE_SCHEDULED), anyString(), contains("Scheduled status change"), anyString(), anyString(), anyString(), isNull(), eq(true), isNull());
-    }
-
-    @Test
-    @DisplayName("Should cancel scheduled change")
-    @WithMockUser(username = "admin")
-    void shouldCancelScheduledChange() throws Exception {
-        // Arrange
-        ServiceStatusDTO cancelledSchedule = new ServiceStatusDTO();
-        cancelledSchedule.setId(1L);
-        cancelledSchedule.setStatus(ServiceStatus.ServiceState.ACTIVE);
-        cancelledSchedule.setScheduledChange(null);
-        cancelledSchedule.setScheduledTime(null);
-        cancelledSchedule.setUpdatedBy("admin");
-        cancelledSchedule.setActive(true);
-        cancelledSchedule.setInstallationId(1L);
-
-        when(serviceStatusService.cancelScheduledChange(eq(1L), eq("admin")))
-                .thenReturn(cancelledSchedule);
-
-        // Act & Assert
-        mockMvc.perform(delete("/api/service/status/1/schedule")
-                .with(csrf()))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value(1))
-                .andExpect(jsonPath("$.scheduledChange").isEmpty())
-                .andExpect(jsonPath("$.status").value("ACTIVE"));
-
-        verify(serviceStatusService).cancelScheduledChange(eq(1L), eq("admin"));
-        verify(operationalLogService).logOperation(
-                anyLong(), eq(OperationalLog.OperationType.SCHEDULED_CHANGE_CANCELLED), anyString(), contains("Cancelled scheduled status change"), anyString(), anyString(), anyString(), isNull(), eq(true), isNull());
-    }
-
-    @Test
     @DisplayName("Should get statuses by user ID")
     @WithMockUser(username = "user")
     void shouldGetStatusesByUserId() throws Exception {
@@ -401,23 +323,12 @@ public class ServiceStatusControllerTest {
     @Test
     @WithMockUser(username = "admin", roles = {"ADMIN"})
     void startService() throws Exception {
-        // Create a mock response for the startService operation
-        ServiceStatusDTO startedStatusDTO = new ServiceStatusDTO();
-        startedStatusDTO.setId(1L);
-        startedStatusDTO.setInstallationId(101L);
-        startedStatusDTO.setStatus(ServiceStatus.ServiceState.ACTIVE);
-        startedStatusDTO.setStatusReason("Service started by admin");
-        startedStatusDTO.setUpdatedBy("admin");
-        startedStatusDTO.setUpdatedAt(LocalDateTime.now());
-        startedStatusDTO.setActive(true);
-        
-        when(serviceStatusService.startService(eq(101L), eq("admin"))).thenReturn(startedStatusDTO);
+        // This endpoint is deprecated and should return 501 Not Implemented
+        when(serviceStatusService.startService(eq(101L), eq("admin")))
+                .thenThrow(new UnsupportedOperationException("Direct start is not supported"));
         
         mockMvc.perform(post("/api/service/status/installations/101/start"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.installationId").value(101))
-                .andExpect(jsonPath("$.status").value("ACTIVE"))
-                .andExpect(jsonPath("$.statusReason").value("Service started by admin"));
+                .andExpect(status().isNotImplemented()); // Expecting 501
         
         verify(serviceStatusService).startService(101L, "admin");
     }
@@ -425,23 +336,12 @@ public class ServiceStatusControllerTest {
     @Test
     @WithMockUser(username = "admin", roles = {"ADMIN"})
     void stopService() throws Exception {
-        // Create a mock response for the stopService operation
-        ServiceStatusDTO stoppedStatusDTO = new ServiceStatusDTO();
-        stoppedStatusDTO.setId(1L);
-        stoppedStatusDTO.setInstallationId(101L);
-        stoppedStatusDTO.setStatus(ServiceStatus.ServiceState.SUSPENDED_MAINTENANCE);
-        stoppedStatusDTO.setStatusReason("Service stopped by admin");
-        stoppedStatusDTO.setUpdatedBy("admin");
-        stoppedStatusDTO.setUpdatedAt(LocalDateTime.now());
-        stoppedStatusDTO.setActive(true);
-        
-        when(serviceStatusService.stopService(eq(101L), eq("admin"))).thenReturn(stoppedStatusDTO);
+        // This endpoint is deprecated and should return 501 Not Implemented
+        when(serviceStatusService.stopService(eq(101L), eq("admin")))
+                .thenThrow(new UnsupportedOperationException("Direct stop is not supported"));
         
         mockMvc.perform(post("/api/service/status/installations/101/stop"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.installationId").value(101))
-                .andExpect(jsonPath("$.status").value("SUSPENDED_MAINTENANCE"))
-                .andExpect(jsonPath("$.statusReason").value("Service stopped by admin"));
+                .andExpect(status().isNotImplemented()); // Expecting 501
         
         verify(serviceStatusService).stopService(101L, "admin");
     }
@@ -449,12 +349,12 @@ public class ServiceStatusControllerTest {
     @Test
     @WithMockUser(username = "admin", roles = {"ADMIN"})
     void restartService() throws Exception {
-        // Create a mock response for the restartService operation
+        // Restart now returns TRANSITIONING status, with scheduled restoration to ACTIVE
         ServiceStatusDTO restartedStatusDTO = new ServiceStatusDTO();
         restartedStatusDTO.setId(1L);
         restartedStatusDTO.setInstallationId(101L);
-        restartedStatusDTO.setStatus(ServiceStatus.ServiceState.ACTIVE);
-        restartedStatusDTO.setStatusReason("Service restarted by admin");
+        restartedStatusDTO.setStatus(ServiceStatus.ServiceState.TRANSITIONING);
+        restartedStatusDTO.setStatusReason("Service restart requested by admin");
         restartedStatusDTO.setUpdatedBy("admin");
         restartedStatusDTO.setUpdatedAt(LocalDateTime.now());
         restartedStatusDTO.setActive(true);
@@ -464,101 +364,177 @@ public class ServiceStatusControllerTest {
         mockMvc.perform(post("/api/service/status/installations/101/restart"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.installationId").value(101))
-                .andExpect(jsonPath("$.status").value("ACTIVE"))
-                .andExpect(jsonPath("$.statusReason").value("Service restarted by admin"));
+                .andExpect(jsonPath("$.status").value("TRANSITIONING"))
+                .andExpect(jsonPath("$.statusReason").value("Service restart requested by admin"));
         
         verify(serviceStatusService).restartService(101L, "admin");
     }
 
-    @Test
-    @WithMockUser(username = "admin", roles = {"ADMIN"})
-    void scheduleStatusChange() throws Exception {
-        // Arrange
-        LocalDateTime scheduledTime = testTime.plusDays(1);
-        String scheduledTimeStr = scheduledTime.format(DateTimeFormatter.ISO_DATE_TIME);
-        
-        ServiceStatusDTO scheduledStatus = new ServiceStatusDTO();
-        scheduledStatus.setId(1L);
-        scheduledStatus.setStatus(ServiceStatus.ServiceState.ACTIVE);
-        scheduledStatus.setScheduledChange(ServiceStatus.ServiceState.SUSPENDED_MAINTENANCE);
-        scheduledStatus.setScheduledTime(scheduledTime);
-        scheduledStatus.setStatusReason("Upcoming maintenance");
-        scheduledStatus.setUpdatedBy("admin");
-        scheduledStatus.setActive(true);
-        scheduledStatus.setInstallationId(1L);
+    // ============================================================
+    // Device Status Report Tests (NEW)
+    // ============================================================
 
-        when(serviceStatusService.scheduleStatusChange(
-                eq(1L), 
-                eq(ServiceStatus.ServiceState.SUSPENDED_MAINTENANCE), 
-                anyString(), 
-                any(LocalDateTime.class), 
-                eq("admin")))
-                .thenReturn(scheduledStatus);
+    @Test
+    @WithMockUser(username = "device", roles = {"DEVICE"})
+    @DisplayName("Should receive device status report successfully")
+    void testReceiveDeviceStatusReport_Success() throws Exception {
+        // Arrange
+        com.solar.core_services.service_control.dto.DeviceStatusReportDTO deviceReport = 
+            com.solar.core_services.service_control.dto.DeviceStatusReportDTO.builder()
+                .installationId(1L)
+                .status("ACTIVE")
+                .reason("Service started via admin command")
+                .timestamp(LocalDateTime.now())
+                .lastCommandId(123L)
+                .deviceVersion("1.0.0")
+                .build();
+
+        doNothing().when(serviceStatusService).processDeviceStatusReport(any());
 
         // Act & Assert
-        mockMvc.perform(post("/api/service/status/1/schedule")
+        mockMvc.perform(post("/api/service/status/device-report")
                 .with(csrf())
-                .param("targetStatus", "SUSPENDED_MAINTENANCE")
-                .param("reason", "Upcoming maintenance")
-                .param("scheduledTime", scheduledTimeStr))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value(1))
-                .andExpect(jsonPath("$.scheduledChange").value("SUSPENDED_MAINTENANCE"))
-                .andExpect(jsonPath("$.status").value("ACTIVE"));
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(deviceReport)))
+                .andExpect(status().isOk());
 
-        verify(serviceStatusService).scheduleStatusChange(
-                eq(1L), 
-                eq(ServiceStatus.ServiceState.SUSPENDED_MAINTENANCE), 
-                anyString(), 
-                any(LocalDateTime.class), 
-                eq("admin"));
-        verify(operationalLogService).logOperation(
-                anyLong(), eq(OperationalLog.OperationType.STATUS_CHANGE_SCHEDULED), anyString(), contains("Scheduled status change"), anyString(), anyString(), anyString(), isNull(), eq(true), isNull());
+        verify(serviceStatusService, times(1)).processDeviceStatusReport(any());
     }
 
     @Test
-    @WithMockUser(username = "admin", roles = {"ADMIN"})
-    void scheduleStatusChange_LocalDateTime() throws Exception {
-        // Arrange
-        LocalDateTime scheduledTime = testTime.plusDays(1);
-        String scheduledTimeStr = scheduledTime.format(DateTimeFormatter.ISO_DATE_TIME);
-        
-        ServiceStatusDTO scheduledStatus = new ServiceStatusDTO();
-        scheduledStatus.setId(1L);
-        scheduledStatus.setStatus(ServiceStatus.ServiceState.ACTIVE);
-        scheduledStatus.setScheduledChange(ServiceStatus.ServiceState.SUSPENDED_MAINTENANCE);
-        scheduledStatus.setScheduledTime(scheduledTime);
-        scheduledStatus.setStatusReason("Upcoming maintenance");
-        scheduledStatus.setUpdatedBy("admin");
-        scheduledStatus.setActive(true);
-        scheduledStatus.setInstallationId(1L);
-
-        when(serviceStatusService.scheduleStatusChange(
-                eq(1L), 
-                eq(ServiceStatus.ServiceState.SUSPENDED_MAINTENANCE), 
-                anyString(), 
-                any(LocalDateTime.class), 
-                eq("admin")))
-                .thenReturn(scheduledStatus);
+    @WithMockUser(username = "device", roles = {"DEVICE"})
+    @DisplayName("Should return 400 when device report has missing required fields")
+    void testReceiveDeviceStatusReport_MissingRequiredFields() throws Exception {
+        // Arrange - Missing installationId
+        com.solar.core_services.service_control.dto.DeviceStatusReportDTO invalidReport = 
+            com.solar.core_services.service_control.dto.DeviceStatusReportDTO.builder()
+                .status("ACTIVE")
+                .timestamp(LocalDateTime.now())
+                .build();
 
         // Act & Assert
-        mockMvc.perform(post("/api/service/status/1/schedule")
+        mockMvc.perform(post("/api/service/status/device-report")
                 .with(csrf())
-                .param("targetStatus", "SUSPENDED_MAINTENANCE")
-                .param("reason", "Upcoming maintenance")
-                .param("scheduledTime", scheduledTimeStr))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value(1))
-                .andExpect(jsonPath("$.scheduledChange").value("SUSPENDED_MAINTENANCE"))
-                .andExpect(jsonPath("$.status").value("ACTIVE"));
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(invalidReport)))
+                .andExpect(status().isBadRequest());
 
-        verify(serviceStatusService).scheduleStatusChange(
-                eq(1L), 
-                eq(ServiceStatus.ServiceState.SUSPENDED_MAINTENANCE), 
-                anyString(), 
-                any(LocalDateTime.class), 
-                eq("admin"));
-        verify(operationalLogService).logOperation(
-                anyLong(), eq(OperationalLog.OperationType.STATUS_CHANGE_SCHEDULED), anyString(), contains("Scheduled status change"), anyString(), anyString(), anyString(), isNull(), eq(true), isNull());
+        verify(serviceStatusService, never()).processDeviceStatusReport(any());
+    }
+
+    @Test
+    @WithMockUser(username = "device", roles = {"DEVICE"})
+    @DisplayName("Should return 400 when status is blank")
+    void testReceiveDeviceStatusReport_BlankStatus() throws Exception {
+        // Arrange
+        com.solar.core_services.service_control.dto.DeviceStatusReportDTO invalidReport = 
+            com.solar.core_services.service_control.dto.DeviceStatusReportDTO.builder()
+                .installationId(1L)
+                .status("")
+                .timestamp(LocalDateTime.now())
+                .build();
+
+        // Act & Assert
+        mockMvc.perform(post("/api/service/status/device-report")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(invalidReport)))
+                .andExpect(status().isBadRequest());
+
+        verify(serviceStatusService, never()).processDeviceStatusReport(any());
+    }
+
+    @Test
+    @WithMockUser(username = "device", roles = {"DEVICE"})
+    @DisplayName("Should handle service exception gracefully")
+    void testReceiveDeviceStatusReport_ServiceException() throws Exception {
+        // Arrange
+        com.solar.core_services.service_control.dto.DeviceStatusReportDTO deviceReport = 
+            com.solar.core_services.service_control.dto.DeviceStatusReportDTO.builder()
+                .installationId(1L)
+                .status("ACTIVE")
+                .timestamp(LocalDateTime.now())
+                .build();
+
+        doThrow(new RuntimeException("Database connection failed"))
+                .when(serviceStatusService).processDeviceStatusReport(any());
+
+        // Act & Assert
+        mockMvc.perform(post("/api/service/status/device-report")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(deviceReport)))
+                .andExpect(status().isInternalServerError());
+
+        verify(serviceStatusService, times(1)).processDeviceStatusReport(any());
+    }
+
+    @Test
+    @WithMockUser(username = "device", roles = {"DEVICE"})
+    @DisplayName("Should accept device report with device health metrics")
+    void testReceiveDeviceStatusReport_WithHealthMetrics() throws Exception {
+        // Arrange
+        java.util.Map<String, Object> deviceHealth = new java.util.HashMap<>();
+        deviceHealth.put("cpu_usage", 75.5);
+        deviceHealth.put("memory_usage", 82.3);
+        deviceHealth.put("temperature", 55.0);
+        deviceHealth.put("disk_usage", 60.0);
+
+        com.solar.core_services.service_control.dto.DeviceStatusReportDTO deviceReport = 
+            com.solar.core_services.service_control.dto.DeviceStatusReportDTO.builder()
+                .installationId(1L)
+                .status("ACTIVE")
+                .reason("Normal operation")
+                .timestamp(LocalDateTime.now())
+                .lastCommandId(456L)
+                .deviceHealth(deviceHealth)
+                .deviceVersion("2.0.0")
+                .build();
+
+        doNothing().when(serviceStatusService).processDeviceStatusReport(any());
+
+        // Act & Assert
+        mockMvc.perform(post("/api/service/status/device-report")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(deviceReport)))
+                .andExpect(status().isOk());
+
+        verify(serviceStatusService, times(1)).processDeviceStatusReport(any());
+    }
+
+    @Test
+    @WithMockUser(username = "device", roles = {"DEVICE"})
+    @DisplayName("Should accept all valid status values")
+    void testReceiveDeviceStatusReport_AllValidStatuses() throws Exception {
+        // Arrange
+        String[] validStatuses = {
+            "ACTIVE",
+            "SUSPENDED_PAYMENT",
+            "SUSPENDED_SECURITY",
+            "SUSPENDED_MAINTENANCE",
+            "TRANSITIONING",
+            "PENDING"
+        };
+
+        doNothing().when(serviceStatusService).processDeviceStatusReport(any());
+
+        // Act & Assert
+        for (String status : validStatuses) {
+            com.solar.core_services.service_control.dto.DeviceStatusReportDTO deviceReport = 
+                com.solar.core_services.service_control.dto.DeviceStatusReportDTO.builder()
+                    .installationId(1L)
+                    .status(status)
+                    .timestamp(LocalDateTime.now())
+                    .build();
+
+            mockMvc.perform(post("/api/service/status/device-report")
+                    .with(csrf())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(deviceReport)))
+                    .andExpect(status().isOk());
+        }
+
+        verify(serviceStatusService, times(validStatuses.length)).processDeviceStatusReport(any());
     }
 } 

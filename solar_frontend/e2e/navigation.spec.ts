@@ -2,10 +2,25 @@ import { test, expect } from '@playwright/test';
 
 test.describe('Navigation', () => {
   test('homepage renders correctly', async ({ page }) => {
-    await page.goto('/');
+    // Mock the profile API call that auth provider makes
+    await page.route('**/api/profile', async (route) => {
+      await route.fulfill({
+        status: 401,
+        contentType: 'application/json',
+        body: JSON.stringify({ message: 'Unauthorized' }),
+      });
+    });
 
-    // Check for main content (this depends on your homepage implementation)
-    await expect(page).toHaveTitle(/Solar|Nebular|Home/i);
+    await page.goto('/', { waitUntil: 'domcontentloaded' });
+
+    // Check for NebulaPower branding in navbar
+    await expect(page.locator('nav').getByText('NebulaPower')).toBeVisible();
+    
+    // Check for hero section text
+    await expect(page.locator('text=Solar Energy Monitoring and Management System')).toBeVisible();
+    
+    // Check for Get Started button
+    await expect(page.locator('text=Get Started')).toBeVisible();
   });
 
   test('404 page handles invalid routes', async ({ page }) => {

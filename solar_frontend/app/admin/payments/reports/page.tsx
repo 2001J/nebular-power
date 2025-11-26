@@ -327,15 +327,15 @@ export default function PaymentReportsPage() {
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div className="flex flex-col items-center justify-center p-4 bg-muted rounded-lg">
-                <span className="text-4xl font-bold text-green-500">{paidOnTime}</span>
+                <span className="text-3xl sm:text-4xl font-bold text-green-500">{paidOnTime}</span>
                 <span className="mt-2 text-sm font-medium">Paid On Time</span>
               </div>
               <div className="flex flex-col items-center justify-center p-4 bg-muted rounded-lg">
-                <span className="text-4xl font-bold text-yellow-500">{paidLate}</span>
+                <span className="text-3xl sm:text-4xl font-bold text-yellow-500">{paidLate}</span>
                 <span className="mt-2 text-sm font-medium">Paid Late</span>
               </div>
               <div className="flex flex-col items-center justify-center p-4 bg-muted rounded-lg">
-                <span className="text-4xl font-bold text-red-500">{unpaid}</span>
+                <span className="text-3xl sm:text-4xl font-bold text-red-500">{unpaid}</span>
                 <span className="mt-2 text-sm font-medium">Unpaid</span>
               </div>
             </div>

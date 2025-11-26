@@ -116,8 +116,13 @@ class TamperSimulator:
                     self.trigger_tamper_event(event_type)
                     last_event_time = time.time()
             
-            # Sleep to avoid high CPU usage
-            time.sleep(5)
+            # Interruptible sleep to avoid high CPU usage
+            for _ in range(10):  # 5 seconds total
+                if not is_running():
+                    break
+                time.sleep(0.5)
+        
+        logger.info("Tamper simulation stopped gracefully")
     
     def trigger_tamper_event(self, event_type):
         """Trigger a tamper event of the specified type."""

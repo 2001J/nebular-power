@@ -3,6 +3,7 @@ package com.solar.core_services.service_control.service;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.solar.core_services.energy_monitoring.model.SolarInstallation;
 import com.solar.core_services.energy_monitoring.repository.SolarInstallationRepository;
+import com.solar.core_services.service_control.config.CommandSchedulerConfig;
 import com.solar.core_services.service_control.dto.BatchCommandRequest;
 import com.solar.core_services.service_control.dto.CommandResponseRequest;
 import com.solar.core_services.service_control.dto.DeviceCommandDTO;
@@ -42,6 +43,15 @@ public class DeviceCommandServiceTest {
     
     @Mock
     private ObjectMapper objectMapper;
+
+    @Mock
+    private DeviceTransmissionService transmissionService;
+
+    @Mock
+    private CommandValidationService validationService;
+    
+    @Mock
+    private CommandSchedulerConfig schedulerConfig;
 
     @InjectMocks
     private DeviceCommandServiceImpl deviceCommandService;
@@ -92,6 +102,8 @@ public class DeviceCommandServiceTest {
             savedCommand.setId(1L);
             return savedCommand;
         });
+        doNothing().when(validationService).validateCommand(anyString(), anyMap());
+        when(transmissionService.transmitCommand(any(DeviceCommand.class))).thenReturn(true);
 
         // Act
         DeviceCommandDTO result = deviceCommandService.sendCommand(installationId, command, parameters, initiatedBy);
@@ -103,6 +115,8 @@ public class DeviceCommandServiceTest {
         assertEquals(DeviceCommand.CommandStatus.SENT, result.getStatus());
 
         verify(installationRepository).findById(installationId);
+        verify(validationService).validateCommand(command, parameters);
+        verify(transmissionService).transmitCommand(any(DeviceCommand.class));
         verify(commandRepository, times(2)).save(any(DeviceCommand.class));
     }
 
@@ -123,6 +137,8 @@ public class DeviceCommandServiceTest {
             savedCommand.setId(1L);
             return savedCommand;
         });
+        doNothing().when(validationService).validateCommand(anyString(), anyMap());
+        when(transmissionService.transmitCommand(any(DeviceCommand.class))).thenReturn(true);
 
         // Act
         List<DeviceCommandDTO> results = deviceCommandService.sendBatchCommand(request);
@@ -132,6 +148,8 @@ public class DeviceCommandServiceTest {
         assertEquals(3, results.size());
         
         verify(installationRepository, times(3)).findById(anyLong());
+        verify(validationService, times(3)).validateCommand(anyString(), anyMap());
+        verify(transmissionService, times(3)).transmitCommand(any(DeviceCommand.class));
         verify(commandRepository, times(6)).save(any(DeviceCommand.class));
     }
 
@@ -301,6 +319,7 @@ public class DeviceCommandServiceTest {
 
         when(commandRepository.findById(commandId)).thenReturn(Optional.of(failedCommand));
         when(commandRepository.save(any(DeviceCommand.class))).thenReturn(failedCommand);
+        when(transmissionService.transmitCommand(any(DeviceCommand.class))).thenReturn(true);
 
         // Act
         DeviceCommandDTO result = deviceCommandService.retryCommand(commandId, retriedBy);
@@ -311,6 +330,7 @@ public class DeviceCommandServiceTest {
         assertTrue(result.getResponseMessage().contains(retriedBy));
 
         verify(commandRepository).findById(commandId);
+        verify(transmissionService).transmitCommand(any(DeviceCommand.class));
         verify(commandRepository, times(2)).save(any(DeviceCommand.class));
     }
 
@@ -318,6 +338,11 @@ public class DeviceCommandServiceTest {
     @DisplayName("Should process expired commands")
     void shouldProcessExpiredCommands() {
         // Arrange
+        // Mock the scheduler config
+        CommandSchedulerConfig.ExpirationConfig expirationConfig = new CommandSchedulerConfig.ExpirationConfig();
+        expirationConfig.setHours(24);
+        when(schedulerConfig.getExpiration()).thenReturn(expirationConfig);
+        
         List<DeviceCommand.CommandStatus> activeStatuses = Arrays.asList(
                 DeviceCommand.CommandStatus.PENDING,
                 DeviceCommand.CommandStatus.SENT,
@@ -339,14 +364,22 @@ public class DeviceCommandServiceTest {
     @DisplayName("Should process command retries")
     void shouldProcessCommandRetries() {
         // Arrange
+        // Mock the scheduler config
+        CommandSchedulerConfig.RetryConfig retryConfig = new CommandSchedulerConfig.RetryConfig();
+        retryConfig.setMaxAttempts(3);
+        retryConfig.setDelayMinutes(5);
+        when(schedulerConfig.getRetry()).thenReturn(retryConfig);
+        
         when(commandRepository.findCommandsForRetry(anyInt(), any(LocalDateTime.class)))
                 .thenReturn(List.of(pendingCommand));
+        when(transmissionService.transmitCommand(any(DeviceCommand.class))).thenReturn(true);
 
         // Act
         deviceCommandService.processCommandRetries();
 
         // Assert
         verify(commandRepository).findCommandsForRetry(anyInt(), any(LocalDateTime.class));
+        verify(transmissionService).transmitCommand(any(DeviceCommand.class));
         verify(commandRepository, times(2)).save(any(DeviceCommand.class));
     }
 

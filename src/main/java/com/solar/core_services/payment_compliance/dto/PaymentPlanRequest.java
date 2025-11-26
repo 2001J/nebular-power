@@ -44,6 +44,8 @@ public class PaymentPlanRequest {
 
     private BigDecimal interestRate;
 
+    private BigDecimal downPayment;
+
     private BigDecimal lateFeeAmount;
 
     private Integer gracePeriodDays;

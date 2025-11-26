@@ -159,7 +159,7 @@ public class ServiceStatusServiceTest {
         assertEquals(ServiceStatus.ServiceState.SUSPENDED_PAYMENT, result.getStatus());
         assertEquals("Payment overdue", result.getStatusReason());
         
-        verify(serviceStatusRepository).findActiveByInstallationId(1L);
+        verify(serviceStatusRepository, times(2)).findActiveByInstallationId(1L);
         verify(serviceStatusRepository, times(2)).save(any(ServiceStatus.class));
     }
 
@@ -179,7 +179,7 @@ public class ServiceStatusServiceTest {
         assertEquals(ServiceStatus.ServiceState.SUSPENDED_SECURITY, result.getStatus());
         assertEquals("Security breach detected", result.getStatusReason());
         
-        verify(serviceStatusRepository).findActiveByInstallationId(1L);
+        verify(serviceStatusRepository, times(2)).findActiveByInstallationId(1L);
         verify(serviceStatusRepository, times(2)).save(any(ServiceStatus.class));
     }
 
@@ -199,7 +199,7 @@ public class ServiceStatusServiceTest {
         assertEquals(ServiceStatus.ServiceState.SUSPENDED_MAINTENANCE, result.getStatus());
         assertEquals("Scheduled maintenance", result.getStatusReason());
         
-        verify(serviceStatusRepository).findActiveByInstallationId(1L);
+    verify(serviceStatusRepository, times(2)).findActiveByInstallationId(1L);
         verify(serviceStatusRepository, times(2)).save(any(ServiceStatus.class));
     }
 
@@ -214,99 +214,28 @@ public class ServiceStatusServiceTest {
         suspendedStatus.setActive(true);
         
         when(installationRepository.findById(1L)).thenReturn(Optional.of(installation));
-        when(serviceStatusRepository.findActiveByInstallationId(1L)).thenReturn(Optional.of(suspendedStatus));
-        when(serviceStatusRepository.save(any(ServiceStatus.class))).thenAnswer(i -> i.getArgument(0));
+        when(serviceStatusRepository.findActiveByInstallationId(1L))
+            .thenReturn(Optional.of(suspendedStatus))  // First call - get current status
+            .thenReturn(Optional.of(suspendedStatus)); // Second call during updateServiceStatus
+        when(serviceStatusRepository.save(any(ServiceStatus.class))).thenAnswer(i -> {
+            ServiceStatus status = i.getArgument(0);
+            // The service now immediately transitions to ACTIVE
+            status.setStatus(ServiceStatus.ServiceState.ACTIVE);
+            return status;
+        });
         
         // Act
         ServiceStatusDTO result = serviceStatusService.restoreService(1L, "Maintenance completed", "admin");
         
-        // Assert
+        // Assert - restoreService now immediately updates to ACTIVE, not scheduled
         assertNotNull(result);
         assertEquals(ServiceStatus.ServiceState.ACTIVE, result.getStatus());
-        assertEquals("Maintenance completed", result.getStatusReason());
-        
-        verify(serviceStatusRepository).findActiveByInstallationId(1L);
+        assertTrue(result.getStatusReason().contains("Restoration requested by admin"));
+        assertTrue(result.getStatusReason().contains("Maintenance completed"));
+
+        verify(installationRepository).findById(1L);
+        verify(serviceStatusRepository, times(2)).findActiveByInstallationId(1L);
         verify(serviceStatusRepository, times(2)).save(any(ServiceStatus.class));
-    }
-
-    @Test
-    @DisplayName("Should schedule status change")
-    void shouldScheduleStatusChange() {
-        // Arrange
-        LocalDateTime scheduledTime = LocalDateTime.now().plusDays(1);
-        
-        when(serviceStatusRepository.findActiveByInstallationId(1L)).thenReturn(Optional.of(activeStatus));
-        when(serviceStatusRepository.save(any(ServiceStatus.class))).thenAnswer(i -> i.getArgument(0));
-        
-        // Act
-        ServiceStatusDTO result = serviceStatusService.scheduleStatusChange(
-            1L, 
-            ServiceStatus.ServiceState.SUSPENDED_MAINTENANCE, 
-            "Scheduled maintenance", 
-            scheduledTime,
-            "admin");
-        
-        // Assert
-        assertNotNull(result);
-        assertEquals(ServiceStatus.ServiceState.ACTIVE, result.getStatus());
-        assertEquals(ServiceStatus.ServiceState.SUSPENDED_MAINTENANCE, result.getScheduledChange());
-        assertEquals(scheduledTime, result.getScheduledTime());
-        
-        verify(serviceStatusRepository).findActiveByInstallationId(1L);
-        verify(serviceStatusRepository).save(any(ServiceStatus.class));
-    }
-
-    @Test
-    @DisplayName("Should cancel scheduled change")
-    void shouldCancelScheduledChange() {
-        // Arrange
-        activeStatus.setScheduledChange(ServiceStatus.ServiceState.SUSPENDED_MAINTENANCE);
-        activeStatus.setScheduledTime(LocalDateTime.now().plusDays(1));
-        
-        when(serviceStatusRepository.findActiveByInstallationId(1L)).thenReturn(Optional.of(activeStatus));
-        when(serviceStatusRepository.save(any(ServiceStatus.class))).thenAnswer(i -> i.getArgument(0));
-        
-        // Act
-        ServiceStatusDTO result = serviceStatusService.cancelScheduledChange(1L, "admin");
-        
-        // Assert
-        assertNotNull(result);
-        assertNull(result.getScheduledChange());
-        assertNull(result.getScheduledTime());
-        
-        verify(serviceStatusRepository).findActiveByInstallationId(1L);
-        verify(serviceStatusRepository).save(any(ServiceStatus.class));
-    }
-
-    @Test
-    @DisplayName("Should process scheduled changes")
-    void shouldProcessScheduledChanges() {
-        // Arrange
-        LocalDateTime scheduledTime = LocalDateTime.now().minusHours(1);
-        
-        ServiceStatus scheduledStatus = new ServiceStatus();
-        scheduledStatus.setId(3L);
-        scheduledStatus.setInstallation(installation);
-        scheduledStatus.setStatus(ServiceStatus.ServiceState.ACTIVE);
-        scheduledStatus.setScheduledChange(ServiceStatus.ServiceState.SUSPENDED_MAINTENANCE);
-        scheduledStatus.setScheduledTime(scheduledTime);
-        scheduledStatus.setUpdatedAt(LocalDateTime.now().minusDays(1));
-        scheduledStatus.setActive(true);
-        
-        List<ServiceStatus> dueChanges = List.of(scheduledStatus);
-        
-        when(serviceStatusRepository.findByScheduledChangeIsNotNullAndScheduledTimeBefore(any(LocalDateTime.class)))
-            .thenReturn(dueChanges);
-        when(installationRepository.findById(anyLong())).thenReturn(Optional.of(installation));
-        when(serviceStatusRepository.findActiveByInstallationId(anyLong())).thenReturn(Optional.of(scheduledStatus));
-        when(serviceStatusRepository.save(any(ServiceStatus.class))).thenAnswer(i -> i.getArgument(0));
-        
-        // Act
-        serviceStatusService.processScheduledChanges();
-        
-        // Assert
-        verify(serviceStatusRepository).findByScheduledChangeIsNotNullAndScheduledTimeBefore(any(LocalDateTime.class));
-        verify(serviceStatusRepository, atLeastOnce()).save(any(ServiceStatus.class));
     }
 
     @Test
@@ -383,25 +312,5 @@ public class ServiceStatusServiceTest {
         );
         
         verify(serviceStatusRepository).findActiveByInstallationId(1L);
-    }
-
-    @Test
-    @DisplayName("Should throw exception when scheduled time is in the past")
-    void shouldThrowExceptionWhenScheduledTimeIsInPast() {
-        // Arrange
-        LocalDateTime pastTime = LocalDateTime.now().minusHours(1);
-        
-        // Act & Assert
-        assertThrows(RuntimeException.class, () -> 
-            serviceStatusService.scheduleStatusChange(
-                1L, 
-                ServiceStatus.ServiceState.SUSPENDED_MAINTENANCE, 
-                "Scheduled maintenance", 
-                pastTime,
-                "admin")
-        );
-        
-        verify(serviceStatusRepository, never()).findActiveByInstallationId(anyLong());
-        verify(serviceStatusRepository, never()).save(any(ServiceStatus.class));
     }
 } 

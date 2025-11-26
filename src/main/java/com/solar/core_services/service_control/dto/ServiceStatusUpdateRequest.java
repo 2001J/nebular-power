@@ -20,9 +20,5 @@ public class ServiceStatusUpdateRequest {
     
     private String statusReason;
     
-    private ServiceStatus.ServiceState scheduledChange;
-    
-    private LocalDateTime scheduledTime;
-    
     private String updatedBy;
 } 

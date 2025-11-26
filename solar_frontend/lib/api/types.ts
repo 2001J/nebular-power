@@ -231,7 +231,6 @@ export interface ServiceCommand {
   command: string;
   commandType: 'restart' | 'shutdown' | 'maintenance' | 'reset' | 'configure';
   status: 'pending' | 'executing' | 'completed' | 'failed';
-  scheduledTime?: string;
   executedTime?: string;
   result?: string;
   error?: string;

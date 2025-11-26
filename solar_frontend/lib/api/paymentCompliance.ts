@@ -45,8 +45,8 @@ export const paymentComplianceApi = {
   async getPaymentPlanById(planId: string) {
     return makeApiRequest(() => apiClient.get(`/api/admin/payments/plans/${planId}`));
   },
-  async updatePaymentPlan(planId: string, request: any) {
-    return makeApiRequest(() => apiClient.put(`/api/admin/payments/plans/${planId}`, request));
+  async updatePaymentPlan(customerId: string, planId: string, request: any) {
+    return makeApiRequest(() => apiClient.put(`/api/admin/payments/customers/${customerId}/plan/${planId}`, request));
   },
   async createPaymentPlan(customerId: string, request: any) {
     return makeApiRequest(() => apiClient.post(`/api/admin/payments/customers/${customerId}/plan`, request));

@@ -333,7 +333,7 @@ export default function LoanManagementPage() {
       ) : (
         <>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <Card>
+            <Card className="border border-border/50 shadow-soft bg-card">
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium">Total Loan Volume</CardTitle>
               </CardHeader>
@@ -344,7 +344,7 @@ export default function LoanManagementPage() {
                 </p>
               </CardContent>
             </Card>
-            <Card>
+            <Card className="border border-border/50 shadow-soft bg-card">
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium">Outstanding Balance</CardTitle>
               </CardHeader>
@@ -355,15 +355,15 @@ export default function LoanManagementPage() {
                 </p>
               </CardContent>
             </Card>
-            <Card className="border-2 border-green-400 dark:border-green-600 shadow-md">
-              <CardHeader className="pb-2 bg-green-50 dark:bg-green-900/30">
+            <Card className="border border-emerald-500/30 dark:border-emerald-500/50 shadow-soft bg-emerald-50/50 dark:bg-emerald-500/5">
+              <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium flex items-center">
-                  <Check className="h-4 w-4 mr-2 text-green-600 dark:text-green-400" />
+                  <Check className="h-4 w-4 mr-2 text-emerald-600 dark:text-emerald-400" />
                   Active Loans
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-green-600 dark:text-green-400">{totalCurrentLoans}</div>
+                <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{totalCurrentLoans}</div>
                 <p className="text-xs text-muted-foreground">
                   {totalCurrentLoans === 1 ? "1 loan" : `${totalCurrentLoans} loans`} in good standing
                 </p>
@@ -374,8 +374,8 @@ export default function LoanManagementPage() {
                 )}
               </CardContent>
             </Card>
-            <Card className="border-2 border-red-400 dark:border-red-600 shadow-md">
-              <CardHeader className="pb-2 bg-red-50 dark:bg-red-900/30">
+            <Card className="border border-red-500/30 dark:border-red-500/50 shadow-soft bg-red-50/50 dark:bg-red-500/5">
+              <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium flex items-center">
                   <XCircle className="h-4 w-4 mr-2 text-red-600 dark:text-red-400" />
                   Overdue Loans
@@ -395,7 +395,7 @@ export default function LoanManagementPage() {
             </Card>
           </div>
 
-          <Card>
+          <Card className="border border-border/50 shadow-soft bg-card">
             <CardHeader>
               <CardTitle>All Loans</CardTitle>
               <CardDescription>
@@ -521,11 +521,12 @@ export default function LoanManagementPage() {
                             <Badge
                               variant={
                                 loan.status === "Current"
-                                  ? "default"
+                                  ? "success"
                                   : loan.status === "Paid"
                                     ? "secondary"
                                     : "destructive"
                               }
+                              className="rounded-full font-medium"
                             >
                               {loan.status}
                             </Badge>

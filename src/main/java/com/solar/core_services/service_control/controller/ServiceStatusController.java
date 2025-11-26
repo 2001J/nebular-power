@@ -1,12 +1,14 @@
 package com.solar.core_services.service_control.controller;
 
+import com.solar.core_services.service_control.dto.MaintenanceRequest;
 import com.solar.core_services.service_control.dto.ServiceStatusDTO;
 import com.solar.core_services.service_control.dto.ServiceStatusUpdateRequest;
-import com.solar.core_services.service_control.dto.MaintenanceRequest;
-import com.solar.core_services.service_control.model.ServiceStatus;
-import com.solar.core_services.service_control.service.ServiceStatusService;
-import com.solar.core_services.service_control.service.OperationalLogService;
+import com.solar.core_services.service_control.exception.InvalidServiceStateException;
+import com.solar.core_services.service_control.exception.ServiceStatusNotFoundException;
 import com.solar.core_services.service_control.model.OperationalLog;
+import com.solar.core_services.service_control.model.ServiceStatus;
+import com.solar.core_services.service_control.service.OperationalLogService;
+import com.solar.core_services.service_control.service.ServiceStatusService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -21,14 +23,14 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
-import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
-import java.time.LocalDateTime;
 import java.util.List;
+import java.util.function.Supplier;
 
 @RestController
 @RequestMapping("/api/service/status")
@@ -54,8 +56,12 @@ public class ServiceStatusController {
             @Parameter(description = "Installation ID", required = true)
             @PathVariable Long installationId) {
         
-        ServiceStatusDTO status = serviceStatusService.getCurrentStatus(installationId);
-        return ResponseEntity.ok(status);
+        return handleServiceStatusOperation(
+                installationId,
+                () -> serviceStatusService.getCurrentStatus(installationId),
+                HttpStatus.NOT_FOUND,
+                "Get current status"
+        );
     }
 
     @GetMapping("/{installationId}/history")
@@ -96,28 +102,33 @@ public class ServiceStatusController {
             HttpServletRequest httpRequest) {
         
         String username = authentication.getName();
-        ServiceStatusDTO updatedStatus = serviceStatusService.updateServiceStatus(installationId, request, username);
-        
-        // Log the operation with error handling
-        try {
-            operationalLogService.logOperation(
-                    installationId,
-                    OperationalLog.OperationType.SERVICE_STATUS_UPDATE,
-                    username,
-                    "Updated service status to " + request.getStatus() + " with reason: " + request.getStatusReason(),
-                    "SERVICE_CONTROL",
-                    "STATUS_UPDATE",
-                    httpRequest.getRemoteAddr(),
-                    httpRequest.getHeader("User-Agent"),
-                    true,
-                    null
-            );
-        } catch (Exception e) {
-            // Log the error but don't prevent the operation from succeeding
-            log.error("Failed to log operation: {}", e.getMessage());
-        }
-        
-        return ResponseEntity.ok(updatedStatus);
+        return handleServiceStatusOperation(
+                installationId,
+                () -> {
+                    ServiceStatusDTO updatedStatus = serviceStatusService.updateServiceStatus(installationId, request, username);
+
+                    try {
+                        operationalLogService.logOperation(
+                                installationId,
+                                OperationalLog.OperationType.SERVICE_STATUS_UPDATE,
+                                username,
+                                "Updated service status to " + request.getStatus() + " with reason: " + request.getStatusReason(),
+                                "SERVICE_CONTROL",
+                                "STATUS_UPDATE",
+                                httpRequest.getRemoteAddr(),
+                                httpRequest.getHeader("User-Agent"),
+                                true,
+                                null
+                        );
+                    } catch (Exception e) {
+                        log.error("Failed to log operation: {}", e.getMessage());
+                    }
+
+                    return updatedStatus;
+                },
+                HttpStatus.BAD_REQUEST,
+                "Update service status"
+        );
     }
 
     @PostMapping("/{installationId}/suspend/payment")
@@ -139,28 +150,33 @@ public class ServiceStatusController {
             HttpServletRequest httpRequest) {
         
         String username = authentication.getName();
-        ServiceStatusDTO updatedStatus = serviceStatusService.suspendServiceForPayment(installationId, reason, username);
-        
-        // Log the operation with error handling
-        try {
-            operationalLogService.logOperation(
-                    installationId,
-                    OperationalLog.OperationType.SERVICE_SUSPENSION,
-                    username,
-                    "Suspended service for payment issues. Reason: " + reason,
-                    "SERVICE_CONTROL",
-                    "PAYMENT_SUSPENSION",
-                    httpRequest.getRemoteAddr(),
-                    httpRequest.getHeader("User-Agent"),
-                    true,
-                    null
-            );
-        } catch (Exception e) {
-            // Log the error but don't prevent the operation from succeeding
-            log.error("Failed to log operation: {}", e.getMessage());
-        }
-        
-        return ResponseEntity.ok(updatedStatus);
+        return handleServiceStatusOperation(
+                installationId,
+                () -> {
+                    ServiceStatusDTO updatedStatus = serviceStatusService.suspendServiceForPayment(installationId, reason, username);
+
+                    try {
+                        operationalLogService.logOperation(
+                                installationId,
+                                OperationalLog.OperationType.SERVICE_SUSPENSION,
+                                username,
+                                "Suspended service for payment issues. Reason: " + reason,
+                                "SERVICE_CONTROL",
+                                "PAYMENT_SUSPENSION",
+                                httpRequest.getRemoteAddr(),
+                                httpRequest.getHeader("User-Agent"),
+                                true,
+                                null
+                        );
+                    } catch (Exception e) {
+                        log.error("Failed to log operation: {}", e.getMessage());
+                    }
+
+                    return updatedStatus;
+                },
+                HttpStatus.CONFLICT,
+                "Suspend service for payment"
+        );
     }
 
     @PostMapping("/{installationId}/suspend/security")
@@ -182,28 +198,33 @@ public class ServiceStatusController {
             HttpServletRequest httpRequest) {
         
         String username = authentication.getName();
-        ServiceStatusDTO updatedStatus = serviceStatusService.suspendServiceForSecurity(installationId, reason, username);
-        
-        // Log the operation with error handling
-        try {
-            operationalLogService.logOperation(
-                    installationId,
-                    OperationalLog.OperationType.SERVICE_SUSPENSION,
-                    username,
-                    "Suspended service for security issues. Reason: " + reason,
-                    "SERVICE_CONTROL",
-                    "SECURITY_SUSPENSION",
-                    httpRequest.getRemoteAddr(),
-                    httpRequest.getHeader("User-Agent"),
-                    true,
-                    null
-            );
-        } catch (Exception e) {
-            // Log the error but don't prevent the operation from succeeding
-            log.error("Failed to log operation: {}", e.getMessage());
-        }
-        
-        return ResponseEntity.ok(updatedStatus);
+        return handleServiceStatusOperation(
+                installationId,
+                () -> {
+                    ServiceStatusDTO updatedStatus = serviceStatusService.suspendServiceForSecurity(installationId, reason, username);
+
+                    try {
+                        operationalLogService.logOperation(
+                                installationId,
+                                OperationalLog.OperationType.SERVICE_SUSPENSION,
+                                username,
+                                "Suspended service for security issues. Reason: " + reason,
+                                "SERVICE_CONTROL",
+                                "SECURITY_SUSPENSION",
+                                httpRequest.getRemoteAddr(),
+                                httpRequest.getHeader("User-Agent"),
+                                true,
+                                null
+                        );
+                    } catch (Exception e) {
+                        log.error("Failed to log operation: {}", e.getMessage());
+                    }
+
+                    return updatedStatus;
+                },
+                HttpStatus.CONFLICT,
+                "Suspend service for security"
+        );
     }
 
     @PostMapping("/{installationId}/suspend/maintenance")
@@ -225,30 +246,35 @@ public class ServiceStatusController {
             HttpServletRequest httpRequest) {
         
         String username = authentication.getName();
-        ServiceStatusDTO updatedStatus = serviceStatusService.suspendServiceForMaintenance(
+    return handleServiceStatusOperation(
+        installationId,
+        () -> {
+            ServiceStatusDTO updatedStatus = serviceStatusService.suspendServiceForMaintenance(
                 installationId, request.getReason(), username);
-        
-        // Log the operation with error handling
-        try {
+
+            try {
             operationalLogService.logOperation(
-                    installationId,
-                    OperationalLog.OperationType.SERVICE_SUSPENSION,
-                    username,
-                    "Suspended service for maintenance. Reason: " + request.getReason() + 
-                            ", Scheduled: " + request.getStartTime() + " to " + request.getEndTime(),
-                    "SERVICE_CONTROL",
-                    "MAINTENANCE_SUSPENSION",
-                    httpRequest.getRemoteAddr(),
-                    httpRequest.getHeader("User-Agent"),
-                    true,
-                    null
+                installationId,
+                OperationalLog.OperationType.SERVICE_SUSPENSION,
+                username,
+                "Suspended service for maintenance. Reason: " + request.getReason() +
+                    ", Scheduled: " + request.getStartTime() + " to " + request.getEndTime(),
+                "SERVICE_CONTROL",
+                "MAINTENANCE_SUSPENSION",
+                httpRequest.getRemoteAddr(),
+                httpRequest.getHeader("User-Agent"),
+                true,
+                null
             );
-        } catch (Exception e) {
-            // Log the error but don't prevent the operation from succeeding
+            } catch (Exception e) {
             log.error("Failed to log operation: {}", e.getMessage());
-        }
-        
-        return ResponseEntity.ok(updatedStatus);
+            }
+
+            return updatedStatus;
+        },
+        HttpStatus.CONFLICT,
+        "Suspend service for maintenance"
+    );
     }
 
     @PostMapping("/{installationId}/restore")
@@ -270,117 +296,33 @@ public class ServiceStatusController {
             HttpServletRequest httpRequest) {
         
         String username = authentication.getName();
-        ServiceStatusDTO updatedStatus = serviceStatusService.restoreService(installationId, reason, username);
-        
-        // Log the operation with error handling
-        try {
-            operationalLogService.logOperation(
-                    installationId,
-                    OperationalLog.OperationType.SERVICE_RESTORATION,
-                    username,
-                    "Restored service. Reason: " + reason,
-                    "SERVICE_CONTROL",
-                    "SERVICE_RESTORATION",
-                    httpRequest.getRemoteAddr(),
-                    httpRequest.getHeader("User-Agent"),
-                    true,
-                    null
-            );
-        } catch (Exception e) {
-            // Log the error but don't prevent the operation from succeeding
-            log.error("Failed to log operation: {}", e.getMessage());
-        }
-        
-        return ResponseEntity.ok(updatedStatus);
-    }
+        return handleServiceStatusOperation(
+                installationId,
+                () -> {
+                    ServiceStatusDTO updatedStatus = serviceStatusService.restoreService(installationId, reason, username);
 
-    @PostMapping("/{installationId}/schedule")
-    @Operation(
-        summary = "Schedule status change",
-        description = "Schedules a future service status change for a specific installation."
-    )
-    @ApiResponses(value = {
-        @ApiResponse(responseCode = "200", description = "Status change scheduled successfully", 
-                    content = @Content(schema = @Schema(implementation = ServiceStatusDTO.class))),
-        @ApiResponse(responseCode = "400", description = "Invalid schedule request", content = @Content),
-        @ApiResponse(responseCode = "404", description = "Installation not found", content = @Content)
-    })
-    public ResponseEntity<ServiceStatusDTO> scheduleStatusChange(
-            @Parameter(description = "Installation ID", required = true)
-            @PathVariable Long installationId,
-            @Parameter(description = "Target service state", required = true)
-            @RequestParam ServiceStatus.ServiceState targetStatus,
-            @Parameter(description = "Reason for status change", required = true)
-            @RequestParam String reason,
-            @Parameter(description = "Scheduled time for the change", required = true)
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime scheduledTime,
-            Authentication authentication,
-            HttpServletRequest httpRequest) {
-        
-        String username = authentication.getName();
-        ServiceStatusDTO scheduledStatus = serviceStatusService.scheduleStatusChange(
-                installationId, targetStatus, reason, scheduledTime, username);
-        
-        // Log the operation with error handling
-        try {
-            operationalLogService.logOperation(
-                    installationId,
-                    OperationalLog.OperationType.STATUS_CHANGE_SCHEDULED,
-                    username,
-                    "Scheduled status change to " + targetStatus + " at " + scheduledTime + ". Reason: " + reason,
-                    "SERVICE_CONTROL",
-                    "SCHEDULE_STATUS_CHANGE",
-                    httpRequest.getRemoteAddr(),
-                    httpRequest.getHeader("User-Agent"),
-                    true,
-                    null
-            );
-        } catch (Exception e) {
-            // Log the error but don't prevent the operation from succeeding
-            log.error("Failed to log operation: {}", e.getMessage());
-        }
-        
-        return ResponseEntity.ok(scheduledStatus);
-    }
+                    try {
+                        operationalLogService.logOperation(
+                                installationId,
+                                OperationalLog.OperationType.SERVICE_RESTORATION,
+                                username,
+                                "Restored service. Reason: " + reason,
+                                "SERVICE_CONTROL",
+                                "SERVICE_RESTORATION",
+                                httpRequest.getRemoteAddr(),
+                                httpRequest.getHeader("User-Agent"),
+                                true,
+                                null
+                        );
+                    } catch (Exception e) {
+                        log.error("Failed to log operation: {}", e.getMessage());
+                    }
 
-    @DeleteMapping("/{installationId}/schedule")
-    @Operation(
-        summary = "Cancel scheduled status change",
-        description = "Cancels a previously scheduled service status change for a specific installation."
-    )
-    @ApiResponses(value = {
-        @ApiResponse(responseCode = "200", description = "Scheduled change cancelled successfully"),
-        @ApiResponse(responseCode = "404", description = "Installation not found or no scheduled change", content = @Content)
-    })
-    public ResponseEntity<ServiceStatusDTO> cancelScheduledChange(
-            @Parameter(description = "Installation ID", required = true)
-            @PathVariable Long installationId,
-            Authentication authentication,
-            HttpServletRequest httpRequest) {
-        
-        String username = authentication.getName();
-        ServiceStatusDTO updatedStatus = serviceStatusService.cancelScheduledChange(installationId, username);
-        
-        // Log the operation with error handling
-        try {
-            operationalLogService.logOperation(
-                    installationId,
-                    OperationalLog.OperationType.SCHEDULED_CHANGE_CANCELLED,
-                    username,
-                    "Cancelled scheduled status change",
-                    "SERVICE_CONTROL",
-                    "CANCEL_SCHEDULED_CHANGE",
-                    httpRequest.getRemoteAddr(),
-                    httpRequest.getHeader("User-Agent"),
-                    true,
-                    null
-            );
-        } catch (Exception e) {
-            // Log the error but don't prevent the operation from succeeding
-            log.error("Failed to log operation: {}", e.getMessage());
-        }
-        
-        return ResponseEntity.ok(updatedStatus);
+                    return updatedStatus;
+                },
+                HttpStatus.CONFLICT,
+                "Restore service"
+        );
     }
 
     @GetMapping("/user/{userId}")
@@ -436,14 +378,20 @@ public class ServiceStatusController {
         return ResponseEntity.ok(statuses);
     }
 
+    /**
+     * @deprecated This endpoint directly updates the backend status without sending a command to the device.
+     * Use /installations/{id}/schedule or wait for device to report its own status.
+     */
+    @Deprecated(since = "2.0", forRemoval = true)
     @PostMapping("/installations/{installationId}/start")
     @Operation(
-        summary = "Start service",
-        description = "Starts the service for a specific installation."
+        summary = "[DEPRECATED] Start service",
+        description = "⚠️ DEPRECATED: This endpoint directly updates backend status without controlling the device. " +
+                     "Use /installations/{id}/schedule to schedule activation or wait for device to come online and report status.",
+        deprecated = true
     )
     @ApiResponses(value = {
-        @ApiResponse(responseCode = "200", description = "Service started successfully", 
-                    content = @Content(schema = @Schema(implementation = ServiceStatusDTO.class))),
+        @ApiResponse(responseCode = "501", description = "Not Implemented - Use schedule endpoint instead", content = @Content),
         @ApiResponse(responseCode = "404", description = "Installation not found", content = @Content)
     })
     public ResponseEntity<ServiceStatusDTO> startService(
@@ -453,38 +401,29 @@ public class ServiceStatusController {
             HttpServletRequest httpRequest) {
         
         String username = authentication.getName();
-        ServiceStatusDTO updatedStatus = serviceStatusService.startService(installationId, username);
-        
-        // Log the operation with error handling
         try {
-            operationalLogService.logOperation(
-                    installationId,
-                    OperationalLog.OperationType.SERVICE_STARTED,
-                    username,
-                    "Started service for installation #" + installationId,
-                    "SERVICE_CONTROL",
-                    "START_SERVICE",
-                    httpRequest.getRemoteAddr(),
-                    httpRequest.getHeader("User-Agent"),
-                    true,
-                    null
-            );
-        } catch (Exception e) {
-            // Log the error but don't prevent the operation from succeeding
-            log.error("Failed to log operation: {}", e.getMessage());
+            serviceStatusService.startService(installationId, username);
+        } catch (UnsupportedOperationException e) {
+            // Expected - this method is deprecated
         }
         
-        return ResponseEntity.ok(updatedStatus);
+        return ResponseEntity.status(HttpStatus.NOT_IMPLEMENTED).build();
     }
 
+    /**
+     * @deprecated This endpoint directly updates the backend status without sending a command to the device.
+     * Use /installations/{id}/suspend with a proper suspension reason.
+     */
+    @Deprecated(since = "2.0", forRemoval = true)
     @PostMapping("/installations/{installationId}/stop")
     @Operation(
-        summary = "Stop service",
-        description = "Stops the service for a specific installation."
+        summary = "[DEPRECATED] Stop service",
+        description = "⚠️ DEPRECATED: This endpoint directly updates backend status without controlling the device. " +
+                     "Use /installations/{id}/suspend with a proper reason (PAYMENT, SECURITY, or MAINTENANCE).",
+        deprecated = true
     )
     @ApiResponses(value = {
-        @ApiResponse(responseCode = "200", description = "Service stopped successfully", 
-                    content = @Content(schema = @Schema(implementation = ServiceStatusDTO.class))),
+        @ApiResponse(responseCode = "501", description = "Not Implemented - Use suspend endpoint instead", content = @Content),
         @ApiResponse(responseCode = "404", description = "Installation not found", content = @Content)
     })
     public ResponseEntity<ServiceStatusDTO> stopService(
@@ -494,39 +433,27 @@ public class ServiceStatusController {
             HttpServletRequest httpRequest) {
         
         String username = authentication.getName();
-        ServiceStatusDTO updatedStatus = serviceStatusService.stopService(installationId, username);
-        
-        // Log the operation with error handling
         try {
-            operationalLogService.logOperation(
-                    installationId,
-                    OperationalLog.OperationType.SERVICE_STOPPED,
-                    username,
-                    "Stopped service for installation #" + installationId,
-                    "SERVICE_CONTROL",
-                    "STOP_SERVICE",
-                    httpRequest.getRemoteAddr(),
-                    httpRequest.getHeader("User-Agent"),
-                    true,
-                    null
-            );
-        } catch (Exception e) {
-            // Log the error but don't prevent the operation from succeeding
-            log.error("Failed to log operation: {}", e.getMessage());
+            serviceStatusService.stopService(installationId, username);
+        } catch (UnsupportedOperationException e) {
+            // Expected - this method is deprecated
         }
         
-        return ResponseEntity.ok(updatedStatus);
+        return ResponseEntity.status(HttpStatus.NOT_IMPLEMENTED).build();
     }
 
     @PostMapping("/installations/{installationId}/restart")
     @Operation(
         summary = "Restart service",
-        description = "Restarts the service for a specific installation."
+        description = "Initiates a service restart for a specific installation. " +
+                     "This temporarily sets status to TRANSITIONING, then schedules restoration to ACTIVE. " +
+                     "In a full implementation, this should send a restart command to the device."
     )
     @ApiResponses(value = {
-        @ApiResponse(responseCode = "200", description = "Service restarted successfully", 
+        @ApiResponse(responseCode = "200", description = "Service restart initiated", 
                     content = @Content(schema = @Schema(implementation = ServiceStatusDTO.class))),
-        @ApiResponse(responseCode = "404", description = "Installation not found", content = @Content)
+        @ApiResponse(responseCode = "404", description = "Installation not found", content = @Content),
+        @ApiResponse(responseCode = "400", description = "Service not in restartable state", content = @Content)
     })
     public ResponseEntity<ServiceStatusDTO> restartService(
             @Parameter(description = "Installation ID", required = true)
@@ -535,27 +462,95 @@ public class ServiceStatusController {
             HttpServletRequest httpRequest) {
         
         String username = authentication.getName();
-        ServiceStatusDTO updatedStatus = serviceStatusService.restartService(installationId, username);
+        return handleServiceStatusOperation(
+                installationId,
+                () -> {
+                    ServiceStatusDTO updatedStatus = serviceStatusService.restartService(installationId, username);
+
+                    try {
+                        operationalLogService.logOperation(
+                                installationId,
+                                OperationalLog.OperationType.SERVICE_RESTARTED,
+                                username,
+                                "Restarted service for installation #" + installationId,
+                                "SERVICE_CONTROL",
+                                "RESTART_SERVICE",
+                                httpRequest.getRemoteAddr(),
+                                httpRequest.getHeader("User-Agent"),
+                                true,
+                                null
+                        );
+                    } catch (Exception e) {
+                        log.error("Failed to log operation: {}", e.getMessage());
+                    }
+
+                    return updatedStatus;
+                },
+                HttpStatus.CONFLICT,
+                "Restart service"
+        );
+    }
+
+    @PostMapping("/device-report")
+    @Operation(
+        summary = "Receive device status report",
+        description = "Endpoint for Pi devices to report their current status to the backend. " +
+                     "This enables bi-directional communication and keeps the backend synchronized with device state."
+    )
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Device status report received successfully"),
+        @ApiResponse(responseCode = "400", description = "Invalid status report data", content = @Content),
+        @ApiResponse(responseCode = "404", description = "Installation not found", content = @Content)
+    })
+    public ResponseEntity<Void> receiveDeviceStatusReport(
+            @Parameter(description = "Device status report", required = true)
+            @Valid @RequestBody com.solar.core_services.service_control.dto.DeviceStatusReportDTO statusReport) {
         
-        // Log the operation with error handling
+        log.info("Received device status report for installation {}: status={}, reason={}", 
+                statusReport.getInstallationId(), 
+                statusReport.getStatus(), 
+                statusReport.getReason());
+        
         try {
-            operationalLogService.logOperation(
-                    installationId,
-                    OperationalLog.OperationType.SERVICE_RESTARTED,
-                    username,
-                    "Restarted service for installation #" + installationId,
-                    "SERVICE_CONTROL",
-                    "RESTART_SERVICE",
-                    httpRequest.getRemoteAddr(),
-                    httpRequest.getHeader("User-Agent"),
-                    true,
-                    null
-            );
+            // Process the device status report
+            serviceStatusService.processDeviceStatusReport(statusReport);
+            
+            // Log successful report reception
+            log.debug("Successfully processed status report from installation {}", 
+                     statusReport.getInstallationId());
+            
+            return ResponseEntity.ok().build();
+            
         } catch (Exception e) {
-            // Log the error but don't prevent the operation from succeeding
-            log.error("Failed to log operation: {}", e.getMessage());
+            log.error("Error processing device status report for installation {}: {}", 
+                     statusReport.getInstallationId(), 
+                     e.getMessage(), 
+                     e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
-        
-        return ResponseEntity.ok(updatedStatus);
+    }
+
+    private ResponseEntity<ServiceStatusDTO> handleServiceStatusOperation(
+            Long installationId,
+            Supplier<ServiceStatusDTO> operation,
+            HttpStatus statusOnNotFound,
+            String actionDescription) {
+
+        try {
+            ServiceStatusDTO result = operation.get();
+            return ResponseEntity.ok(result);
+        } catch (ServiceStatusNotFoundException e) {
+            log.warn("{} failed for installation {}: {}", actionDescription, installationId, e.getMessage());
+            throw new ResponseStatusException(statusOnNotFound, e.getMessage(), e);
+        } catch (InvalidServiceStateException e) {
+            log.warn("{} rejected for installation {}: {}", actionDescription, installationId, e.getMessage());
+            throw new ResponseStatusException(HttpStatus.CONFLICT, e.getMessage(), e);
+        } catch (IllegalArgumentException e) {
+            log.warn("{} invalid input for installation {}: {}", actionDescription, installationId, e.getMessage());
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage(), e);
+        } catch (RuntimeException e) {
+            log.error("{} failed for installation {}: {}", actionDescription, installationId, e.getMessage(), e);
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, e.getMessage(), e);
+        }
     }
 } 

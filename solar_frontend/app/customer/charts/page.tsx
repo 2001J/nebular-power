@@ -234,84 +234,33 @@ export default function DashboardPage() {
         console.log("Installation dashboard data:", dashboardResponse)
         setDashboardData(dashboardResponse)
 
-        // Get recent energy readings and recent alerts
+        // FIXED: Use pre-aggregated series data from backend
+        // This endpoint returns kWh values that are already properly integrated
+        console.log(`Fetching aggregated series for installation ${selectedInstallation}, period: ${selectedPeriod}`)
+        
+        const seriesData = await energyApi.getInstallationSeriesForTimeRange(
+          selectedInstallation,
+          selectedPeriod as 'day' | 'week' | 'month' | 'year'
+        )
+        
         let energyData: any[] = []
-        let alertsData: any[] = []
-
-        // Try to get energy readings from the dashboard response first
-        if (dashboardResponse.recentReadings && dashboardResponse.recentReadings.length > 0) {
-          console.log(`Using ${dashboardResponse.recentReadings.length} readings from dashboard response`)
-          energyData = dashboardResponse.recentReadings
+        
+        if (Array.isArray(seriesData) && seriesData.length > 0) {
+          console.log(`Received ${seriesData.length} pre-aggregated data points`)
+          // Map to format expected by chart (values are ALREADY in kWh)
+          energyData = seriesData.map((point: any) => ({
+            timestamp: point.bucketStart,
+            // These are kWh values - store as totalGenerationKWh/totalConsumptionKWh
+            totalGenerationKWh: point.generationKWh || 0,
+            totalConsumptionKWh: point.consumptionKWh || 0,
+            // Also keep average power for display
+            powerGenerationWatts: point.avgGenerationWatts || 0,
+            powerConsumptionWatts: point.avgConsumptionWatts || 0,
+            isSimulated: false
+          }))
         } else {
-          // If not available in dashboard, fetch them separately
-          console.log(`Fetching recent readings for installation ${selectedInstallation}`)
-          const readingsResponse = await energyApi.getRecentReadings(selectedInstallation, 100) // Get more readings for better charts
-
-          if (Array.isArray(readingsResponse) && readingsResponse.length > 0) {
-            console.log(`Fetched ${readingsResponse.length} separate energy readings`)
-            energyData = readingsResponse
-          } else {
-            console.warn("No energy readings available or format incorrect")
-            // Try to fetch energy summaries by period if no raw readings
-
-            // Get appropriate start and end dates
-            const today = new Date()
-            let startDate, endDate
-
-            if (selectedPeriod === 'day') {
-              startDate = new Date(today.setHours(0, 0, 0, 0)).toISOString()
-              endDate = new Date().toISOString()
-            } else if (selectedPeriod === 'week') {
-              // Get previous 7 days
-              const weekStart = new Date(today)
-              weekStart.setDate(today.getDate() - 7)
-              startDate = weekStart.toISOString()
-              endDate = new Date().toISOString()
-            } else if (selectedPeriod === 'month') {
-              // Get current month
-              const monthStart = new Date(today.getFullYear(), today.getMonth(), 1)
-              startDate = monthStart.toISOString()
-              endDate = new Date().toISOString()
-            } else {
-              // Year view - get this year
-              const yearStart = new Date(today.getFullYear(), 0, 1)
-              startDate = yearStart.toISOString()
-              endDate = new Date().toISOString()
-            }
-
-            console.log(`Attempting to fetch ${selectedPeriod} summaries from ${startDate} to ${endDate}`)
-            const summariesResponse = await energyApi.getSummariesByPeriodAndDateRange(
-              selectedInstallation, 
-              selectedPeriod, 
-              startDate, 
-              endDate
-            )
-
-            if (Array.isArray(summariesResponse) && summariesResponse.length > 0) {
-              console.log(`Received ${summariesResponse.length} energy summaries`)
-              // Use summaries as readings with appropriate fields
-              energyData = summariesResponse.map(summary => ({
-                id: summary.id,
-                installationId: summary.installationId,
-                timestamp: summary.date || summary.endDate || summary.timestamp,
-                powerGenerationWatts: summary.averageGenerationWatts || 0,
-                powerConsumptionWatts: summary.averageConsumptionWatts || 0,
-                dailyYieldKWh: summary.totalGenerationKWh || 0,
-                totalGenerationKWh: summary.totalGenerationKWh || 0,
-                totalConsumptionKWh: summary.totalConsumptionKWh || 0,
-                isSimulated: true
-              }))
-            } else {
-              console.warn(`No energy summaries available for ${selectedPeriod} period`)
-              // Optionally generate sample data; default is disabled
-              if (ENABLE_SAMPLE_DATA) {
-                console.log('Generating sample data as last resort (flag enabled)')
-                energyData = generateSampleData(selectedPeriod)
-              } else {
-                energyData = []
-              }
-            }
-          }
+          console.warn(`No series data available for ${selectedPeriod} period`)
+          energyData = []
         }
 
         // Set the energy data for charts
@@ -596,6 +545,7 @@ export default function DashboardPage() {
   if (!user) return null
 
   // Process data for chart display based on period
+  // FIXED: Data from getInstallationSeriesForTimeRange is already in kWh - NO normalization needed!
   const getProcessedChartData = () => {
     if (energyReadings.length === 0) {
       return []
@@ -603,82 +553,47 @@ export default function DashboardPage() {
 
     const chartData: { time: string; production: number; consumption: number }[] = []
 
+    // Data is already in kWh from the backend - use directly
     const getGenerationKWh = (reading: any): number => {
-      if (typeof reading.energyProduced === 'number') return reading.energyProduced
+      // Priority: pre-aggregated kWh values
       if (typeof reading.totalGenerationKWh === 'number') return reading.totalGenerationKWh
-      if (typeof reading.dailyYieldKWh === 'number') return reading.dailyYieldKWh
-      if (typeof reading.powerGenerationWatts === 'number') return reading.powerGenerationWatts / 1000
+      if (typeof reading.generationKWh === 'number') return reading.generationKWh
       return 0
     }
 
     const getConsumptionKWh = (reading: any): number => {
-      if (typeof reading.energyConsumed === 'number') return reading.energyConsumed
+      // Priority: pre-aggregated kWh values
       if (typeof reading.totalConsumptionKWh === 'number') return reading.totalConsumptionKWh
-      if (typeof reading.powerConsumptionWatts === 'number') return reading.powerConsumptionWatts / 1000
+      if (typeof reading.consumptionKWh === 'number') return reading.consumptionKWh
       return 0
     }
 
-    // Get reference values from dashboard for normalization
-    const todayGeneration = dashboardData?.todayGenerationKWh || 0
-    const todayConsumption = dashboardData?.todayConsumptionKWh || 0
-    const weekGeneration = dashboardData?.weekToDateGenerationKWh || 0
-    const weekConsumption = dashboardData?.weekToDateConsumptionKWh || 0
-    const monthGeneration = dashboardData?.monthToDateGenerationKWh || 0
-    const monthConsumption = dashboardData?.monthToDateConsumptionKWh || 0
-    const yearGeneration = dashboardData?.yearToDateGenerationKWh || 0
-    const yearConsumption = dashboardData?.yearToDateConsumptionKWh || 0
-
-    // Get the appropriate generation and consumption totals based on period
-    let expectedGeneration = 0
-    let expectedConsumption = 0
-
-    switch (selectedPeriod) {
-      case 'day':
-        expectedGeneration = todayGeneration
-        expectedConsumption = todayConsumption
-        break
-      case 'week':
-        expectedGeneration = weekGeneration
-        expectedConsumption = weekConsumption
-        break
-      case 'month':
-        expectedGeneration = monthGeneration
-        expectedConsumption = monthConsumption
-        break
-      case 'year':
-        expectedGeneration = yearGeneration
-        expectedConsumption = yearConsumption
-        break
+    // Get bucket label from timestamp
+    // Backend sends LocalDateTime (no timezone) - display as-is
+    const getBucketLabel = (timestamp: string, period: string): string => {
+      const date = new Date(timestamp)
+      switch (period) {
+        case 'day':
+          return `${date.getHours()}:00`
+        case 'week':
+          return ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][date.getDay()]
+        case 'month':
+          return date.getDate().toString()
+        case 'year':
+          return ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][date.getMonth()]
+        default:
+          return timestamp
+      }
     }
 
-    // Calculate total readings values for normalization
-    const totalReadingsGeneration = energyReadings.reduce(
-      (sum, reading) => sum + getGenerationKWh(reading), 0
-    )
-
-    const totalReadingsConsumption = energyReadings.reduce(
-      (sum, reading) => sum + getConsumptionKWh(reading), 0
-    )
-
-    // Calculate normalization factors - if readings have values and expected values exist
-    const generationNormalizationFactor = 
-      totalReadingsGeneration > 0 && expectedGeneration > 0
-        ? expectedGeneration / totalReadingsGeneration
-        : 1
-
-    const consumptionNormalizationFactor = 
-      totalReadingsConsumption > 0 && expectedConsumption > 0
-        ? expectedConsumption / totalReadingsConsumption
-        : 1
-
-    console.log('Chart normalization factors:', {
+    // Log totals for debugging
+    const totalGen = energyReadings.reduce((sum, r) => sum + getGenerationKWh(r), 0)
+    const totalCon = energyReadings.reduce((sum, r) => sum + getConsumptionKWh(r), 0)
+    console.log('Chart data totals:', {
       selectedPeriod,
-      expectedGeneration,
-      expectedConsumption,
-      totalReadingsGeneration,
-      totalReadingsConsumption,
-      generationFactor: generationNormalizationFactor,
-      consumptionFactor: consumptionNormalizationFactor
+      dataPoints: energyReadings.length,
+      totalGeneration: totalGen.toFixed(3) + ' kWh',
+      totalConsumption: totalCon.toFixed(3) + ' kWh'
     })
 
     if (selectedPeriod === "day") {
@@ -696,38 +611,23 @@ export default function DashboardPage() {
         }
       }
 
-      // Process readings
+      // Process readings - data is ALREADY in kWh
       energyReadings.forEach(reading => {
         if (!reading.timestamp) return
+        const hourLabel = getBucketLabel(reading.timestamp, 'day')
 
-        const date = new Date(reading.timestamp)
-        const hour = date.getHours()
-        const hourLabel = `${hour}:00`
-
-        // Apply normalization factors
-        const normalizedGeneration = getGenerationKWh(reading) * generationNormalizationFactor
-        const normalizedConsumption = getConsumptionKWh(reading) * consumptionNormalizationFactor
-
-        hourlyData[hourLabel].production += normalizedGeneration
-        hourlyData[hourLabel].consumption += normalizedConsumption
+        hourlyData[hourLabel].production += getGenerationKWh(reading)
+        hourlyData[hourLabel].consumption += getConsumptionKWh(reading)
         hourlyData[hourLabel].count += 1
       })
 
-      // Convert to array and calculate averages
+      // Convert to array
       for (const hour in hourlyData) {
-        if (hourlyData[hour].count > 0) {
-          chartData.push({
-            time: hour,
-            production: hourlyData[hour].production,
-            consumption: hourlyData[hour].consumption
-          })
-        } else {
-          chartData.push({
-            time: hour,
-            production: 0,
-            consumption: 0
-          })
-        }
+        chartData.push({
+          time: hour,
+          production: hourlyData[hour].production,
+          consumption: hourlyData[hour].consumption
+        })
       }
 
       // Sort by hour
@@ -735,8 +635,8 @@ export default function DashboardPage() {
         return parseInt(a.time.split(':')[0]) - parseInt(b.time.split(':')[0])
       })
     } else if (selectedPeriod === "week") {
-      // Group by day for week
-      const dayData = {}
+      // Group by day for week - data is already in kWh
+      const dayData: Record<string, { time: string; production: number; consumption: number }> = {}
       const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
       // Initialize all days
@@ -744,37 +644,17 @@ export default function DashboardPage() {
         dayData[day] = {
           time: day,
           production: 0,
-          consumption: 0,
-          count: 0
+          consumption: 0
         }
       })
 
-      // Process readings
+      // Process readings - data is ALREADY in kWh
       energyReadings.forEach(reading => {
-        let readingDate
-        let dayName
+        if (!reading.timestamp) return
+        const dayName = getBucketLabel(reading.timestamp, 'week')
 
-        if (reading.timestamp) {
-          readingDate = new Date(reading.timestamp)
-          dayName = dayNames[readingDate.getDay()]
-        } else if (reading.date) {
-          readingDate = new Date(reading.date)
-          dayName = dayNames[readingDate.getDay()]
-        } else {
-          return // Skip if no valid date
-        }
-
-        // Apply normalization - based on whether we have summary or raw readings
-        if (reading.totalGenerationKWh !== undefined) {
-          dayData[dayName].production += reading.totalGenerationKWh * generationNormalizationFactor
-          dayData[dayName].consumption += (reading.totalConsumptionKWh || 0) * consumptionNormalizationFactor
-        } else {
-          // For hourly readings
-          dayData[dayName].production += getGenerationKWh(reading) * generationNormalizationFactor
-          dayData[dayName].consumption += getConsumptionKWh(reading) * consumptionNormalizationFactor
-        }
-
-        dayData[dayName].count += 1
+        dayData[dayName].production += getGenerationKWh(reading)
+        dayData[dayName].consumption += getConsumptionKWh(reading)
       })
 
       // Use default order: Mon-Sun
@@ -789,47 +669,24 @@ export default function DashboardPage() {
         })
       })
     } else if (selectedPeriod === "month") {
-      // Group by day for month
-      const monthData: Record<string, { time: string; production: number; consumption: number; count: number; actualDate: Date | null }> = {}
+      // Group by day for month - data is already in kWh
+      const monthData: Record<string, { time: string; production: number; consumption: number }> = {}
 
-      // Process readings
+      // Process readings - data is ALREADY in kWh
       energyReadings.forEach(reading => {
-        let readingDate
-        let day
-
-        if (reading.timestamp) {
-          readingDate = new Date(reading.timestamp)
-          day = readingDate.getDate()
-        } else if (reading.date) {
-          readingDate = new Date(reading.date)
-          day = readingDate.getDate()
-        } else {
-          return // Skip if no valid date
-        }
-
-        const dayLabel = day.toString()
+        if (!reading.timestamp) return
+        const dayLabel = getBucketLabel(reading.timestamp, 'month')
 
         if (!monthData[dayLabel]) {
           monthData[dayLabel] = {
             time: dayLabel,
             production: 0,
-            consumption: 0,
-            count: 0,
-            actualDate: readingDate
+            consumption: 0
           }
         }
 
-        // Apply normalization - based on whether we have summary or raw readings
-        if (reading.totalGenerationKWh !== undefined) {
-          monthData[dayLabel].production += reading.totalGenerationKWh * generationNormalizationFactor
-          monthData[dayLabel].consumption += (reading.totalConsumptionKWh || 0) * consumptionNormalizationFactor
-        } else {
-          // For hourly readings
-          monthData[dayLabel].production += getGenerationKWh(reading) * generationNormalizationFactor
-          monthData[dayLabel].consumption += getConsumptionKWh(reading) * consumptionNormalizationFactor
-        }
-
-        monthData[dayLabel].count += 1
+        monthData[dayLabel].production += getGenerationKWh(reading)
+        monthData[dayLabel].consumption += getConsumptionKWh(reading)
       })
 
       // Show all days of the month, including days with zero readings
@@ -857,8 +714,8 @@ export default function DashboardPage() {
 
       // Already sorted since we loop from 1 to daysInMonth
     } else if (selectedPeriod === "year") {
-      // Group by month for year
-      const yearData: Record<string, { time: string; production: number; consumption: number; count: number; monthIndex: number }> = {}
+      // Group by month for year - data is already in kWh
+      const yearData: Record<string, { time: string; production: number; consumption: number; monthIndex: number }> = {}
       const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
       // Initialize all months
@@ -867,39 +724,17 @@ export default function DashboardPage() {
           time: month,
           production: 0,
           consumption: 0,
-          count: 0,
           monthIndex: index
         }
       })
 
-      // Process readings
+      // Process readings - data is ALREADY in kWh
       energyReadings.forEach(reading => {
-        let readingDate
-        let month
+        if (!reading.timestamp) return
+        const monthLabel = getBucketLabel(reading.timestamp, 'year')
 
-        if (reading.timestamp) {
-          readingDate = new Date(reading.timestamp)
-          month = readingDate.getMonth()
-        } else if (reading.date) {
-          readingDate = new Date(reading.date)
-          month = readingDate.getMonth()
-        } else {
-          return // Skip if no valid date
-        }
-
-        const monthLabel = monthNames[month]
-
-        // Apply normalization - based on whether we have summary or raw readings
-        if (reading.totalGenerationKWh !== undefined) {
-          yearData[monthLabel].production += reading.totalGenerationKWh * generationNormalizationFactor
-          yearData[monthLabel].consumption += (reading.totalConsumptionKWh || 0) * consumptionNormalizationFactor
-        } else {
-          // For hourly readings
-          yearData[monthLabel].production += getGenerationKWh(reading) * generationNormalizationFactor
-          yearData[monthLabel].consumption += getConsumptionKWh(reading) * consumptionNormalizationFactor
-        }
-
-        yearData[monthLabel].count += 1
+        yearData[monthLabel].production += getGenerationKWh(reading)
+        yearData[monthLabel].consumption += getConsumptionKWh(reading)
       })
 
       // Convert to array and sort by month
@@ -952,25 +787,26 @@ export default function DashboardPage() {
             <AreaChart
               data={chartData}
               margin={{
-                top: 10,
-                right: 30,
-                left: 10,
+                top: 20,
+                right: 20,
+                left: 20,
                 bottom: 20,
               }}
             >
-              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={chartColors.grid} />
+              <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
               <XAxis 
-                dataKey="time" 
-                tick={{ fontSize: 12, fill: chartColors.axis.tick }}
-                axisLine={{ stroke: chartColors.grid }}
-                tickLine={{ stroke: chartColors.grid }}
+                dataKey="time"
+                className="text-xs"
+                tickLine={false}
+                axisLine={false}
+                interval={2}
                 tickFormatter={(time) => time.split(':')[0]}
-                label={{ value: "Hour", position: "insideBottom", offset: -10, fill: chartColors.axis.tick }}
               />
-              <YAxis 
-                tick={{ fontSize: 12, fill: chartColors.axis.tick }}
-                axisLine={{ stroke: chartColors.grid }}
-                tickLine={{ stroke: chartColors.grid }}
+              <YAxis
+                width={60}
+                className="text-xs"
+                tickLine={false}
+                axisLine={false}
                 tickFormatter={(value) => {
                   if (value === 0) return '0';
                   if (value < 0.001) return value.toFixed(4);
@@ -978,7 +814,6 @@ export default function DashboardPage() {
                   if (value >= 1000) return `${(value / 1000).toFixed(1)}k`;
                   return value.toFixed(1);
                 }}
-                label={{ value: "Power (kW)", angle: -90, position: "insideLeft", fill: chartColors.axis.tick }}
               />
               <Tooltip 
                 formatter={(value: number) => {
@@ -1024,36 +859,30 @@ export default function DashboardPage() {
             <BarChart
               data={chartData}
               margin={{
-                top: 10,
-                right: 30,
-                left: 10,
+                top: 20,
+                right: 20,
+                left: 20,
                 bottom: 20,
               }}
             >
-              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={chartColors.grid} />
+              <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
               <XAxis 
-                dataKey="time" 
-                tick={{ fontSize: 12, fill: chartColors.axis.tick }}
-                axisLine={{ stroke: chartColors.grid }}
-                tickLine={{ stroke: chartColors.grid }}
+                dataKey="time"
+                className="text-xs"
+                tickLine={false}
+                axisLine={false}
                 {...(selectedPeriod === 'month' ? {
                   interval: 2,
                   angle: -45,
                   textAnchor: 'end',
                   height: 60
                 } : {})}
-              label={{ 
-                 value: selectedPeriod === 'week' ? "Day" : 
-                        selectedPeriod === 'month' ? "Day of Month" : "Month", 
-                  position: "insideBottom", 
-                  offset: selectedPeriod === 'month' ? -45 : -10,
-                  fill: chartColors.axis.tick 
-                }}
               />
-              <YAxis 
-                tick={{ fontSize: 12, fill: chartColors.axis.tick }}
-                axisLine={{ stroke: chartColors.grid }}
-                tickLine={{ stroke: chartColors.grid }}
+              <YAxis
+                width={60}
+                className="text-xs"
+                tickLine={false}
+                axisLine={false}
                 tickFormatter={(value) => {
                   if (value === 0) return '0';
                   if (value < 0.001) return value.toFixed(4);
@@ -1061,7 +890,6 @@ export default function DashboardPage() {
                   if (value >= 1000) return `${(value / 1000).toFixed(1)}k`;
                   return value.toFixed(1);
                 }}
-                label={{ value: "Energy (kWh)", angle: -90, position: "insideLeft", fill: chartColors.axis.tick }}
               />
               <Tooltip 
                 formatter={(value: number) => {
@@ -1207,21 +1035,21 @@ export default function DashboardPage() {
 
           {/* Production summary cards */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <Card className="bg-white">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">Current Generation</CardTitle>
+            <Card className="bg-white dark:bg-[#111318] border-gray-200 dark:border-white/10 rounded-2xl shadow-sm dark:shadow-none">
+              <CardHeader className="pb-3 px-6 pt-6">
+                <CardTitle className="text-sm font-medium text-gray-600 dark:text-white/70">Current Generation</CardTitle>
               </CardHeader>
-              <CardContent>
+              <CardContent className="px-6 pb-6">
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center">
-                    <Sun className="h-5 w-5 text-orange-500 mr-2" />
-                  <div className="text-2xl font-bold">{((dashboardData?.currentPowerGenerationWatts ?? 0) / 1000).toFixed(2)} kW</div>
+                  <div className="flex items-center gap-2">
+                    <Sun className="h-5 w-5 text-orange-600 dark:text-orange-400" strokeWidth={2} />
+                  <div className="text-2xl font-semibold text-gray-900 dark:text-white/90">{((dashboardData?.currentPowerGenerationWatts ?? 0) / 1000).toFixed(2)} kW</div>
                 </div>
                   {(dashboardData?.currentPowerGenerationWatts ?? 0) > 0 && 
-                    <ArrowUp className="h-4 w-4 text-green-500" />
+                    <ArrowUp className="h-4 w-4 text-emerald-600 dark:text-emerald-400" strokeWidth={2} />
                   }
                 </div>
-                <p className="text-xs text-muted-foreground mt-1">
+                <p className="text-xs text-gray-500 dark:text-white/50 mt-2">
                   {dashboardData?.lastUpdated ? 
                     `Last updated: ${new Date(dashboardData.lastUpdated).toLocaleTimeString()}` : 
                     'No recent updates'}
@@ -1229,53 +1057,53 @@ export default function DashboardPage() {
               </CardContent>
             </Card>
 
-            <Card className="bg-white">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">Today's Production</CardTitle>
+            <Card className="bg-white dark:bg-[#111318] border-gray-200 dark:border-white/10 rounded-2xl shadow-sm dark:shadow-none">
+              <CardHeader className="pb-3 px-6 pt-6">
+                <CardTitle className="text-sm font-medium text-gray-600 dark:text-white/70">Today's Production</CardTitle>
               </CardHeader>
-              <CardContent>
+              <CardContent className="px-6 pb-6">
                 <div className="flex items-center justify-between">
-                  <div className="text-2xl font-bold">
+                  <div className="text-2xl font-semibold text-gray-900 dark:text-white/90">
                     {dashboardData?.todayGenerationKWh?.toFixed(2) || '0.00'} kWh
                 </div>
                   {(dashboardData?.todayGenerationKWh ?? 0) > 0 && 
-                    <ArrowUp className="h-4 w-4 text-green-500" />
+                    <ArrowUp className="h-4 w-4 text-emerald-600 dark:text-emerald-400" strokeWidth={2} />
                   }
                 </div>
                 <Progress 
-                  className="h-2 mt-2" 
+                  className="h-2 mt-3" 
                   value={(dashboardData?.installationDetails?.installedCapacityKW ?? 0) > 0 ? 
                     Math.min(100, ((dashboardData?.todayGenerationKWh ?? 0) / (((dashboardData?.installationDetails?.installedCapacityKW ?? 0) * 4))) * 100) : 0} 
                 />
               </CardContent>
             </Card>
 
-            <Card className="bg-white">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">Monthly Production</CardTitle>
+            <Card className="bg-white dark:bg-[#111318] border-gray-200 dark:border-white/10 rounded-2xl shadow-sm dark:shadow-none">
+              <CardHeader className="pb-3 px-6 pt-6">
+                <CardTitle className="text-sm font-medium text-gray-600 dark:text-white/70">Monthly Production</CardTitle>
               </CardHeader>
-              <CardContent>
+              <CardContent className="px-6 pb-6">
                 <div className="flex items-center justify-between">
-                  <div className="text-2xl font-bold">
+                  <div className="text-2xl font-semibold text-gray-900 dark:text-white/90">
                   {dashboardData?.monthToDateGenerationKWh?.toFixed(2) || '0.00'} kWh
                 </div>
                   {(dashboardData?.monthToDateGenerationKWh ?? 0) > 0 && 
-                    <ArrowUp className="h-4 w-4 text-green-500" />
+                    <ArrowUp className="h-4 w-4 text-emerald-600 dark:text-emerald-400" strokeWidth={2} />
                   }
                 </div>
-                <p className="text-xs text-muted-foreground mt-1">
+                <p className="text-xs text-gray-500 dark:text-white/50 mt-2">
                   Month to date
                 </p>
               </CardContent>
             </Card>
 
-            <Card className="bg-white">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">System Efficiency</CardTitle>
+            <Card className="bg-white dark:bg-[#111318] border-gray-200 dark:border-white/10 rounded-2xl shadow-sm dark:shadow-none">
+              <CardHeader className="pb-3 px-6 pt-6">
+                <CardTitle className="text-sm font-medium text-gray-600 dark:text-white/70">System Efficiency</CardTitle>
               </CardHeader>
-              <CardContent>
+              <CardContent className="px-6 pb-6">
                 <div className="flex items-center justify-between">
-                  <div className="text-2xl font-bold">
+                  <div className="text-2xl font-semibold text-gray-900 dark:text-white/90">
                     {dashboardData?.averageEfficiencyPercentage !== undefined ? 
                       `${(dashboardData.averageEfficiencyPercentage).toFixed(1)}%` : 
                       dashboardData?.currentEfficiencyPercentage !== undefined ? 
@@ -1283,13 +1111,13 @@ export default function DashboardPage() {
                       "0.0%"}
                 </div>
                   {systemStatus && (
-                    <Badge className={`${getHealthColor(systemStatus.systemHealth)}`}>
+                    <Badge className={`${getHealthColor(systemStatus.systemHealth)} rounded-lg`}>
                       {systemStatus.systemHealth}
                     </Badge>
                   )}
                 </div>
                 <Progress 
-                  className="h-2 mt-2" 
+                  className="h-2 mt-3" 
                   value={dashboardData?.averageEfficiencyPercentage !== undefined ? 
                     dashboardData.averageEfficiencyPercentage : 
                     dashboardData?.currentEfficiencyPercentage || 0} 
@@ -1300,9 +1128,9 @@ export default function DashboardPage() {
 
           {/* Energy Flow summary */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Card className="bg-white col-span-2">
-              <CardHeader className="pb-2 flex flex-row items-center justify-between">
-                <CardTitle>Energy Production</CardTitle>
+            <Card className="bg-white dark:bg-[#111318] border-gray-200 dark:border-white/10 rounded-2xl shadow-sm dark:shadow-none col-span-2">
+              <CardHeader className="pb-4 px-6 pt-6 flex flex-row items-center justify-between">
+                <CardTitle className="text-gray-900 dark:text-white/90">Energy Production</CardTitle>
                 <Select 
                   value={selectedPeriod} 
                   onValueChange={handlePeriodChange}
@@ -1331,19 +1159,19 @@ export default function DashboardPage() {
               </CardContent>
             </Card>
 
-            <Card className="bg-white">
-              <CardHeader className="pb-2">
-                <CardTitle>Energy Flow</CardTitle>
+            <Card className="bg-white dark:bg-[#111318] border-gray-200 dark:border-white/10 rounded-2xl shadow-sm dark:shadow-none">
+              <CardHeader className="pb-4 px-6 pt-6">
+                <CardTitle className="text-gray-900 dark:text-white/90">Energy Flow</CardTitle>
               </CardHeader>
-              <CardContent>
+              <CardContent className="px-6 pb-6">
                 {/* Energy flow metrics */}
                 <div className="space-y-4">
-                  <div className="flex justify-between items-center py-2 border-b">
+                  <div className="flex justify-between items-center py-2 border-b border-gray-200 dark:border-white/10">
                     <div className="flex items-center">
-                      <Sun className="h-4 w-4 text-orange-500 mr-2" />
-                      <span>Production</span>
+                      <Sun className="h-4 w-4 text-orange-600 dark:text-orange-400 mr-2" strokeWidth={2} />
+                      <span className="text-gray-700 dark:text-white/70">Production</span>
                     </div>
-                    <span className="font-bold text-green-500">
+                    <span className="font-semibold text-emerald-600 dark:text-emerald-400">
                       {selectedPeriod === 'day' 
                         ? `${totalProduction.toFixed(2)} kWh` 
                         : `${totalProduction.toFixed(2)} kWh`}
@@ -1381,49 +1209,49 @@ export default function DashboardPage() {
           </div>
 
           {/* System Status Card */}
-          <Card className="bg-white">
-            <CardHeader className="pb-2">
-              <CardTitle className="flex items-center justify-between">
+          <Card className="bg-white dark:bg-[#111318] border-gray-200 dark:border-white/10 rounded-2xl shadow-sm dark:shadow-none">
+            <CardHeader className="pb-4 px-6 pt-6">
+              <CardTitle className="flex items-center justify-between text-gray-900 dark:text-white/90">
                 <span>System Status</span>
                 {systemStatus && (
-                  <Badge className={`${getHealthColor(systemStatus.systemHealth)} text-white`}>
+                  <Badge className={`${getHealthColor(systemStatus.systemHealth)} text-white rounded-lg`}>
                     {systemStatus.systemHealth}
                   </Badge>
                 )}
               </CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="px-6 pb-6">
               {systemStatus ? (
-                <div className="space-y-4">
+                <div className="space-y-6">
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                    <div className="p-3 border rounded-md">
-                      <div className="text-sm text-gray-500">System Efficiency</div>
-                      <div className="text-lg font-semibold">{systemStatus.efficiency.toFixed(1)}%</div>
-                      <div className="w-full bg-gray-200 rounded-full h-2 mt-1.5">
+                    <div className="p-4 bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl hover:bg-gray-100 dark:hover:bg-white/10 transition-colors duration-150">
+                      <div className="text-xs font-medium text-gray-500 dark:text-white/50 uppercase tracking-wide">System Efficiency</div>
+                      <div className="text-2xl font-semibold text-gray-900 dark:text-white/90 mt-2">{systemStatus.efficiency.toFixed(1)}%</div>
+                      <div className="w-full bg-gray-200 dark:bg-white/10 rounded-full h-2 mt-3">
                         <div 
-                          className="bg-blue-500 h-2 rounded-full" 
+                          className="bg-blue-600 dark:bg-blue-400 h-2 rounded-full transition-all duration-300" 
                           style={{ width: `${Math.min(100, systemStatus.efficiency)}%` }}
                         ></div>
                       </div>
                     </div>
 
-                    <div className="p-3 border rounded-md">
-                      <div className="text-sm text-gray-500">Security Status</div>
-                      <div className="flex items-center mt-1">
-                        <Shield className={`h-5 w-5 mr-2 ${systemStatus.tamperDetected ? 'text-red-500' : 'text-green-500'}`} />
-                        <span className="text-lg font-semibold">
+                    <div className="p-4 bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl hover:bg-gray-100 dark:hover:bg-white/10 transition-colors duration-150">
+                      <div className="text-xs font-medium text-gray-500 dark:text-white/50 uppercase tracking-wide">Security Status</div>
+                      <div className="flex items-center mt-2">
+                        <Shield className={`h-5 w-5 mr-2 ${systemStatus.tamperDetected ? 'text-red-500 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'}`} strokeWidth={2} />
+                        <span className="text-base font-semibold text-gray-900 dark:text-white/90">
                           {systemStatus.tamperDetected ? 'Tamper Detected' : 'Secure'}
                         </span>
                       </div>
-                      <div className="text-xs text-gray-400 mt-1">
+                      <div className="text-xs text-gray-500 dark:text-white/50 mt-2">
                         Last check: {new Date(systemStatus.lastTamperCheck).toLocaleDateString()}
                       </div>
                     </div>
 
-                    <div className="p-3 border rounded-md">
-                      <div className="text-sm text-gray-500">Active Alerts</div>
-                      <div className="text-lg font-semibold">{systemStatus.alerts.filter(alert => !alert.resolved).length}</div>
-                      <div className="flex gap-1 mt-1.5">
+                    <div className="p-4 bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl hover:bg-gray-100 dark:hover:bg-white/10 transition-colors duration-150">
+                      <div className="text-xs font-medium text-gray-500 dark:text-white/50 uppercase tracking-wide">Active Alerts</div>
+                      <div className="text-2xl font-semibold text-gray-900 dark:text-white/90 mt-2">{systemStatus.alerts.filter(alert => !alert.resolved).length}</div>
+                      <div className="flex gap-1 mt-3">
                         {systemStatus.alerts.filter(alert => !alert.resolved).length > 0 ? (
                           systemStatus.alerts.filter(alert => !alert.resolved).slice(0, 4).map((alert, i) => (
                             <div 
@@ -1433,14 +1261,14 @@ export default function DashboardPage() {
                             ></div>
                           ))
                         ) : (
-                          <span className="text-xs text-gray-400">No active alerts</span>
+                          <span className="text-xs text-gray-500 dark:text-white/50">No active alerts</span>
                         )}
                       </div>
                     </div>
 
-                    <div className="p-3 border rounded-md">
-                      <div className="text-sm text-gray-500">Last Reading</div>
-                      <div className="text-lg font-semibold truncate">
+                    <div className="p-4 bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl hover:bg-gray-100 dark:hover:bg-white/10 transition-colors duration-150">
+                      <div className="text-xs font-medium text-gray-500 dark:text-white/50 uppercase tracking-wide">Last Reading</div>
+                      <div className="text-base font-semibold text-gray-900 dark:text-white/90 truncate mt-2">
                         {dashboardData?.lastUpdated 
                           ? new Date(dashboardData.lastUpdated).toLocaleString() 
                           : 'No data'}
@@ -1449,15 +1277,15 @@ export default function DashboardPage() {
                   </div>
 
                   {systemStatus.recommendations.length > 0 && (
-                    <div className="border rounded-md p-3">
-                      <div className="flex items-center text-sm font-medium mb-2">
-                        <Info className="h-4 w-4 mr-1 text-blue-500" />
+                    <div className="bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20 rounded-xl p-4">
+                      <div className="flex items-center text-sm font-medium text-gray-900 dark:text-white/90 mb-3">
+                        <Info className="h-4 w-4 mr-2 text-blue-600 dark:text-blue-400" strokeWidth={2} />
                         Recommendations
                       </div>
-                      <ul className="space-y-1 text-sm">
+                      <ul className="space-y-2 text-sm text-gray-700 dark:text-white/70">
                         {systemStatus.recommendations.map((rec, i) => (
                           <li key={i} className="flex items-start">
-                            <span className="text-blue-500 mr-2">•</span>
+                            <span className="text-blue-600 dark:text-blue-400 mr-2 font-medium">•</span>
                             {rec}
                           </li>
                         ))}
@@ -1466,7 +1294,7 @@ export default function DashboardPage() {
                   )}
                 </div>
               ) : (
-                <div className="text-center py-4 text-gray-500">
+                <div className="text-center py-8 text-sm text-gray-500 dark:text-white/50">
                   System status information not available
                 </div>
               )}
@@ -1474,7 +1302,7 @@ export default function DashboardPage() {
           </Card>
 
           {/* Environmental Impact */}
-          <Card className="bg-white">
+          <Card className="bg-white dark:bg-[#111318] border-gray-200 dark:border-white/10 rounded-2xl shadow-sm dark:shadow-none">
             <CardHeader className="pb-2">
               <CardTitle>Environmental Impact</CardTitle>
             </CardHeader>
@@ -1582,3 +1410,4 @@ function Tree(props: React.SVGProps<SVGSVGElement>) {
     </svg>
   )
 }
+

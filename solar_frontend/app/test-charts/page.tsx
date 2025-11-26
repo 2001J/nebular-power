@@ -4,11 +4,15 @@ import { TestChart } from "@/components/test-chart"
 import { EnergyProductionChart } from "@/components/energy-production-chart"
 import { EnergyConsumptionChart } from "@/components/energy-consumption-chart"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { ModeToggle } from "@/components/mode-toggle"
 
 export default function TestChartsPage() {
   return (
     <div className="space-y-6 p-6">
-      <h1 className="text-2xl font-bold">Chart Testing Page</h1>
+      <div className="flex justify-between items-center">
+        <h1 className="text-2xl font-bold">Chart Testing Page</h1>
+        <ModeToggle />
+      </div>
       
       <Card>
         <CardHeader>

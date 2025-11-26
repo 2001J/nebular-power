@@ -532,71 +532,74 @@ export default function ProfilePage() {
                     </div>
                   ) : (
                     <div className="grid gap-3">
-                      <div className="bg-gray-100 rounded-lg p-4 flex justify-between items-center">
-                        <span className="text-gray-700">Account ID</span>
-                        <span className="text-gray-500">{profileData?.id || user.id}</span>
+                      <div className="rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/5 p-4 flex justify-between items-center">
+                        <span className="text-sm font-medium text-gray-700 dark:text-white/80">Account ID</span>
+                        <span className="text-sm text-gray-500 dark:text-white/60">{profileData?.id || user.id}</span>
                       </div>
 
-                      <div className="bg-gray-100 rounded-lg p-4 flex justify-between items-center">
-                        <span className="text-gray-700">Full Name</span>
-                        <span className="text-gray-500">{profileData?.fullName || user.name}</span>
+                      <div className="rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/5 p-4 flex justify-between items-center">
+                        <span className="text-sm font-medium text-gray-700 dark:text-white/80">Full Name</span>
+                        <span className="text-sm text-gray-500 dark:text-white/60">{profileData?.fullName || user.name}</span>
                       </div>
 
-                      <div className="bg-gray-100 rounded-lg p-4 flex justify-between items-center">
-                        <span className="text-gray-700">Email</span>
-                        <span className="text-gray-500">{profileData?.email || user.email}</span>
+                      <div className="rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/5 p-4 flex justify-between items-center">
+                        <span className="text-sm font-medium text-gray-700 dark:text-white/80">Email</span>
+                        <span className="text-sm text-gray-500 dark:text-white/60">{profileData?.email || user.email}</span>
                       </div>
 
-                      <div className="bg-gray-100 rounded-lg p-4 flex justify-between items-center">
-                        <span className="text-gray-700">Phone</span>
-                        <span className="text-gray-500">{profileData?.phoneNumber || 'Not provided'}</span>
+                      <div className="rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/5 p-4 flex justify-between items-center">
+                        <span className="text-sm font-medium text-gray-700 dark:text-white/80">Phone</span>
+                        <span className="text-sm text-gray-500 dark:text-white/60">{profileData?.phoneNumber || 'Not provided'}</span>
                       </div>
 
-                      <div className="bg-gray-100 rounded-lg p-4 flex justify-between items-center">
-                        <span className="text-gray-700">Account Status</span>
-                        <span className={`px-3 py-1 rounded-full text-xs ${
-                          profileData?.status === 'ACTIVE' ? 'bg-green-100 text-green-800' : 
-                          profileData?.status === 'SUSPENDED' ? 'bg-red-100 text-red-800' : 
-                          'bg-yellow-100 text-yellow-800'
+                      <div className="rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/5 p-4 flex justify-between items-center">
+                        <span className="text-sm font-medium text-gray-700 dark:text-white/80">Account Status</span>
+                        <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                          profileData?.status === 'ACTIVE'
+                            ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-300'
+                            : profileData?.status === 'SUSPENDED'
+                            ? 'bg-red-100 text-red-800 dark:bg-red-500/15 dark:text-red-300'
+                            : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-500/15 dark:text-yellow-200'
                         }`}>
                           {profileData?.status || 'ACTIVE'}
                         </span>
                       </div>
 
-                      <div className="bg-gray-100 rounded-lg p-4 flex justify-between items-center">
-                        <span className="text-gray-700">Email Verified</span>
-                        <span className={`px-3 py-1 rounded-full text-xs ${
-                          profileData?.emailVerified ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                      <div className="rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/5 p-4 flex justify-between items-center">
+                        <span className="text-sm font-medium text-gray-700 dark:text-white/80">Email Verified</span>
+                        <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                          profileData?.emailVerified
+                            ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-300'
+                            : 'bg-red-100 text-red-800 dark:bg-red-500/15 dark:text-red-300'
                         }`}>
                           {profileData?.emailVerified ? 'Verified' : 'Not Verified'}
                         </span>
                       </div>
 
-                      <div className="bg-gray-100 rounded-lg p-4 flex justify-between items-center">
-                        <span className="text-gray-700">Last Login</span>
-                        <span className="text-gray-500">
+                      <div className="rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/5 p-4 flex justify-between items-center">
+                        <span className="text-sm font-medium text-gray-700 dark:text-white/80">Last Login</span>
+                        <span className="text-sm text-gray-500 dark:text-white/60">
                           {profileData?.lastLogin ? 
                             formatDate(profileData.lastLogin) : 
                             'Never logged in before'}
                         </span>
                       </div>
-
-                      <div className="bg-gray-100 rounded-lg p-4 flex justify-between items-center">
-                        <span className="text-gray-700">Member Since</span>
-                        <span className="text-gray-500">{formatDate(profileData?.createdAt)}</span>
+                      <div className="rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/5 p-4 flex justify-between items-center">
+                        <span className="text-sm font-medium text-gray-700 dark:text-white/80">Member Since</span>
+                        <span className="text-sm text-gray-500 dark:text-white/60">{formatDate(profileData?.createdAt)}</span>
                       </div>
 
                       {profileData?.installationDate && (
-                        <div className="bg-gray-100 rounded-lg p-4 flex justify-between items-center">
-                          <span className="text-gray-700">Installation Date</span>
-                          <span className="text-gray-500">{formatDate(profileData.installationDate)}</span>
+                        <div className="rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/5 p-4 flex justify-between items-center">
+                          <span className="text-sm font-medium text-gray-700 dark:text-white/80">Installation Date</span>
+                          <span className="text-sm text-gray-500 dark:text-white/60">{formatDate(profileData.installationDate)}</span>
                         </div>
                       )}
 
                       {profileData?.installationType && (
-                        <div className="bg-gray-100 rounded-lg p-4 flex justify-between items-center">
-                          <span className="text-gray-700">Installation Type</span>
-                          <span className="text-gray-500">{profileData.installationType}</span>
+                        <div className="rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/5 p-4 flex justify-between items-center">
+                          <span className="text-sm font-medium text-gray-700 dark:text-white/80">Installation Type</span>
+                          <span className="text-sm text-gray-500 dark:text-white/60">{profileData.installationType}</span>
                         </div>
                       )}
                     </div>
@@ -611,8 +614,8 @@ export default function ProfilePage() {
                   <CardTitle>Security Settings</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="grid gap-3">
-                    <div className="bg-gray-100 rounded-lg p-4">
+                    <div className="grid gap-3">
+                    <div className="rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/5 p-4">
                       <div className="flex justify-between items-center">
                         <div>
                           <span className="text-gray-700 block">Change Password</span>
@@ -624,7 +627,7 @@ export default function ProfilePage() {
                       </div>
 
                       {isChangingPassword && (
-                        <div className="mt-4 space-y-3 bg-white p-4 rounded-lg border">
+                        <div className="mt-4 space-y-3 rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#111318] p-4">
                           <div className="grid gap-1.5">
                             <Label htmlFor="current-password">Current Password</Label>
                             <Input 
@@ -660,7 +663,7 @@ export default function ProfilePage() {
                       )}
                     </div>
 
-                    <div className="bg-gray-100 rounded-lg p-4 flex justify-between items-center">
+                    <div className="rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/5 p-4 flex justify-between items-center">
                       <div>
                         <span className="text-gray-700 block">Two-factor Authentication</span>
                         <span className="text-gray-500 text-sm">Add an extra layer of security</span>
@@ -668,7 +671,7 @@ export default function ProfilePage() {
                       <Switch disabled />
                     </div>
 
-                    <div className="bg-gray-100 rounded-lg p-4 block cursor-pointer" onClick={() => setIsResetPasswordOpen(true)}>
+                    <div className="rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/5 p-4 block cursor-pointer" onClick={() => setIsResetPasswordOpen(true)}>
                       <div className="flex justify-between items-center">
                         <div>
                           <span className="text-gray-700 block">Reset Password</span>
@@ -679,12 +682,12 @@ export default function ProfilePage() {
                     </div>
 
                     {!profileData?.emailVerified && (
-                      <div className="bg-yellow-100 rounded-lg p-4">
+                      <div className="rounded-xl border border-amber-200 dark:border-amber-500/40 bg-yellow-100 dark:bg-amber-500/15 p-4">
                         <div className="flex items-start gap-3">
                           <AlertCircle className="h-5 w-5 text-yellow-600 flex-shrink-0 mt-0.5" />
                           <div>
-                            <h4 className="font-medium text-yellow-800">Email Not Verified</h4>
-                            <p className="text-sm text-yellow-700 mt-1">
+                            <h4 className="font-medium text-yellow-800 dark:text-amber-200">Email Not Verified</h4>
+                            <p className="text-sm text-yellow-700 dark:text-amber-100/80 mt-1">
                               Your email is not verified. Please check your inbox for a verification email or click below to resend it.
                             </p>
                             <Button 

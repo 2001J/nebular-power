@@ -1,9 +1,8 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import React, { useState, useEffect, use } from "react"
 import { useRouter } from "next/navigation"
-import React from "react"
-import { ArrowLeft, Calendar, DollarSign, Loader2 } from "lucide-react"
+import { ArrowLeft, DollarSign, Percent, Loader2 } from "lucide-react"
 import {
   Card,
   CardContent,
@@ -39,27 +38,60 @@ import {
   FormMessage,
 } from "@/components/ui/form"
 import { Checkbox } from "@/components/ui/checkbox"
-import { Calendar as CalendarComponent } from "@/components/ui/calendar"
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover"
 import { toast } from "@/components/ui/use-toast"
-import { cn } from "@/lib/utils"
 import { format } from "date-fns"
 import { paymentComplianceApi } from "@/lib/api/paymentCompliance"
 import { useForm, type Resolver } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
+import { useTheme } from "next-themes"
+import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs"
+import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider"
+import { DatePicker } from "@mui/x-date-pickers/DatePicker"
+import dayjs from "dayjs"
+import { createTheme, ThemeProvider } from "@mui/material/styles"
 
-// Payment frequency options
+// Payment frequency options - matches backend PaymentPlan.PaymentFrequency enum
 const paymentFrequencies = [
+  { value: "WEEKLY", label: "Weekly" },
+  { value: "BI_WEEKLY", label: "Bi-Weekly" },
   { value: "MONTHLY", label: "Monthly" },
   { value: "QUARTERLY", label: "Quarterly" },
   { value: "SEMI_ANNUALLY", label: "Semi-Annually" },
   { value: "ANNUALLY", label: "Annually" },
 ]
+
+// Helper to get frequency label
+const getFrequencyLabel = (frequency: string): string => {
+  const labels: Record<string, string> = {
+    WEEKLY: "weekly",
+    BI_WEEKLY: "bi-weekly",
+    MONTHLY: "monthly",
+    QUARTERLY: "quarterly",
+    SEMI_ANNUALLY: "semi-annually",
+    ANNUALLY: "annually"
+  }
+  return labels[frequency] || "per billing period"
+}
+
+// Helper to get muted className based on enabled state
+const getMutedClassName = (isEnabled: boolean): string => {
+  return isEnabled ? "" : "text-muted-foreground";
+}
+
+// Helper to get reminder description based on settings
+const getReminderDescription = (loadingSettings: boolean, autoSendEnabled: boolean): string => {
+  if (loadingSettings) return "Loading settings...";
+  if (autoSendEnabled) return "Automatically notify customer about upcoming payments (controlled by global settings)";
+  return "Payment reminders are disabled in global payment settings";
+}
+
+// Helper to get late fee description based on settings
+const getLateFeeDescription = (loadingSettings: boolean, lateFeesEnabled: boolean): string => {
+  if (loadingSettings) return "Loading settings...";
+  if (lateFeesEnabled) return "Apply fees for overdue payments (controlled by global settings)";
+  return "Late fees are disabled in global payment settings";
+}
 
 // Form schema with validation
 const loanFormSchema = z.object({
@@ -72,6 +104,7 @@ const loanFormSchema = z.object({
   endDate: z.date(),
   totalAmount: z.coerce.number().positive("Total amount must be positive"),
   interestRate: z.coerce.number().min(0, "Interest rate cannot be negative").default(0),
+  downPayment: z.coerce.number().min(0).default(0),
   lateFeeAmount: z.coerce.number().min(0).default(0),
   gracePeriodDays: z.coerce.number().min(0).default(7),
   useDefaultGracePeriod: z.boolean().default(false),
@@ -107,6 +140,7 @@ interface PaymentPlan {
   endDate?: string;
   status?: string;
   interestRate?: number;
+  downPayment?: number;
   lateFeeAmount?: number;
   gracePeriodDays?: number;
   useDefaultGracePeriod?: boolean;
@@ -115,12 +149,87 @@ interface PaymentPlan {
   sendPaymentReminders?: boolean;
 }
 
-export default function EditLoanPage({ params }: { params: EditLoanParams }) {
+interface GracePeriodConfig {
+  gracePeriodDays?: number;
+  numberOfDays?: number;
+  lateFeePercentage?: number;
+  lateFeeFixedAmount?: number;
+  lateFeesEnabled?: boolean;
+}
+
+interface ReminderConfig {
+  autoSendReminders?: boolean;
+  firstReminderDays?: number;
+  secondReminderDays?: number;
+  finalReminderDays?: number;
+  reminderMethod?: string;
+}
+
+// Calculate end date from amounts, frequency, and start date
+function calculateEndDateFromAmounts(startDate: Date | null | undefined, frequency: string, totalAmount: number, installmentAmount: number) {
+  if (!startDate || !frequency || !totalAmount || !installmentAmount) return null;
+  if (installmentAmount <= 0) return null;
+
+  const paymentsNeeded = Math.ceil(totalAmount / installmentAmount);
+  if (!Number.isFinite(paymentsNeeded) || paymentsNeeded <= 0) return null;
+
+  const start = new Date(startDate);
+  const end = new Date(start);
+
+  switch (frequency) {
+    case "WEEKLY":
+      end.setDate(end.getDate() + paymentsNeeded * 7);
+      break;
+    case "BI_WEEKLY":
+      end.setDate(end.getDate() + paymentsNeeded * 14);
+      break;
+    case "MONTHLY":
+      end.setMonth(end.getMonth() + paymentsNeeded);
+      break;
+    case "QUARTERLY":
+      end.setMonth(end.getMonth() + paymentsNeeded * 3);
+      break;
+    case "SEMI_ANNUALLY":
+      end.setMonth(end.getMonth() + paymentsNeeded * 6);
+      break;
+    case "ANNUALLY":
+      end.setFullYear(end.getFullYear() + paymentsNeeded);
+      break;
+    default:
+      end.setMonth(end.getMonth() + paymentsNeeded);
+  }
+
+  return end;
+}
+
+export default function EditLoanPage({ params }: { params: Promise<EditLoanParams> }) {
   const router = useRouter()
-  const loanId = params.id
+  const { id: loanId } = use(params)
+  const { resolvedTheme } = useTheme()
   const [loan, setLoan] = useState<PaymentPlan | null>(null)
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
+  const [globalPaymentSettings, setGlobalPaymentSettings] = useState({
+    gracePeriodDays: 7,
+    lateFeePercentage: 0,
+    lateFeeFixedAmount: 0,
+    lateFeesEnabled: false
+  });
+  const [reminderSettings, setReminderSettings] = useState({
+    autoSendReminders: true,
+    firstReminderDays: 1,
+    secondReminderDays: 3,
+    finalReminderDays: 7,
+    reminderMethod: "EMAIL"
+  });
+  const [loadingSettings, setLoadingSettings] = useState(true);
+
+  // MUI theme for date pickers, respecting app theme
+  const muiTheme = createTheme({
+    palette: {
+      mode: resolvedTheme === "dark" ? "dark" : "light",
+    },
+  });
 
   // Set up form with validation
   const form = useForm<LoanFormValues>({
@@ -135,6 +244,7 @@ export default function EditLoanPage({ params }: { params: EditLoanParams }) {
       endDate: new Date(new Date().setFullYear(new Date().getFullYear() + 1)),
       totalAmount: 0,
       interestRate: 0,
+      downPayment: 0,
       lateFeeAmount: 0,
       gracePeriodDays: 7,
       useDefaultGracePeriod: false,
@@ -144,6 +254,79 @@ export default function EditLoanPage({ params }: { params: EditLoanParams }) {
     }
   });
 
+  // Watch core payment fields for auto end-date calculation
+  const watchedTotalAmount = form.watch("totalAmount");
+  const watchedInstallmentAmount = form.watch("installmentAmount");
+  const watchedFrequency = form.watch("frequency");
+  const watchedStartDate = form.watch("startDate");
+
+  // Automatically update end date based on amounts and frequency
+  useEffect(() => {
+    const autoEndDate = calculateEndDateFromAmounts(
+      watchedStartDate,
+      watchedFrequency,
+      Number(watchedTotalAmount),
+      Number(watchedInstallmentAmount)
+    );
+
+    if (!autoEndDate) return;
+
+    const currentEndDate = form.getValues("endDate");
+    if (currentEndDate && autoEndDate.getTime() === currentEndDate.getTime()) return;
+
+    form.setValue("endDate", autoEndDate, { shouldValidate: true, shouldDirty: true });
+  }, [
+    watchedStartDate,
+    watchedFrequency,
+    watchedTotalAmount,
+    watchedInstallmentAmount,
+    form,
+  ]);
+
+  // Load global payment settings on component mount
+  useEffect(() => {
+    const fetchGlobalSettings = async () => {
+      setLoadingSettings(true);
+      try {
+        // Fetch grace period config (late fees)
+        const gracePeriodSettings = await paymentComplianceApi.getGracePeriodConfig() as GracePeriodConfig;
+        console.log("Loaded grace period settings:", gracePeriodSettings);
+
+        // Fetch reminder config
+        const reminderConfigData = await paymentComplianceApi.getReminderConfig() as ReminderConfig;
+        console.log("Loaded reminder settings:", reminderConfigData);
+
+        // Update grace period state
+        setGlobalPaymentSettings({
+          gracePeriodDays: gracePeriodSettings.gracePeriodDays || gracePeriodSettings.numberOfDays || 7,
+          lateFeePercentage: gracePeriodSettings.lateFeePercentage || 0,
+          lateFeeFixedAmount: gracePeriodSettings.lateFeeFixedAmount || 0,
+          lateFeesEnabled: gracePeriodSettings.lateFeesEnabled || false
+        });
+
+        // Update reminder state
+        setReminderSettings({
+          autoSendReminders: reminderConfigData.autoSendReminders !== false,
+          firstReminderDays: reminderConfigData.firstReminderDays || 1,
+          secondReminderDays: reminderConfigData.secondReminderDays || 3,
+          finalReminderDays: reminderConfigData.finalReminderDays || 7,
+          reminderMethod: reminderConfigData.reminderMethod || "EMAIL"
+        });
+      } catch (error) {
+        console.error("Error loading global payment settings:", error);
+        toast({
+          title: "Warning",
+          description: "Could not load global payment settings. Using default values.",
+          variant: "destructive",
+        });
+      } finally {
+        setLoadingSettings(false);
+      }
+    };
+
+    fetchGlobalSettings();
+  }, []);
+
   // Fetch loan details
   useEffect(() => {
     const fetchLoanDetails = async () => {
@@ -151,7 +334,7 @@ export default function EditLoanPage({ params }: { params: EditLoanParams }) {
         setLoading(true)
 
         // Get the payment plan details
-        const loanData = await paymentComplianceApi.getPaymentPlanById(loanId)
+        const loanData = await paymentComplianceApi.getPaymentPlanById(loanId) as PaymentPlan
 
         if (loanData) {
           console.log("Retrieved loan data:", loanData)
@@ -172,6 +355,7 @@ export default function EditLoanPage({ params }: { params: EditLoanParams }) {
             endDate: endDate,
             totalAmount: loanData.totalAmount || 0,
             interestRate: loanData.interestRate || 0,
+            downPayment: loanData.downPayment || 0,
             lateFeeAmount: loanData.lateFeeAmount || 0,
             gracePeriodDays: loanData.gracePeriodDays || 7,
             useDefaultGracePeriod: loanData.useDefaultGracePeriod || false,
@@ -206,29 +390,49 @@ export default function EditLoanPage({ params }: { params: EditLoanParams }) {
     try {
       setSubmitting(true)
 
-      // Format the data for the API
-      const formattedData = {
-        ...data,
-        id: parseInt(loanId),
-        startDate: format(data.startDate, "yyyy-MM-dd"),
-        endDate: format(data.endDate, "yyyy-MM-dd"),
-      }
-
       if (!loan) {
         throw new Error("Loan details not found");
       }
 
-      // Get installation ID from the form data
-      const installationId = data.installationId;
+      if (!loan.customerId) {
+        throw new Error("Customer ID not found in loan details");
+      }
+
+      const customerId = String(loan.customerId);
+
+      // Format the data for the API - explicitly map all fields
+      const formattedData = {
+        installationId: data.installationId,
+        name: data.name || `Payment Plan for Installation #${data.installationId}`,
+        totalAmount: data.totalAmount,
+        installmentAmount: data.installmentAmount,
+        frequency: data.frequency,
+        startDate: format(data.startDate, "yyyy-MM-dd"),
+        endDate: format(data.endDate, "yyyy-MM-dd"),
+        interestRate: data.interestRate || 0,
+        status: "ACTIVE",
+        downPayment: data.downPayment || 0,
+        // Set late fee amount only if applyLateFee is true
+        lateFeeAmount: data.applyLateFee ? data.lateFeeAmount || 0 : 0,
+        // Use global settings when checked but set to 0
+        useGlobalLateFees: data.applyLateFee && data.lateFeeAmount === 0,
+        // Grace period days (use global if set to 0)
+        gracePeriodDays: data.gracePeriodDays || 0,
+        // If grace period is 0, use global settings
+        useGlobalGracePeriod: data.gracePeriodDays === 0,
+        sendPaymentReminders: data.sendPaymentReminders,
+        description: data.description || "Solar installation financing"
+      };
 
       console.log("Submitting loan update:", {
-        installationId,
-        planId: parseInt(loanId),
+        customerId,
+        installationId: data.installationId,
+        planId: Number.parseInt(loanId),
         loanData: formattedData
       });
 
       // Update the payment plan
-      await paymentComplianceApi.updatePaymentPlan(loanId, formattedData)
+      await paymentComplianceApi.updatePaymentPlan(customerId, loanId, formattedData)
 
       toast({
         title: "Success",
@@ -314,14 +518,25 @@ export default function EditLoanPage({ params }: { params: EditLoanParams }) {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <FormField
                   control={form.control}
-                  name="name"
+                  name="totalAmount"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Payment Plan Name</FormLabel>
+                      <FormLabel>Total Loan Amount ($)</FormLabel>
                       <FormControl>
-                        <Input placeholder="Name for this payment plan" {...field} />
+                        <div className="relative">
+                          <DollarSign className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                          <Input 
+                            type="number" 
+                            step="0.01" 
+                            placeholder="0.00" 
+                            value={field.value}
+                            onChange={field.onChange}
+                            onWheel={(e) => e.currentTarget.blur()}
+                            className="pl-9 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                          />
+                        </div>
                       </FormControl>
-                      <FormDescription>Optional descriptive name</FormDescription>
+                      <FormDescription>Total amount to be financed</FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -332,14 +547,24 @@ export default function EditLoanPage({ params }: { params: EditLoanParams }) {
                   name="installmentAmount"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Installment Amount ($)</FormLabel>
+                      <FormLabel>Payment Amount per Period ($)</FormLabel>
                       <FormControl>
                         <div className="relative">
                           <DollarSign className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                          <Input type="number" step="0.01" placeholder="0.00" {...field} className="pl-9" />
+                          <Input 
+                            type="number" 
+                            step="0.01" 
+                            placeholder="0.00" 
+                            value={field.value}
+                            onChange={field.onChange}
+                            onWheel={(e) => e.currentTarget.blur()}
+                            className="pl-9 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                          />
                         </div>
                       </FormControl>
-                      <FormDescription>The amount of each payment</FormDescription>
+                      <FormDescription>
+                        Amount paid {getFrequencyLabel(form.watch("frequency"))} towards solar system financing
+                      </FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -347,23 +572,6 @@ export default function EditLoanPage({ params }: { params: EditLoanParams }) {
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="totalAmount"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Total Amount ($)</FormLabel>
-                      <FormControl>
-                        <div className="relative">
-                          <DollarSign className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                          <Input type="number" step="0.01" placeholder="0.00" {...field} className="pl-9" />
-                        </div>
-                      </FormControl>
-                      <FormDescription>The total loan amount</FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
 
                 <FormField
                   control={form.control}
@@ -390,6 +598,29 @@ export default function EditLoanPage({ params }: { params: EditLoanParams }) {
                     </FormItem>
                   )}
                 />
+
+                <FormField
+                  control={form.control}
+                  name="interestRate"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Interest Rate (%)</FormLabel>
+                      <FormControl>
+                        <Input 
+                          type="number" 
+                          step="0.01" 
+                          placeholder="0.00" 
+                          value={field.value}
+                          onChange={field.onChange}
+                          onWheel={(e) => e.currentTarget.blur()}
+                          className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        />
+                      </FormControl>
+                      <FormDescription>Annual interest rate (APR) - automatically adjusted per payment period (e.g., 12% annually = 1% monthly)</FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -397,40 +628,47 @@ export default function EditLoanPage({ params }: { params: EditLoanParams }) {
                   control={form.control}
                   name="startDate"
                   render={({ field }) => (
-                    <FormItem className="flex flex-col">
+                    <FormItem className="flex flex-col gap-2">
                       <FormLabel>Start Date</FormLabel>
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <FormControl>
-                            <Button
-                              variant={"outline"}
-                              className={cn(
-                                "pl-3 text-left font-normal",
-                                !field.value && "text-muted-foreground"
-                              )}
-                            >
-                              {field.value ? (
-                                format(field.value, "PPP")
-                              ) : (
-                                <span>Pick a date</span>
-                              )}
-                              <Calendar className="ml-auto h-4 w-4 opacity-50" />
-                            </Button>
-                          </FormControl>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0" align="start">
-                          <CalendarComponent
-                            mode="single"
-                            selected={field.value}
-                            onSelect={field.onChange}
-                            disabled={(date) =>
-                              date < new Date(new Date().setDate(new Date().getDate() - 1))
-                            }
-                            initialFocus
-                          />
-                        </PopoverContent>
-                      </Popover>
-                      <FormDescription>
+                      <FormControl>
+                        <ThemeProvider theme={muiTheme}>
+                          <LocalizationProvider dateAdapter={AdapterDayjs}>
+                            <DatePicker
+                              label={undefined}
+                              value={field.value ? dayjs(field.value) : null}
+                              onChange={(date) => field.onChange(date ? date.toDate() : null)}
+                              slotProps={{
+                                textField: {
+                                  fullWidth: true,
+                                  variant: "outlined",
+                                  error: !!form.formState.errors.startDate,
+                                  helperText: form.formState.errors.startDate?.message,
+                                  InputProps: {
+                                    sx: {
+                                      borderRadius: "0.75rem",
+                                      boxShadow: "inset 0 2px 4px rgba(15, 23, 42, 0.08)",
+                                      "& .MuiOutlinedInput-input": {
+                                        padding: "0.5rem 2.5rem 0.5rem 1rem",
+                                        fontSize: "0.875rem",
+                                      },
+                                      "& .MuiOutlinedInput-notchedOutline": {
+                                        borderColor: "rgba(148, 163, 184, 0.35)",
+                                      },
+                                      "&:hover .MuiOutlinedInput-notchedOutline": {
+                                        borderColor: "rgba(148, 163, 184, 0.45)",
+                                      },
+                                      "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
+                                        borderColor: "rgba(59, 130, 246, 0.8)",
+                                      },
+                                    },
+                                  },
+                                },
+                              }}
+                            />
+                          </LocalizationProvider>
+                        </ThemeProvider>
+                      </FormControl>
+                      <FormDescription className="mt-1">
                         When payments begin
                       </FormDescription>
                       <FormMessage />
@@ -442,40 +680,47 @@ export default function EditLoanPage({ params }: { params: EditLoanParams }) {
                   control={form.control}
                   name="endDate"
                   render={({ field }) => (
-                    <FormItem className="flex flex-col">
+                    <FormItem className="flex flex-col gap-2">
                       <FormLabel>End Date</FormLabel>
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <FormControl>
-                            <Button
-                              variant={"outline"}
-                              className={cn(
-                                "pl-3 text-left font-normal",
-                                !field.value && "text-muted-foreground"
-                              )}
-                            >
-                              {field.value ? (
-                                format(field.value, "PPP")
-                              ) : (
-                                <span>Pick a date</span>
-                              )}
-                              <Calendar className="ml-auto h-4 w-4 opacity-50" />
-                            </Button>
-                          </FormControl>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0" align="start">
-                          <CalendarComponent
-                            mode="single"
-                            selected={field.value}
-                            onSelect={field.onChange}
-                            disabled={(date) =>
-                              date <= (form.getValues("startDate") || new Date())
-                            }
-                            initialFocus
-                          />
-                        </PopoverContent>
-                      </Popover>
-                      <FormDescription>
+                      <FormControl>
+                        <ThemeProvider theme={muiTheme}>
+                          <LocalizationProvider dateAdapter={AdapterDayjs}>
+                            <DatePicker
+                              label={undefined}
+                              value={field.value ? dayjs(field.value) : null}
+                              onChange={(date) => field.onChange(date ? date.toDate() : null)}
+                              slotProps={{
+                                textField: {
+                                  fullWidth: true,
+                                  variant: "outlined",
+                                  error: !!form.formState.errors.endDate,
+                                  helperText: form.formState.errors.endDate?.message,
+                                  InputProps: {
+                                    sx: {
+                                      borderRadius: "0.75rem",
+                                      boxShadow: "inset 0 2px 4px rgba(15, 23, 42, 0.08)",
+                                      "& .MuiOutlinedInput-input": {
+                                        padding: "0.5rem 2.5rem 0.5rem 1rem",
+                                        fontSize: "0.875rem",
+                                      },
+                                      "& .MuiOutlinedInput-notchedOutline": {
+                                        borderColor: "rgba(148, 163, 184, 0.35)",
+                                      },
+                                      "&:hover .MuiOutlinedInput-notchedOutline": {
+                                        borderColor: "rgba(148, 163, 184, 0.45)",
+                                      },
+                                      "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
+                                        borderColor: "rgba(59, 130, 246, 0.8)",
+                                      },
+                                    },
+                                  },
+                                },
+                              }}
+                            />
+                          </LocalizationProvider>
+                        </ThemeProvider>
+                      </FormControl>
+                      <FormDescription className="mt-1">
                         When payments end
                       </FormDescription>
                       <FormMessage />
@@ -483,108 +728,101 @@ export default function EditLoanPage({ params }: { params: EditLoanParams }) {
                   )}
                 />
               </div>
+            </CardContent>
+          </Card>
 
-              <FormField
-                control={form.control}
-                name="description"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Description</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Brief description of this payment plan" {...field} />
-                    </FormControl>
-                    <FormDescription>Optional additional information</FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="interestRate"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Interest Rate (% per annum)</FormLabel>
-                    <FormControl>
-                      <Input type="number" step="0.01" placeholder="0.00" {...field} />
-                    </FormControl>
-                    <FormDescription>Optional, leave at 0 for interest-free</FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="sendPaymentReminders"
-                render={({ field }) => (
-                  <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
-                    <FormControl>
-                      <Checkbox
-                        checked={field.value}
-                        onCheckedChange={field.onChange}
-                      />
-                    </FormControl>
-                    <div className="space-y-1 leading-none">
-                      <FormLabel>
-                        Send Payment Reminders
-                      </FormLabel>
+          <Card>
+            <CardHeader>
+              <CardTitle>Additional Terms</CardTitle>
+              <CardDescription>Configure optional payment plan settings</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="interestRate"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Annual Interest Rate (%)</FormLabel>
+                      <FormControl>
+                        <div className="relative">
+                          <Percent className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                          <Input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            max="100"
+                            placeholder="0.00"
+                            value={field.value}
+                            onChange={field.onChange}
+                            onWheel={(e) => e.currentTarget.blur()}
+                            className="pl-9 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                          />
+                        </div>
+                      </FormControl>
                       <FormDescription>
-                        Automatically notify customer about upcoming payments
+                        Annual interest rate applied per payment period (e.g., 5% annual = ~0.42% monthly for monthly payments)
                       </FormDescription>
-                    </div>
-                  </FormItem>
-                )}
-              />
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-              <div className="pt-4 border-t">
-                <h3 className="font-medium mb-3">Late Payment Settings</h3>
+                <FormField
+                  control={form.control}
+                  name="downPayment"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Down Payment Amount ($)</FormLabel>
+                      <FormControl>
+                        <div className="relative">
+                          <DollarSign className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                          <Input 
+                            type="number" 
+                            step="0.01" 
+                            placeholder="0.00" 
+                            value={field.value}
+                            onChange={field.onChange}
+                            onWheel={(e) => e.currentTarget.blur()}
+                            className="pl-9 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" 
+                          />
+                        </div>
+                      </FormControl>
+                      <FormDescription>Optional initial payment</FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="applyLateFee"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
+                      <FormControl>
+                        <Checkbox
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                          disabled={loadingSettings || !globalPaymentSettings.lateFeesEnabled}
+                        />
+                      </FormControl>
+                      <div className="space-y-1 leading-none">
+                        <FormLabel className={getMutedClassName(globalPaymentSettings.lateFeesEnabled)}>
+                          Apply Late Fees
+                        </FormLabel>
+                        <FormDescription>
+                          {getLateFeeDescription(loadingSettings, globalPaymentSettings.lateFeesEnabled)}
+                        </FormDescription>
+                      </div>
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              {form.watch("applyLateFee") && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="applyLateFee"
-                    render={({ field }) => (
-                      <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
-                        <FormControl>
-                          <Checkbox
-                            checked={field.value}
-                            onCheckedChange={field.onChange}
-                          />
-                        </FormControl>
-                        <div className="space-y-1 leading-none">
-                          <FormLabel>Apply Late Fees</FormLabel>
-                          <FormDescription>
-                            Apply fees for overdue payments
-                          </FormDescription>
-                        </div>
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="useDefaultLateFee"
-                    render={({ field }) => (
-                      <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
-                        <FormControl>
-                          <Checkbox
-                            checked={field.value}
-                            onCheckedChange={field.onChange}
-                            disabled={!form.watch("applyLateFee")}
-                          />
-                        </FormControl>
-                        <div className="space-y-1 leading-none">
-                          <FormLabel>Use Default Late Fee</FormLabel>
-                          <FormDescription>
-                            Use system-defined late fees
-                          </FormDescription>
-                        </div>
-                      </FormItem>
-                    )}
-                  />
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
                   <FormField
                     control={form.control}
                     name="lateFeeAmount"
@@ -597,14 +835,20 @@ export default function EditLoanPage({ params }: { params: EditLoanParams }) {
                             <Input
                               type="number"
                               step="0.01"
-                              placeholder="0.00"
-                              {...field}
-                              disabled={!form.watch("applyLateFee") || form.watch("useDefaultLateFee")}
-                              className="pl-9"
+                              placeholder={loadingSettings ? "Loading..." : `Global default: $${globalPaymentSettings.lateFeeFixedAmount}`}
+                              value={field.value}
+                              onChange={field.onChange}
+                              onWheel={(e) => e.currentTarget.blur()}
+                              className="pl-9 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                             />
                           </div>
                         </FormControl>
-                        <FormDescription>Fixed fee for late payments</FormDescription>
+                        <FormDescription>
+                          Fixed amount charged for late payments. {
+                            !loadingSettings &&
+                            `Global setting: $${globalPaymentSettings.lateFeeFixedAmount}. Set to 0 to use global setting.`
+                          }
+                        </FormDescription>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -615,46 +859,68 @@ export default function EditLoanPage({ params }: { params: EditLoanParams }) {
                     name="gracePeriodDays"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Grace Period (days)</FormLabel>
+                        <FormLabel>Grace Period (Days)</FormLabel>
                         <FormControl>
                           <Input
                             type="number"
-                            placeholder="0"
-                            {...field}
-                            disabled={!form.watch("applyLateFee") || form.watch("useDefaultGracePeriod")}
+                            value={field.value}
+                            onChange={field.onChange}
+                            onWheel={(e) => e.currentTarget.blur()}
+                            placeholder={loadingSettings ? "Loading..." : `Global default: ${globalPaymentSettings.gracePeriodDays}`}
+                            className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                           />
                         </FormControl>
-                        <FormDescription>Days before late fees apply</FormDescription>
+                        <FormDescription>
+                          Days before late fee is applied. {
+                            !loadingSettings &&
+                            `Global setting: ${globalPaymentSettings.gracePeriodDays} days. Set to 0 to use global setting.`
+                          }
+                        </FormDescription>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
                 </div>
+              )}
 
-                <div className="mt-4">
-                  <FormField
-                    control={form.control}
-                    name="useDefaultGracePeriod"
-                    render={({ field }) => (
-                      <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
-                        <FormControl>
-                          <Checkbox
-                            checked={field.value}
-                            onCheckedChange={field.onChange}
-                            disabled={!form.watch("applyLateFee")}
-                          />
-                        </FormControl>
-                        <div className="space-y-1 leading-none">
-                          <FormLabel>Use Default Grace Period</FormLabel>
-                          <FormDescription>
-                            Use system-defined grace period
-                          </FormDescription>
-                        </div>
-                      </FormItem>
-                    )}
-                  />
-                </div>
-              </div>
+              <FormField
+                control={form.control}
+                name="sendPaymentReminders"
+                render={({ field }) => (
+                  <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
+                    <FormControl>
+                      <Checkbox
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                        disabled={loadingSettings || !reminderSettings.autoSendReminders}
+                      />
+                    </FormControl>
+                    <div className="space-y-1 leading-none">
+                      <FormLabel className={getMutedClassName(reminderSettings.autoSendReminders)}>
+                        Send Payment Reminders
+                      </FormLabel>
+                      <FormDescription>
+                        {getReminderDescription(loadingSettings, reminderSettings.autoSendReminders)}
+                      </FormDescription>
+                    </div>
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Description</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Optional description of the payment plan" {...field} />
+                    </FormControl>
+                    <FormDescription>Additional notes about this payment plan</FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
             </CardContent>
             <CardFooter className="border-t p-6 flex flex-col sm:flex-row gap-4 items-center">
               <Button
@@ -680,4 +946,4 @@ export default function EditLoanPage({ params }: { params: EditLoanParams }) {
       </Form>
     </div>
   )
-} 
+}

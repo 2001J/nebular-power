@@ -4,8 +4,11 @@ import com.solar.core_services.energy_monitoring.model.SolarInstallation;
 import com.solar.core_services.energy_monitoring.repository.SolarInstallationRepository;
 import com.solar.core_services.service_control.dto.ServiceStatusDTO;
 import com.solar.core_services.service_control.dto.ServiceStatusUpdateRequest;
+import com.solar.core_services.service_control.exception.InvalidServiceStateException;
+import com.solar.core_services.service_control.exception.ServiceStatusNotFoundException;
 import com.solar.core_services.service_control.model.ServiceStatus;
 import com.solar.core_services.service_control.repository.ServiceStatusRepository;
+import com.solar.core_services.service_control.service.DeviceCommandService;
 import com.solar.core_services.service_control.service.ServiceStatusService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -16,7 +19,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -26,6 +31,7 @@ public class ServiceStatusServiceImpl implements ServiceStatusService {
 
     private final ServiceStatusRepository serviceStatusRepository;
     private final SolarInstallationRepository installationRepository;
+    private final DeviceCommandService deviceCommandService;
 
     @Override
     @Transactional
@@ -35,14 +41,15 @@ public class ServiceStatusServiceImpl implements ServiceStatusService {
         try {
             // Try to find existing active status
             ServiceStatus status = serviceStatusRepository.findActiveByInstallationId(installationId)
-                    .orElseThrow(() -> new RuntimeException("No active service status found for installation: " + installationId));
+                    .orElseThrow(() -> new ServiceStatusNotFoundException("No active service status found for installation: " + installationId));
             
             return ServiceStatusDTO.fromEntity(status);
+        } catch (ServiceStatusNotFoundException e) {
+            log.warn("Service status not found for installation {}: {}", installationId, e.getMessage());
+            throw e;
         } catch (Exception e) {
             log.error("Error getting current status for installation {}: {}", installationId, e.getMessage());
-            
-            // Rethrow the exception instead of creating a fallback
-            throw new RuntimeException("Error retrieving current status: " + e.getMessage(), e);
+            throw new IllegalStateException("Error retrieving current status: " + e.getMessage(), e);
         }
     }
 
@@ -60,12 +67,12 @@ public class ServiceStatusServiceImpl implements ServiceStatusService {
     public ServiceStatusDTO updateServiceStatus(Long installationId, ServiceStatusUpdateRequest request, String username) {
         log.info("Updating service status for installation {} to {}", installationId, request.getStatus());
         
-        SolarInstallation installation = installationRepository.findById(installationId)
-                .orElseThrow(() -> new RuntimeException("Installation not found with ID: " + installationId));
+    SolarInstallation installation = installationRepository.findById(installationId)
+        .orElseThrow(() -> new ServiceStatusNotFoundException("Installation not found with ID: " + installationId));
         
         // Deactivate current status
-        ServiceStatus currentStatus = serviceStatusRepository.findActiveByInstallationId(installationId)
-                .orElse(null);
+    ServiceStatus currentStatus = serviceStatusRepository.findActiveByInstallationId(installationId)
+        .orElse(null);
         
         if (currentStatus != null) {
             currentStatus.setActive(false);
@@ -78,8 +85,6 @@ public class ServiceStatusServiceImpl implements ServiceStatusService {
         newStatus.setStatus(request.getStatus());
         newStatus.setStatusReason(request.getStatusReason());
         newStatus.setUpdatedBy(username != null ? username : request.getUpdatedBy());
-        newStatus.setScheduledChange(request.getScheduledChange());
-        newStatus.setScheduledTime(request.getScheduledTime());
         newStatus.setActive(true);
         
         newStatus = serviceStatusRepository.save(newStatus);
@@ -93,12 +98,27 @@ public class ServiceStatusServiceImpl implements ServiceStatusService {
     public ServiceStatusDTO suspendServiceForPayment(Long installationId, String reason, String username) {
         log.info("Suspending service for payment issues for installation {}", installationId);
         
+        // Validate current status - can only suspend from ACTIVE
+        ServiceStatus currentStatus = serviceStatusRepository.findActiveByInstallationId(installationId)
+                .orElseThrow(() -> new ServiceStatusNotFoundException("No active service status found for installation: " + installationId));
+        
+        if (currentStatus.getStatus() != ServiceStatus.ServiceState.ACTIVE) {
+            throw new InvalidServiceStateException(
+                "Cannot suspend service that is not ACTIVE. Current status: " + currentStatus.getStatus()
+            );
+        }
+        
         ServiceStatusUpdateRequest request = new ServiceStatusUpdateRequest();
         request.setStatus(ServiceStatus.ServiceState.SUSPENDED_PAYMENT);
         request.setStatusReason(reason);
         request.setUpdatedBy(username);
         
-        return updateServiceStatus(installationId, request, username);
+        ServiceStatusDTO result = updateServiceStatus(installationId, request, username);
+        
+        // Send device command to actually suspend the service
+        sendSuspendCommand(installationId, reason, "payment", username);
+        
+        return result;
     }
 
     @Override
@@ -106,12 +126,27 @@ public class ServiceStatusServiceImpl implements ServiceStatusService {
     public ServiceStatusDTO suspendServiceForSecurity(Long installationId, String reason, String username) {
         log.info("Suspending service for security issues for installation {}", installationId);
         
+        // Validate current status - can only suspend from ACTIVE
+        ServiceStatus currentStatus = serviceStatusRepository.findActiveByInstallationId(installationId)
+                .orElseThrow(() -> new ServiceStatusNotFoundException("No active service status found for installation: " + installationId));
+        
+        if (currentStatus.getStatus() != ServiceStatus.ServiceState.ACTIVE) {
+            throw new InvalidServiceStateException(
+                "Cannot suspend service that is not ACTIVE. Current status: " + currentStatus.getStatus()
+            );
+        }
+        
         ServiceStatusUpdateRequest request = new ServiceStatusUpdateRequest();
         request.setStatus(ServiceStatus.ServiceState.SUSPENDED_SECURITY);
         request.setStatusReason(reason);
         request.setUpdatedBy(username);
         
-        return updateServiceStatus(installationId, request, username);
+        ServiceStatusDTO result = updateServiceStatus(installationId, request, username);
+        
+        // Send device command to actually suspend the service
+        sendSuspendCommand(installationId, reason, "security", username);
+        
+        return result;
     }
 
     @Override
@@ -119,105 +154,67 @@ public class ServiceStatusServiceImpl implements ServiceStatusService {
     public ServiceStatusDTO suspendServiceForMaintenance(Long installationId, String reason, String username) {
         log.info("Suspending service for maintenance for installation {}", installationId);
         
+        // Validate current status - can only suspend from ACTIVE
+        ServiceStatus currentStatus = serviceStatusRepository.findActiveByInstallationId(installationId)
+                .orElseThrow(() -> new ServiceStatusNotFoundException("No active service status found for installation: " + installationId));
+        
+        if (currentStatus.getStatus() != ServiceStatus.ServiceState.ACTIVE) {
+            throw new InvalidServiceStateException(
+                "Cannot suspend service that is not ACTIVE. Current status: " + currentStatus.getStatus()
+            );
+        }
+        
         ServiceStatusUpdateRequest request = new ServiceStatusUpdateRequest();
         request.setStatus(ServiceStatus.ServiceState.SUSPENDED_MAINTENANCE);
         request.setStatusReason(reason);
         request.setUpdatedBy(username);
         
-        return updateServiceStatus(installationId, request, username);
+        ServiceStatusDTO result = updateServiceStatus(installationId, request, username);
+        
+        // Send device command to actually suspend the service
+        sendSuspendCommand(installationId, reason, "maintenance", username);
+        
+        // Also send ENABLE_MAINTENANCE_MODE device command
+        sendEnableMaintenanceModeCommand(installationId, username);
+        
+        return result;
     }
 
     @Override
     @Transactional
     public ServiceStatusDTO restoreService(Long installationId, String reason, String username) {
-        log.info("Restoring service for installation {}", installationId);
+        log.info("Restoring service for installation {} by {}", installationId, username);
         
-        ServiceStatusUpdateRequest request = new ServiceStatusUpdateRequest();
-        request.setStatus(ServiceStatus.ServiceState.ACTIVE);
-        request.setStatusReason(reason);
-        request.setUpdatedBy(username);
-        
-        return updateServiceStatus(installationId, request, username);
-    }
-
-    @Override
-    @Transactional
-    public ServiceStatusDTO scheduleStatusChange(Long installationId, ServiceStatus.ServiceState targetStatus, 
-                                               String reason, LocalDateTime scheduledTime, String username) {
-        log.info("Scheduling status change to {} for installation {} at {}", targetStatus, installationId, scheduledTime);
-        
-        if (scheduledTime.isBefore(LocalDateTime.now())) {
-            throw new RuntimeException("Scheduled time must be in the future");
-        }
-        
+        // Validate current status - can only restore from suspended states
         ServiceStatus currentStatus = serviceStatusRepository.findActiveByInstallationId(installationId)
-                .orElseThrow(() -> new RuntimeException("No active service status found for installation: " + installationId));
+                .orElseThrow(() -> new ServiceStatusNotFoundException("No active service status found for installation: " + installationId));
         
-        currentStatus.setScheduledChange(targetStatus);
-        currentStatus.setScheduledTime(scheduledTime);
-        currentStatus.setStatusReason(reason);
-        currentStatus.setUpdatedBy(username);
-        currentStatus.setUpdatedAt(LocalDateTime.now());
-        
-        currentStatus = serviceStatusRepository.save(currentStatus);
-        log.info("Status change scheduled for installation {}: {} at {}", 
-                installationId, targetStatus, scheduledTime);
-        
-        return ServiceStatusDTO.fromEntity(currentStatus);
-    }
-
-    @Override
-    @Transactional
-    public ServiceStatusDTO cancelScheduledChange(Long installationId, String username) {
-        log.info("Cancelling scheduled status change for installation {}", installationId);
-        
-        ServiceStatus currentStatus = serviceStatusRepository.findActiveByInstallationId(installationId)
-                .orElseThrow(() -> new RuntimeException("No active service status found for installation: " + installationId));
-        
-        if (currentStatus.getScheduledChange() == null) {
-            throw new RuntimeException("No scheduled status change found for installation: " + installationId);
+        if (!currentStatus.getStatus().name().startsWith("SUSPENDED_")) {
+            throw new InvalidServiceStateException(
+                "Cannot restore service that is not SUSPENDED. Current status: " + currentStatus.getStatus()
+            );
         }
         
-        currentStatus.setScheduledChange(null);
-        currentStatus.setScheduledTime(null);
-        currentStatus.setStatusReason("Scheduled change cancelled by " + username);
-        currentStatus.setUpdatedBy(username);
-        currentStatus.setUpdatedAt(LocalDateTime.now());
+        // Check if restoring from maintenance - if so, send DISABLE_MAINTENANCE_MODE command
+        boolean wasMaintenanceMode = currentStatus.getStatus() == ServiceStatus.ServiceState.SUSPENDED_MAINTENANCE;
         
-        currentStatus = serviceStatusRepository.save(currentStatus);
-        log.info("Scheduled status change cancelled for installation {}", installationId);
+        // Update status to ACTIVE immediately
+        ServiceStatusUpdateRequest restoreRequest = new ServiceStatusUpdateRequest();
+        restoreRequest.setStatus(ServiceStatus.ServiceState.ACTIVE);
+        restoreRequest.setStatusReason("Restoration requested by " + username + ": " + reason);
+        restoreRequest.setUpdatedBy(username);
         
-        return ServiceStatusDTO.fromEntity(currentStatus);
-    }
-
-    @Override
-    @Transactional
-    public void processScheduledChanges() {
-        log.info("Processing scheduled status changes");
+        ServiceStatusDTO result = updateServiceStatus(installationId, restoreRequest, username);
         
-        List<ServiceStatus> scheduledChanges = serviceStatusRepository
-                .findByScheduledChangeIsNotNullAndScheduledTimeBefore(LocalDateTime.now());
+        // Send device command to restore the service
+        sendRestoreCommand(installationId, reason, username);
         
-        log.info("Found {} scheduled changes to process", scheduledChanges.size());
-        
-        for (ServiceStatus status : scheduledChanges) {
-            try {
-                ServiceStatusUpdateRequest request = new ServiceStatusUpdateRequest();
-                request.setStatus(status.getScheduledChange());
-                request.setStatusReason("Scheduled change from " + status.getStatus() + " to " + 
-                        status.getScheduledChange() + " at " + status.getScheduledTime());
-                request.setUpdatedBy("SYSTEM");
-                
-                updateServiceStatus(status.getInstallation().getId(), request, "SYSTEM");
-                
-                log.info("Processed scheduled change for installation {}: {} -> {}", 
-                        status.getInstallation().getId(), status.getStatus(), status.getScheduledChange());
-            } catch (Exception e) {
-                log.error("Error processing scheduled change for installation {}: {}", 
-                        status.getInstallation().getId(), e.getMessage());
-                // Continue with other scheduled changes even if one fails
-            }
+        // If restoring from maintenance, also send DISABLE_MAINTENANCE_MODE command
+        if (wasMaintenanceMode) {
+            sendDisableMaintenanceModeCommand(installationId, username);
         }
+        
+        return result;
     }
 
     @Override
@@ -286,57 +283,243 @@ public class ServiceStatusServiceImpl implements ServiceStatusService {
         return results;
     }
 
+    /**
+     * @deprecated Device must report its own status when it starts. Admin cannot "start" a device.
+     * Wait for device to come online and report its status.
+     */
+    @Deprecated(since = "2.0", forRemoval = true)
     @Override
     @Transactional
     public ServiceStatusDTO startService(Long installationId, String username) {
-        log.info("Starting service for installation {}", installationId);
-        
-        ServiceStatusUpdateRequest request = new ServiceStatusUpdateRequest();
-        request.setStatus(ServiceStatus.ServiceState.ACTIVE);
-        request.setStatusReason("Service started by " + username);
-        request.setUpdatedBy(username);
-        
-        // Create a device command to actually start the service
-        // This would typically send a command to the device
-        // For this implementation, we'll just update the status
-        
-        return updateServiceStatus(installationId, request, username);
+        throw new UnsupportedOperationException(
+            "Direct start is not supported. Device must report its own status when it starts. " +
+            "Wait for device to come online."
+        );
     }
 
+    /**
+     * @deprecated Use suspendService() instead. Stopping requires a suspension reason.
+     */
+    @Deprecated(since = "2.0", forRemoval = true)
     @Override
     @Transactional
     public ServiceStatusDTO stopService(Long installationId, String username) {
-        log.info("Stopping service for installation {}", installationId);
-        
-        ServiceStatusUpdateRequest request = new ServiceStatusUpdateRequest();
-        request.setStatus(ServiceStatus.ServiceState.SUSPENDED_MAINTENANCE);
-        request.setStatusReason("Service stopped by " + username);
-        request.setUpdatedBy(username);
-        
-        // Create a device command to actually stop the service
-        // This would typically send a command to the device
-        // For this implementation, we'll just update the status
-        
-        return updateServiceStatus(installationId, request, username);
+        throw new UnsupportedOperationException(
+            "Direct stop is not supported. Use suspendService() to suspend with a specific reason " +
+            "(PAYMENT, SECURITY, or MAINTENANCE)."
+        );
     }
 
     @Override
     @Transactional
     public ServiceStatusDTO restartService(Long installationId, String username) {
-        log.info("Restarting service for installation {}", installationId);
+        log.info("Restarting service for installation {} by {}", installationId, username);
         
-        // First stop the service
-        stopService(installationId, username);
+        // Set status to TRANSITIONING
+        ServiceStatusUpdateRequest stopRequest = new ServiceStatusUpdateRequest();
+        stopRequest.setStatus(ServiceStatus.ServiceState.TRANSITIONING);
+        stopRequest.setStatusReason("Service restart requested by " + username);
+        stopRequest.setUpdatedBy(username);
         
-        // Then start it again after a short delay
+        ServiceStatusDTO stoppedStatus = updateServiceStatus(installationId, stopRequest, username);
+        
+        // Send restart command to device - device will report back when restart is complete
+        sendRestartCommand(installationId, "Admin restart requested", username);
+        
+        // Note: Device should report its status as ACTIVE once restart completes
+        // No need to schedule restoration - let the device tell us when it's ready
+        
+        return stoppedStatus;
+    }
+
+    @Override
+    @Transactional
+    public void processDeviceStatusReport(com.solar.core_services.service_control.dto.DeviceStatusReportDTO statusReport) {
+        Long installationId = statusReport.getInstallationId();
+        
+        log.info("Processing device status report for installation {}: status={}, reason={}", 
+                installationId, 
+                statusReport.getStatus(), 
+                statusReport.getReason());
+        
+        // Get the installation entity
+        com.solar.core_services.energy_monitoring.model.SolarInstallation installation = 
+            installationRepository.findById(installationId)
+                .orElseThrow(() -> new ServiceStatusNotFoundException("Installation not found: " + installationId));
+        
+        // Get current service status
+        ServiceStatus currentStatus = serviceStatusRepository.findByInstallationAndActiveTrue(installation)
+            .orElseGet(() -> {
+                // Create new status if it doesn't exist
+                log.info("Creating new service status for installation {}", installationId);
+                ServiceStatus newStatus = new ServiceStatus();
+                newStatus.setInstallation(installation);
+                newStatus.setStatus(ServiceStatus.ServiceState.PENDING);
+                newStatus.setUpdatedBy("DEVICE");
+                newStatus.setActive(true);
+                return newStatus;
+            });
+        
+        // Parse the reported status
+        ServiceStatus.ServiceState reportedState;
         try {
-            // Simulate a delay for restart
-            Thread.sleep(500);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
+            reportedState = ServiceStatus.ServiceState.valueOf(statusReport.getStatus());
+        } catch (IllegalArgumentException e) {
+            log.error("Invalid status reported by device: {}", statusReport.getStatus());
+            throw new IllegalArgumentException("Invalid service status: " + statusReport.getStatus());
         }
         
-        // Start the service again
-        return startService(installationId, username);
+        // Update the status if it has changed
+        boolean statusChanged = currentStatus.getStatus() != reportedState;
+        
+        if (statusChanged) {
+            log.info("Device reported status change for installation {}: {} -> {}", 
+                    installationId, 
+                    currentStatus.getStatus(), 
+                    reportedState);
+            
+            // Update status
+            currentStatus.setStatus(reportedState);
+            currentStatus.setStatusReason(statusReport.getReason());
+            currentStatus.setUpdatedBy("DEVICE");
+            
+            // Save the updated status
+            serviceStatusRepository.save(currentStatus);
+            
+            log.info("Successfully updated service status from device report for installation {}", 
+                    installationId);
+        } else {
+            log.debug("Device status report matches current status for installation {}: {}", 
+                     installationId, 
+                     reportedState);
+            
+            // Touch the record to update the timestamp
+            currentStatus.setUpdatedBy("DEVICE");
+            serviceStatusRepository.save(currentStatus);
+        }
+        
+        // Store device health information if provided
+        if (statusReport.getDeviceHealth() != null && !statusReport.getDeviceHealth().isEmpty()) {
+            log.debug("Received device health data for installation {}: {}", 
+                     installationId, 
+                     statusReport.getDeviceHealth());
+            // In a real implementation, you might want to store this in a separate table
+            // or use it for monitoring/alerting purposes
+        }
+    }
+    
+    /**
+     * Send SUSPEND_SERVICE command to device
+     */
+    private void sendSuspendCommand(Long installationId, String reason, String type, String username) {
+        Map<String, Object> parameters = new HashMap<>();
+        parameters.put("reason", reason);
+        parameters.put("type", type);
+        parameters.put("requestedBy", username);
+        
+        try {
+            deviceCommandService.sendCommand(
+                installationId,
+                "SUSPEND_SERVICE",
+                parameters,
+                username != null ? username : "SYSTEM"
+            );
+            log.info("Sent SUSPEND_SERVICE command to installation {} (type: {})", installationId, type);
+        } catch (Exception e) {
+            log.error("Failed to send SUSPEND_SERVICE command to installation {}: {}", 
+                     installationId, e.getMessage(), e);
+            // Don't throw - database is already updated
+        }
+    }
+    
+    /**
+     * Send RESTORE_SERVICE command to device
+     */
+    private void sendRestoreCommand(Long installationId, String reason, String username) {
+        Map<String, Object> parameters = new HashMap<>();
+        parameters.put("reason", reason);
+        parameters.put("requestedBy", username);
+        
+        try {
+            deviceCommandService.sendCommand(
+                installationId,
+                "RESTORE_SERVICE",
+                parameters,
+                username != null ? username : "SYSTEM"
+            );
+            log.info("Sent RESTORE_SERVICE command to installation {}", installationId);
+        } catch (Exception e) {
+            log.error("Failed to send RESTORE_SERVICE command to installation {}: {}", 
+                     installationId, e.getMessage(), e);
+            // Don't throw - database is already updated
+        }
+    }
+    
+    /**
+     * Send RESTART_SERVICE command to device
+     */
+    private void sendRestartCommand(Long installationId, String reason, String username) {
+        Map<String, Object> parameters = new HashMap<>();
+        parameters.put("reason", reason);
+        parameters.put("requestedBy", username);
+        
+        try {
+            deviceCommandService.sendCommand(
+                installationId,
+                "RESTART_SERVICE",
+                parameters,
+                username != null ? username : "SYSTEM"
+            );
+            log.info("Sent RESTART_SERVICE command to installation {}", installationId);
+        } catch (Exception e) {
+            log.error("Failed to send RESTART_SERVICE command to installation {}: {}", 
+                     installationId, e.getMessage(), e);
+            // Don't throw - database is already updated
+        }
+    }
+    
+    /**
+     * Send ENABLE_MAINTENANCE_MODE command to device when suspending for maintenance
+     */
+    private void sendEnableMaintenanceModeCommand(Long installationId, String username) {
+        Map<String, Object> parameters = new HashMap<>();
+        parameters.put("requestedBy", username);
+        // Could add duration_hours if needed in the future
+        
+        try {
+            deviceCommandService.sendCommand(
+                installationId,
+                "ENABLE_MAINTENANCE_MODE",
+                parameters,
+                username != null ? username : "SYSTEM"
+            );
+            log.info("Sent ENABLE_MAINTENANCE_MODE command to installation {}", installationId);
+        } catch (Exception e) {
+            log.error("Failed to send ENABLE_MAINTENANCE_MODE command to installation {}: {}", 
+                     installationId, e.getMessage(), e);
+            // Don't throw - database is already updated
+        }
+    }
+    
+    /**
+     * Send DISABLE_MAINTENANCE_MODE command to device when restoring from maintenance
+     */
+    private void sendDisableMaintenanceModeCommand(Long installationId, String username) {
+        Map<String, Object> parameters = new HashMap<>();
+        parameters.put("requestedBy", username);
+        
+        try {
+            deviceCommandService.sendCommand(
+                installationId,
+                "DISABLE_MAINTENANCE_MODE",
+                parameters,
+                username != null ? username : "SYSTEM"
+            );
+            log.info("Sent DISABLE_MAINTENANCE_MODE command to installation {}", installationId);
+        } catch (Exception e) {
+            log.error("Failed to send DISABLE_MAINTENANCE_MODE command to installation {}: {}", 
+                     installationId, e.getMessage(), e);
+            // Don't throw - database is already updated
+        }
     }
 } 

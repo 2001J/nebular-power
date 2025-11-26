@@ -50,7 +50,7 @@ describe('paymentComplianceApi additional endpoints', () => {
     getMock.mockResolvedValueOnce({ data: { id: 'pl1' } });
     await paymentComplianceApi.getPaymentPlanById('pl1');
     putMock.mockResolvedValueOnce({ data: {} });
-    await paymentComplianceApi.updatePaymentPlan('pl1', {});
+    await paymentComplianceApi.updatePaymentPlan('c1', 'pl1', {});
     postMock.mockResolvedValueOnce({ data: {} });
     await paymentComplianceApi.createPaymentPlan('c1', {});
 

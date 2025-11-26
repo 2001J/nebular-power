@@ -40,15 +40,12 @@ describe('serviceControlApi additional endpoints', () => {
     await expect(serviceControlApi.updateServiceStatus('i1', { status: 'BAD' })).rejects.toThrow('Invalid status value');
   });
 
-  test('suspend/restore/schedule/cancel', async () => {
+  test('suspend/restore', async () => {
     postMock.mockResolvedValue({ data: { ok: true } });
     await serviceControlApi.suspendServiceForPayment('i1', 'r');
     await serviceControlApi.suspendServiceForSecurity('i1', 'r');
     await serviceControlApi.suspendServiceForMaintenance('i1', {});
     await serviceControlApi.restoreService('i1', 'r');
-    await serviceControlApi.scheduleStatusChange('i1', 'ACTIVE', 'r', '2025-01-01T00:00:00Z');
-    deleteMock.mockResolvedValue({ data: { ok: true } });
-    await serviceControlApi.cancelScheduledChange('i1');
   });
 
   test('command endpoints', async () => {

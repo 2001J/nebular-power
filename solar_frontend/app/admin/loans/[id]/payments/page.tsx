@@ -1,8 +1,7 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import React, { useState, useEffect, useCallback, use } from "react"
 import { useRouter } from "next/navigation"
-import React from "react"
 import {
   ArrowLeft,
   Calendar,
@@ -34,9 +33,9 @@ interface PaymentParams {
   id: string;
 }
 
-export default function LoanPaymentsPage({ params }: { params: PaymentParams }) {
+export default function LoanPaymentsPage({ params }: { params: Promise<PaymentParams> }) {
   const router = useRouter()
-  const loanId = params.id
+  const { id: loanId } = use(params)
   const [loan, setLoan] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [payments, setPayments] = useState<any[]>([])

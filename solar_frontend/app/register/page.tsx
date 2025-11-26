@@ -3,10 +3,14 @@
 import Link from "next/link"
 import { ShieldAlert, ArrowLeft } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { ModeToggle } from "@/components/mode-toggle"
 
 export default function RegisterPageAccessDenied() {
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-gray-50 p-4">
+      <div className="absolute top-4 right-4">
+        <ModeToggle />
+      </div>
       <div className="w-full max-w-md space-y-8 rounded-lg border bg-white p-6 shadow-sm">
         <div className="flex flex-col items-center justify-center space-y-2 text-center">
           <div className="rounded-full bg-red-100 p-3">

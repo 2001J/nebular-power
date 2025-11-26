@@ -77,6 +77,7 @@ public class PaymentPlanRepositoryTest {
                 .endDate(now.plusMonths(22))
                 .status(PaymentPlan.PaymentPlanStatus.ACTIVE)
                 .interestRate(new BigDecimal("5.0"))
+                .downPayment(new BigDecimal("2000.00"))
                 .lateFeeAmount(new BigDecimal("25.00"))
                 .gracePeriodDays(7)
                 .build();
@@ -94,6 +95,7 @@ public class PaymentPlanRepositoryTest {
                 .endDate(now.plusYears(3))
                 .status(PaymentPlan.PaymentPlanStatus.ACTIVE)
                 .interestRate(new BigDecimal("4.5"))
+                .downPayment(new BigDecimal("1500.00"))
                 .lateFeeAmount(new BigDecimal("30.00"))
                 .gracePeriodDays(10)
                 .build();
@@ -111,6 +113,7 @@ public class PaymentPlanRepositoryTest {
                 .endDate(now.minusYears(1))
                 .status(PaymentPlan.PaymentPlanStatus.COMPLETED)
                 .interestRate(new BigDecimal("5.5"))
+                .downPayment(new BigDecimal("500.00"))
                 .lateFeeAmount(new BigDecimal("20.00"))
                 .gracePeriodDays(5)
                 .build();

@@ -2,11 +2,34 @@
 # -*- coding: utf-8 -*-
 
 """
-Solar Installation Simulator Main Script
+Solar Installation Simulator (Raspberry Pi Role)
 
-This script coordinates all the simulation modules to create a comprehensive
-simulation of a solar installation with real-time data, heartbeats, tamper events,
-and command handling capabilities.
+This script simulates a complete solar installation's monitoring and control system
+running on a Raspberry Pi device. The Pi is responsible for:
+
+1. MONITORING: Collecting data from solar panels, inverter, battery
+2. CONTROL: Receiving and executing commands from the backend server
+3. REPORTING: Sending status updates, energy data, and diagnostics
+
+IMPORTANT: The Pi simulates the ENTIRE installation including:
+- Solar Panels (generation based on time/weather)
+- Smart Inverter (DC→AC conversion, power management)
+- Battery Storage (charging/discharging)
+- Combiner Box (panel string management)
+- Monitoring Device (Raspberry Pi itself)
+
+The distinction between SERVICE STATUS and HARDWARE STATUS:
+- SERVICE STATUS (ACTIVE/SUSPENDED): Controls customer power delivery
+- HARDWARE STATUS: Solar panels, inverter, battery keep working regardless
+  
+Example: When service is SUSPENDED for payment:
+  ✅ Solar panels still generate power
+  ✅ Battery still charges
+  ✅ Inverter still operates (autonomous mode)
+  ✅ Pi still monitors and reports data
+  ❌ Customer doesn't receive electricity (service cut)
+
+The Pi itself can be REBOOTED (2-5 min offline) but hardware continues autonomously.
 """
 
 import os
@@ -18,6 +41,7 @@ import logging
 import argparse
 import threading
 import signal
+import select
 from datetime import datetime
 
 # Import simulator modules
@@ -25,6 +49,7 @@ from energy_simulator import EnergySimulator
 from heartbeat_simulator import HeartbeatSimulator
 from tamper_simulator import TamperSimulator
 from command_handler import CommandHandler
+from status_reporter import StatusReporter
 from auth_helper import init_auth_helper, get_auth_helper
 
 # Set up logging
@@ -96,6 +121,11 @@ class SolarSimulator:
                 "enabled": True,
                 "polling_interval": 10,    # Seconds between command polls
                 "success_rate": 0.95       # Command success rate (0.0-1.0)
+            },
+            "status_reporter": {
+                "enabled": True,
+                "interval": 30,            # Seconds between status reports
+                "force_report_interval": 300  # Force report every 5 minutes
             }
         }
         
@@ -208,6 +238,30 @@ class SolarSimulator:
         else:
             self.command_handler = None
             logger.info("Command handling disabled")
+        
+        # Initialize Status Reporter
+        if config["status_reporter"]["enabled"] and self.command_handler:
+            self.status_reporter = StatusReporter(
+                installation_id=installation_id,
+                server_url=server_url,
+                command_handler=self.command_handler
+            )
+            
+            # Set status reporter parameters
+            self.status_reporter.report_interval = config["status_reporter"]["interval"]
+            self.status_reporter.force_report_count = config["status_reporter"]["force_report_interval"] // config["status_reporter"]["interval"]
+            
+            # Set bidirectional reference so command handler can trigger immediate reports
+            self.command_handler.status_reporter = self.status_reporter
+        else:
+            self.status_reporter = None
+            if not self.command_handler:
+                logger.warning("Status reporter disabled: requires command handler")
+            else:
+                logger.info("Status reporter disabled")
+        
+        # Scheduled executor has been removed - schedule functionality is no longer supported
+        self.scheduled_executor = None
     
     def start(self):
         """Start all simulation threads."""
@@ -274,6 +328,18 @@ class SolarSimulator:
             self.threads.append(command_thread)
             logger.info("Command handler started")
         
+        # Start status reporter thread
+        if self.status_reporter:
+            status_thread = threading.Thread(
+                target=self.status_reporter.run_simulation,
+                args=(is_running,),
+                name="StatusReporter"
+            )
+            status_thread.daemon = True
+            status_thread.start()
+            self.threads.append(status_thread)
+            logger.info("Status reporter started")
+        
         logger.info(f"Simulation running with {len(self.threads)} active components")
         
         # Register signal handlers for clean shutdown
@@ -291,11 +357,13 @@ class SolarSimulator:
         # Signal threads to stop
         self._stop_event.set()
         
-        # Wait for threads to finish (with timeout)
+        # Wait for threads to finish (with 15 second timeout to allow HTTP requests to complete)
+        # Threads may be in the middle of HTTP requests with 5-10 second timeouts
         for thread in self.threads:
-            thread.join(timeout=2.0)
+            thread.join(timeout=15.0)
             if thread.is_alive():
                 logger.warning(f"Thread {thread.name} did not terminate gracefully")
+                logger.warning("This may indicate a hung HTTP request or blocking operation")
         
         self.threads = []
         self.running = False
@@ -362,38 +430,74 @@ def main():
     # Interactive mode for manual tamper events
     print("\nSolar Installation Simulator is running...")
     print("Press Ctrl+C to stop the simulation")
-    print("Enter 'p' to trigger physical tamper, 'v' for voltage, 'c' for connection, 'l' for location, or 'q' to quit")
+    print("Commands: p=physical tamper, v=voltage, c=connection, l=location, q=quit")
+    print()
     
     try:
-        # Keep the main thread alive with interactive input
+        # Keep the main thread alive with non-blocking input
         while simulator.running:
             try:
-                user_input = input("> ").lower()
-                if user_input == 'q':
-                    print("Stopping simulation...")
-                    simulator.stop()
-                    break
-                elif user_input == 'p':
-                    print("Triggering physical tamper event...")
-                    simulator.trigger_tamper_event("physical")
-                elif user_input == 'v':
-                    print("Triggering voltage tamper event...")
-                    simulator.trigger_tamper_event("voltage")
-                elif user_input == 'c':
-                    print("Triggering connection tamper event...")
-                    simulator.trigger_tamper_event("connection")
-                elif user_input == 'l':
-                    print("Triggering location tamper event...")
-                    simulator.trigger_tamper_event("location")
+                # Use non-blocking input for Unix-like systems
+                if sys.platform != 'win32' and hasattr(select, 'select'):
+                    # Check if input is available (non-blocking)
+                    ready, _, _ = select.select([sys.stdin], [], [], 0.5)
+                    if ready:
+                        user_input = sys.stdin.readline().strip().lower()
+                        if user_input == 'q':
+                            print("Stopping simulation...")
+                            simulator.stop()
+                            break
+                        elif user_input == 'p':
+                            print("Triggering physical tamper event...")
+                            simulator.trigger_tamper_event("physical")
+                        elif user_input == 'v':
+                            print("Triggering voltage tamper event...")
+                            simulator.trigger_tamper_event("voltage")
+                        elif user_input == 'c':
+                            print("Triggering connection tamper event...")
+                            simulator.trigger_tamper_event("connection")
+                        elif user_input == 'l':
+                            print("Triggering location tamper event...")
+                            simulator.trigger_tamper_event("location")
+                        elif user_input:
+                            print(f"Unknown command: {user_input}")
+                            print("Commands: p=physical, v=voltage, c=connection, l=location, q=quit")
+                else:
+                    # Windows fallback - blocking input but with shorter timeout handling
+                    # This is less ideal but necessary for Windows compatibility
+                    user_input = input("> ").lower()
+                    if user_input == 'q':
+                        print("Stopping simulation...")
+                        simulator.stop()
+                        break
+                    elif user_input == 'p':
+                        print("Triggering physical tamper event...")
+                        simulator.trigger_tamper_event("physical")
+                    elif user_input == 'v':
+                        print("Triggering voltage tamper event...")
+                        simulator.trigger_tamper_event("voltage")
+                    elif user_input == 'c':
+                        print("Triggering connection tamper event...")
+                        simulator.trigger_tamper_event("connection")
+                    elif user_input == 'l':
+                        print("Triggering location tamper event...")
+                        simulator.trigger_tamper_event("location")
+                    elif user_input:
+                        print(f"Unknown command: {user_input}")
             except EOFError:
                 # Handle EOF (Ctrl+D)
+                print("\nEOF detected, stopping simulation...")
+                break
+            except Exception as e:
+                logger.error(f"Error reading user input: {e}")
                 break
     except KeyboardInterrupt:
         # Handle Ctrl+C
-        pass
+        print("\nKeyboard interrupt received, stopping simulation...")
     finally:
         # Ensure simulation is stopped
-        simulator.stop()
+        if simulator.running:
+            simulator.stop()
 
 if __name__ == "__main__":
     main()

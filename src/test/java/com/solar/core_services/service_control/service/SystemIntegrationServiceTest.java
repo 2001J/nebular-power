@@ -48,6 +48,9 @@ public class SystemIntegrationServiceTest {
     @Mock
     private OperationalLogService operationalLogService;
 
+    @Mock
+    private DeviceTransmissionService deviceTransmissionService;
+
     @InjectMocks
     private SystemIntegrationServiceImpl systemIntegrationService;
 
@@ -89,7 +92,8 @@ public class SystemIntegrationServiceTest {
         systemIntegrationService.processDeviceHeartbeat(heartbeatRequest);
         
         // Verify
-        verify(systemMonitoringService).processHeartbeat(eq(heartbeatRequest));
+        verify(systemMonitoringService).processHeartbeat(heartbeatRequest);
+        verify(deviceTransmissionService).updateDeviceHeartbeat(1L);
     }
 
     @Test
@@ -99,7 +103,7 @@ public class SystemIntegrationServiceTest {
         DeviceCommandDTO result = systemIntegrationService.processCommandResponse(commandResponse);
         
         // Verify
-        verify(deviceCommandService).processCommandResponse(eq(commandResponse));
+        verify(deviceCommandService).processCommandResponse(commandResponse);
         
         // Check result
         assertThat(result).isNotNull();

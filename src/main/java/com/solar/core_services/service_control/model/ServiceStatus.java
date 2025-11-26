@@ -31,13 +31,6 @@ public class ServiceStatus {
     @Column(length = 100)
     private String updatedBy;
 
-    @Enumerated(EnumType.STRING)
-    @Column
-    private ServiceState scheduledChange;
-
-    @Column
-    private LocalDateTime scheduledTime;
-
     @Column(length = 500)
     private String statusReason;
 

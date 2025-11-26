@@ -85,93 +85,224 @@ class ServiceStatusServiceImplTest {
 
     @Test
     void startService_ShouldUpdateStatusToActive() {
-        // Arrange
-        when(installationRepository.findById(101L)).thenReturn(Optional.of(testInstallation));
-        when(serviceStatusRepository.findActiveByInstallationId(101L)).thenReturn(Optional.of(testStatus));
-        when(serviceStatusRepository.save(any(ServiceStatus.class))).thenAnswer(i -> {
-            ServiceStatus status = i.getArgument(0);
-            status.setId(2L); // New status record
-            return status;
-        });
-
-        // Act
-        ServiceStatusDTO result = serviceStatusService.startService(101L, "admin");
-
-        // Assert
-        assertNotNull(result);
-        assertEquals(101L, result.getInstallationId());
-        assertEquals(ServiceStatus.ServiceState.ACTIVE, result.getStatus());
-        assertTrue(result.getStatusReason().contains("started by admin"));
-        assertEquals("admin", result.getUpdatedBy());
+        // Act & Assert - startService is now deprecated and throws UnsupportedOperationException
+        UnsupportedOperationException exception = assertThrows(
+            UnsupportedOperationException.class,
+            () -> serviceStatusService.startService(101L, "admin")
+        );
         
-        verify(serviceStatusRepository).findActiveByInstallationId(101L);
-        verify(installationRepository).findById(101L);
-        // Verify the old status was deactivated and a new one was created
-        verify(serviceStatusRepository, times(2)).save(any(ServiceStatus.class));
+        assertTrue(exception.getMessage().contains("Direct start is not supported"));
+        assertTrue(exception.getMessage().contains("Device must report its own status"));
     }
 
     @Test
     void stopService_ShouldUpdateStatusToSuspendedMaintenance() {
-        // Arrange
-        when(installationRepository.findById(101L)).thenReturn(Optional.of(testInstallation));
-        when(serviceStatusRepository.findActiveByInstallationId(101L)).thenReturn(Optional.of(testStatus));
-        when(serviceStatusRepository.save(any(ServiceStatus.class))).thenAnswer(i -> {
-            ServiceStatus status = i.getArgument(0);
-            status.setId(2L); // New status record
-            return status;
-        });
-
-        // Act
-        ServiceStatusDTO result = serviceStatusService.stopService(101L, "admin");
-
-        // Assert
-        assertNotNull(result);
-        assertEquals(101L, result.getInstallationId());
-        assertEquals(ServiceStatus.ServiceState.SUSPENDED_MAINTENANCE, result.getStatus());
-        assertTrue(result.getStatusReason().contains("stopped by admin"));
-        assertEquals("admin", result.getUpdatedBy());
+        // Act & Assert - stopService is now deprecated and throws UnsupportedOperationException
+        UnsupportedOperationException exception = assertThrows(
+            UnsupportedOperationException.class,
+            () -> serviceStatusService.stopService(101L, "admin")
+        );
         
-        verify(serviceStatusRepository).findActiveByInstallationId(101L);
-        verify(installationRepository).findById(101L);
-        // Verify the old status was deactivated and a new one was created
-        verify(serviceStatusRepository, times(2)).save(any(ServiceStatus.class));
+        assertTrue(exception.getMessage().contains("Direct stop is not supported"));
+        assertTrue(exception.getMessage().contains("suspendService()"));
     }
 
     @Test
     void restartService_ShouldStopThenStartService() {
-        // Arrange - Set up for both stop and start operations
+        // Arrange - Restart now sets TRANSITIONING and schedules restoration
         when(installationRepository.findById(101L)).thenReturn(Optional.of(testInstallation));
-        when(serviceStatusRepository.findActiveByInstallationId(101L)).thenReturn(Optional.of(testStatus));
+        when(serviceStatusRepository.findActiveByInstallationId(101L))
+            .thenReturn(Optional.of(testStatus))  // First call for the initial check
+            .thenReturn(Optional.of(testStatus)); // Second call might happen during update
         when(serviceStatusRepository.save(any(ServiceStatus.class))).thenAnswer(i -> {
             ServiceStatus status = i.getArgument(0);
-            if (!status.isActive()) {
-                // For the deactivated old status
-                return status;
-            } else if (status.getStatus() == ServiceStatus.ServiceState.SUSPENDED_MAINTENANCE) {
-                // For the stop operation
-                status.setId(2L);
-                return status;
-            } else {
-                // For the start operation
-                status.setId(3L);
-                return status;
-            }
+            status.setId(2L);
+            return status;
         });
 
         // Act
         ServiceStatusDTO result = serviceStatusService.restartService(101L, "admin");
 
-        // Assert
+        // Assert - Now expects TRANSITIONING status, not ACTIVE
         assertNotNull(result);
         assertEquals(101L, result.getInstallationId());
-        assertEquals(ServiceStatus.ServiceState.ACTIVE, result.getStatus());
-        assertTrue(result.getStatusReason().contains("started by admin"));
+        assertEquals(ServiceStatus.ServiceState.TRANSITIONING, result.getStatus());
+        assertTrue(result.getStatusReason().contains("Service restart requested"));
         assertEquals("admin", result.getUpdatedBy());
         
-        // Verify multiple service status repository interactions due to restart
-        verify(serviceStatusRepository, atLeast(2)).findActiveByInstallationId(101L);
-        verify(installationRepository, atLeast(2)).findById(101L);
-        // Several saves: deactivate status + new status for stop, deactivate status + new status for start
-        verify(serviceStatusRepository, atLeast(3)).save(any(ServiceStatus.class));
+        // Verify the status was queried at least once
+        verify(serviceStatusRepository, atLeastOnce()).findActiveByInstallationId(101L);
+        verify(installationRepository, atLeast(1)).findById(101L);
+        // Verify save was called for the TRANSITIONING status and for scheduling
+        verify(serviceStatusRepository, atLeast(2)).save(any(ServiceStatus.class));
+    }
+
+    // ============================================================
+    // Device Status Report Tests (NEW)
+    // ============================================================
+
+    @Test
+    void testProcessDeviceStatusReport_NewInstallation_CreatesStatus() {
+        // Arrange
+        com.solar.core_services.service_control.dto.DeviceStatusReportDTO reportDTO = 
+            com.solar.core_services.service_control.dto.DeviceStatusReportDTO.builder()
+                .installationId(101L)
+                .status("ACTIVE")
+                .reason("Device initialized")
+                .timestamp(LocalDateTime.now())
+                .lastCommandId(123L)
+                .build();
+
+        when(installationRepository.findById(101L)).thenReturn(Optional.of(testInstallation));
+        when(serviceStatusRepository.findByInstallationAndActiveTrue(testInstallation))
+            .thenReturn(Optional.empty()); // No existing status
+        when(serviceStatusRepository.save(any(ServiceStatus.class))).thenAnswer(invocation -> {
+            ServiceStatus saved = invocation.getArgument(0);
+            saved.setId(1L);
+            return saved;
+        });
+
+        // Act
+        serviceStatusService.processDeviceStatusReport(reportDTO);
+
+        // Assert
+        verify(installationRepository).findById(101L);
+        verify(serviceStatusRepository).findByInstallationAndActiveTrue(testInstallation);
+        verify(serviceStatusRepository).save(argThat(status -> 
+            status.getStatus() == ServiceStatus.ServiceState.ACTIVE &&
+            status.getStatusReason().equals("Device initialized") &&
+            status.getUpdatedBy().equals("DEVICE")
+        ));
+    }
+
+    @Test
+    void testProcessDeviceStatusReport_StatusChanged_UpdatesStatus() {
+        // Arrange
+        testStatus.setStatus(ServiceStatus.ServiceState.PENDING);
+        testStatus.setActive(true);
+
+        com.solar.core_services.service_control.dto.DeviceStatusReportDTO reportDTO = 
+            com.solar.core_services.service_control.dto.DeviceStatusReportDTO.builder()
+                .installationId(101L)
+                .status("ACTIVE")
+                .reason("Service started")
+                .timestamp(LocalDateTime.now())
+                .lastCommandId(456L)
+                .build();
+
+        when(installationRepository.findById(101L)).thenReturn(Optional.of(testInstallation));
+        when(serviceStatusRepository.findByInstallationAndActiveTrue(testInstallation))
+            .thenReturn(Optional.of(testStatus));
+        when(serviceStatusRepository.save(any(ServiceStatus.class))).thenReturn(testStatus);
+
+        // Act
+        serviceStatusService.processDeviceStatusReport(reportDTO);
+
+        // Assert
+        verify(serviceStatusRepository).save(argThat(status -> 
+            status.getStatus() == ServiceStatus.ServiceState.ACTIVE &&
+            status.getStatusReason().equals("Service started") &&
+            status.getUpdatedBy().equals("DEVICE")
+        ));
+    }
+
+    @Test
+    void testProcessDeviceStatusReport_StatusUnchanged_TouchesRecord() {
+        // Arrange
+        testStatus.setStatus(ServiceStatus.ServiceState.ACTIVE);
+        testStatus.setStatusReason("Already active");
+        testStatus.setActive(true);
+
+        com.solar.core_services.service_control.dto.DeviceStatusReportDTO reportDTO = 
+            com.solar.core_services.service_control.dto.DeviceStatusReportDTO.builder()
+                .installationId(101L)
+                .status("ACTIVE")
+                .reason("Already active")
+                .timestamp(LocalDateTime.now())
+                .build();
+
+        when(installationRepository.findById(101L)).thenReturn(Optional.of(testInstallation));
+        when(serviceStatusRepository.findByInstallationAndActiveTrue(testInstallation))
+            .thenReturn(Optional.of(testStatus));
+        when(serviceStatusRepository.save(any(ServiceStatus.class))).thenReturn(testStatus);
+
+        // Act
+        serviceStatusService.processDeviceStatusReport(reportDTO);
+
+        // Assert
+        verify(serviceStatusRepository).save(argThat(status -> 
+            status.getUpdatedBy().equals("DEVICE")
+        ));
+    }
+
+    @Test
+    void testProcessDeviceStatusReport_InstallationNotFound_ThrowsException() {
+        // Arrange
+        com.solar.core_services.service_control.dto.DeviceStatusReportDTO reportDTO = 
+            com.solar.core_services.service_control.dto.DeviceStatusReportDTO.builder()
+                .installationId(999L)
+                .status("ACTIVE")
+                .timestamp(LocalDateTime.now())
+                .build();
+
+        when(installationRepository.findById(999L)).thenReturn(Optional.empty());
+
+        // Act & Assert
+        assertThrows(RuntimeException.class, () -> {
+            serviceStatusService.processDeviceStatusReport(reportDTO);
+        });
+
+        verify(serviceStatusRepository, never()).save(any());
+    }
+
+    @Test
+    void testProcessDeviceStatusReport_InvalidStatus_ThrowsException() {
+        // Arrange
+        com.solar.core_services.service_control.dto.DeviceStatusReportDTO reportDTO = 
+            com.solar.core_services.service_control.dto.DeviceStatusReportDTO.builder()
+                .installationId(101L)
+                .status("INVALID_STATUS")
+                .timestamp(LocalDateTime.now())
+                .build();
+
+        when(installationRepository.findById(101L)).thenReturn(Optional.of(testInstallation));
+        when(serviceStatusRepository.findByInstallationAndActiveTrue(testInstallation))
+            .thenReturn(Optional.of(testStatus));
+
+        // Act & Assert
+        assertThrows(IllegalArgumentException.class, () -> {
+            serviceStatusService.processDeviceStatusReport(reportDTO);
+        });
+
+        verify(serviceStatusRepository, never()).save(any());
+    }
+
+    @Test
+    void testProcessDeviceStatusReport_WithDeviceHealth() {
+        // Arrange
+        java.util.Map<String, Object> deviceHealth = new java.util.HashMap<>();
+        deviceHealth.put("cpu_usage", 75.5);
+        deviceHealth.put("memory_usage", 82.3);
+        deviceHealth.put("temperature", 55.0);
+
+        com.solar.core_services.service_control.dto.DeviceStatusReportDTO reportDTO = 
+            com.solar.core_services.service_control.dto.DeviceStatusReportDTO.builder()
+                .installationId(101L)
+                .status("ACTIVE")
+                .reason("Normal operation")
+                .timestamp(LocalDateTime.now())
+                .deviceHealth(deviceHealth)
+                .build();
+
+        when(installationRepository.findById(101L)).thenReturn(Optional.of(testInstallation));
+        when(serviceStatusRepository.findByInstallationAndActiveTrue(testInstallation))
+            .thenReturn(Optional.of(testStatus));
+        when(serviceStatusRepository.save(any(ServiceStatus.class))).thenReturn(testStatus);
+
+        // Act
+        serviceStatusService.processDeviceStatusReport(reportDTO);
+
+        // Assert - Should process successfully even with health data
+        verify(serviceStatusRepository).save(any(ServiceStatus.class));
     }
 } 

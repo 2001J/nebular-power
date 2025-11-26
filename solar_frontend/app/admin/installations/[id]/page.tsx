@@ -44,6 +44,7 @@ import {
   ComposedChart,
   Bar,
 } from "@/components/ui/direct-recharts"
+import { formatChartYAxis, formatChartTooltip, getMonthlyXAxisConfig } from "@/lib/energyUtils"
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -234,33 +235,28 @@ export default function InstallationDetailPage() {
 
           setPerformance(perfMetrics)
 
-          // Prefer aggregated series for accurate charts
+          // FIXED: Fetch pre-aggregated series data directly (values are already kWh)
           try {
-            const { start, end, bucket } = getRangeAndBucket(timeRange)
-            const series = await energyApi.getAggregatedSeries(id, start.toISOString(), end.toISOString(), bucket)
+            const series = await energyApi.getInstallationSeriesForTimeRange(
+              id,
+              timeRange as 'day' | 'week' | 'month' | 'year'
+            )
+            
             if (Array.isArray(series) && series.length > 0) {
-              // Map aggregated buckets to pseudo-readings (kWh -> W by *1000 so later /1000 returns kWh)
-              const pseudoReadings = series.map((pt: any) => ({
-                timestamp: pt.bucketStart,
-                powerGenerationWatts: (pt.generationKWh || 0) * 1000,
-                powerConsumptionWatts: (pt.consumptionKWh || 0) * 1000,
-              }))
-              const chartData = processEnergyData(pseudoReadings, timeRange, dashboardData)
-              setEnergyData(chartData)
-            } else if (dashboardData.recentReadings && dashboardData.recentReadings.length > 0) {
-              const chartData = processEnergyData(dashboardData.recentReadings, timeRange, dashboardData)
+              // Data is already in kWh - use directly without conversion or normalization
+              const chartData = transformSeriesForChart(series, timeRange)
+              console.log('Chart data from aggregated series:', {
+                points: chartData.length,
+                totalGeneration: chartData.reduce((s, p) => s + p.generation, 0).toFixed(3) + ' kWh',
+                totalConsumption: chartData.reduce((s, p) => s + p.consumption, 0).toFixed(3) + ' kWh'
+              })
               setEnergyData(chartData)
             } else {
               setEnergyData([])
             }
           } catch (e) {
-            console.warn('Aggregated series fetch failed, falling back to dashboard readings')
-            if (dashboardData.recentReadings && dashboardData.recentReadings.length > 0) {
-              const chartData = processEnergyData(dashboardData.recentReadings, timeRange, dashboardData)
-              setEnergyData(chartData)
-            } else {
-              setEnergyData([])
-            }
+            console.warn('Aggregated series fetch failed:', e)
+            setEnergyData([])
           }
 
           // Fetch recent security events
@@ -390,10 +386,58 @@ export default function InstallationDetailPage() {
   }
 
   // Transform readings to chart data
+  /**
+   * Transform pre-aggregated series data to chart format
+   * IMPORTANT: Values from backend are ALREADY in kWh - use directly!
+   */
+  const transformSeriesForChart = (
+    series: any[],
+    timeRangeType: string
+  ): ChartDataPoint[] => {
+    if (!series || series.length === 0) {
+      return []
+    }
+
+    // Get bucket label based on time range
+    // Backend sends LocalDateTime (no timezone) - display as-is
+    const getBucketLabel = (bucketStart: string): string => {
+      const date = new Date(bucketStart)
+      
+      switch (timeRangeType) {
+        case 'day':
+          return `${date.getHours()}:00`
+        case 'week':
+          return ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][date.getDay()]
+        case 'month':
+          return date.getDate().toString()
+        case 'year':
+          return ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][date.getMonth()]
+        default:
+          return bucketStart
+      }
+    }
+
+    // Sort by timestamp
+    const sorted = [...series].sort(
+      (a, b) => new Date(a.bucketStart).getTime() - new Date(b.bucketStart).getTime()
+    )
+
+    // Map to chart format - values are ALREADY kWh!
+    return sorted.map(point => ({
+      name: getBucketLabel(point.bucketStart),
+      generation: point.generationKWh || 0,
+      consumption: point.consumptionKWh || 0
+    }))
+  }
+
+  /**
+   * @deprecated Use transformSeriesForChart instead
+   * Legacy function kept for reference
+   */
   const processEnergyData = (
     readings: any[],
     timeRangeType: string,
-    dashboardData: any
+    _dashboardData: any
   ) => {
     if (!readings || readings.length === 0) {
       return []
@@ -404,52 +448,7 @@ export default function InstallationDetailPage() {
       (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
     )
 
-    // Get expected totals from the dashboard data for normalization
-    const expectedProduction = {
-      day: dashboardData?.todayGenerationKWh || 0,
-      week: dashboardData?.weekToDateGenerationKWh || 0,
-      month: dashboardData?.monthToDateGenerationKWh || 0,
-      year: dashboardData?.yearToDateGenerationKWh || 0
-    }
-
-    const expectedConsumption = {
-      day: dashboardData?.todayConsumptionKWh || 0,
-      week: dashboardData?.weekToDateConsumptionKWh || 0,
-      month: dashboardData?.monthToDateConsumptionKWh || 0,
-      year: dashboardData?.yearToDateConsumptionKWh || 0
-    }
-
-    // Calculate the total energy from readings to normalize later
-    const totalProductionFromReadings = sortedReadings.reduce(
-      (sum, reading) => sum + (reading.powerGenerationWatts / 1000), 0
-    )
-
-    const totalConsumptionFromReadings = sortedReadings.reduce(
-      (sum, reading) => sum + (reading.powerConsumptionWatts / 1000), 0
-    )
-
-    // Calculate normalization factors
-    const productionNormalizationFactor = 
-      totalProductionFromReadings > 0 && expectedProduction[timeRangeType] > 0 
-        ? expectedProduction[timeRangeType] / totalProductionFromReadings
-        : 1
-
-    const consumptionNormalizationFactor = 
-      totalConsumptionFromReadings > 0 && expectedConsumption[timeRangeType] > 0 
-        ? expectedConsumption[timeRangeType] / totalConsumptionFromReadings
-        : 1
-
-    console.log('Installation normalization factors:', {
-      timeRangeType,
-      productionFactor: productionNormalizationFactor,
-      consumptionFactor: consumptionNormalizationFactor,
-      expectedProduction: expectedProduction[timeRangeType],
-      expectedConsumption: expectedConsumption[timeRangeType],
-      totalProductionFromReadings,
-      totalConsumptionFromReadings
-    })
-
-    // Process data based on time range
+    // Process data based on time range (simplified, no normalization)
     if (timeRangeType === "day") {
       // Group by hour for day
       const hourlyData: Record<string, { name: string; generation: number; consumption: number; count: number }> = {}
@@ -472,12 +471,12 @@ export default function InstallationDetailPage() {
         const hourKey = `${hour}:00`
 
         if (hourlyData[hourKey]) {
-          // Normalize the values using the calculated factors
-          const normalizedGeneration = (reading.powerGenerationWatts / 1000) * productionNormalizationFactor
-          const normalizedConsumption = (reading.powerConsumptionWatts / 1000) * consumptionNormalizationFactor
+          // Use kWh values directly if available
+          const gen = (reading.generationKWh ?? reading.totalGenerationKWh ?? (reading.powerGenerationWatts / 1000)) || 0
+          const con = (reading.consumptionKWh ?? reading.totalConsumptionKWh ?? (reading.powerConsumptionWatts / 1000)) || 0
 
-          hourlyData[hourKey].generation += normalizedGeneration
-          hourlyData[hourKey].consumption += normalizedConsumption
+          hourlyData[hourKey].generation += gen
+          hourlyData[hourKey].consumption += con
           hourlyData[hourKey].count += 1
         }
       })
@@ -512,15 +511,15 @@ export default function InstallationDetailPage() {
         if (!reading.timestamp) return
 
         const date = new Date(reading.timestamp)
-        const day = date.getDay() // 0-6, Sunday is 0
+        const day = date.getDay()
         const dayName = dayNames[day]
 
-        // Normalize the values using the calculated factors
-        const normalizedGeneration = (reading.powerGenerationWatts / 1000) * productionNormalizationFactor
-        const normalizedConsumption = (reading.powerConsumptionWatts / 1000) * consumptionNormalizationFactor
+        // Use kWh values directly if available
+        const gen = (reading.generationKWh ?? reading.totalGenerationKWh ?? (reading.powerGenerationWatts / 1000)) || 0
+        const con = (reading.consumptionKWh ?? reading.totalConsumptionKWh ?? (reading.powerConsumptionWatts / 1000)) || 0
 
-        dailyData[dayName].generation += normalizedGeneration
-        dailyData[dayName].consumption += normalizedConsumption
+        dailyData[dayName].generation += gen
+        dailyData[dayName].consumption += con
         dailyData[dayName].count += 1
       })
 
@@ -552,12 +551,12 @@ export default function InstallationDetailPage() {
         const day = date.getDate()
         const dayStr = day.toString()
 
-        // Normalize the values using the calculated factors
-        const normalizedGeneration = (reading.powerGenerationWatts / 1000) * productionNormalizationFactor
-        const normalizedConsumption = (reading.powerConsumptionWatts / 1000) * consumptionNormalizationFactor
+        // Use kWh values directly if available
+        const gen = (reading.generationKWh ?? reading.totalGenerationKWh ?? (reading.powerGenerationWatts / 1000)) || 0
+        const con = (reading.consumptionKWh ?? reading.totalConsumptionKWh ?? (reading.powerConsumptionWatts / 1000)) || 0
 
-        monthData[dayStr].generation += normalizedGeneration
-        monthData[dayStr].consumption += normalizedConsumption
+        monthData[dayStr].generation += gen
+        monthData[dayStr].consumption += con
         monthData[dayStr].count += 1
       })
 
@@ -598,12 +597,12 @@ export default function InstallationDetailPage() {
         const month = date.getMonth()
         const monthName = monthNames[month]
 
-        // Normalize the values using the calculated factors
-        const normalizedGeneration = (reading.powerGenerationWatts / 1000) * productionNormalizationFactor
-        const normalizedConsumption = (reading.powerConsumptionWatts / 1000) * consumptionNormalizationFactor
+        // Use kWh values directly if available
+        const gen = (reading.generationKWh ?? reading.totalGenerationKWh ?? (reading.powerGenerationWatts / 1000)) || 0
+        const con = (reading.consumptionKWh ?? reading.totalConsumptionKWh ?? (reading.powerConsumptionWatts / 1000)) || 0
 
-        yearData[monthName].generation += normalizedGeneration
-        yearData[monthName].consumption += normalizedConsumption
+        yearData[monthName].generation += gen
+        yearData[monthName].consumption += con
         yearData[monthName].count += 1
       })
 
@@ -891,7 +890,7 @@ export default function InstallationDetailPage() {
               </div>
             ) : (
               <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <h3 className="text-sm font-medium text-muted-foreground">Customer</h3>
                     <p className="text-base">{installation?.username || "N/A"}</p>
@@ -901,7 +900,7 @@ export default function InstallationDetailPage() {
                     <p className="text-base">{installation?.installationDate ? new Date(installation.installationDate).toLocaleDateString() : "N/A"}</p>
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <h3 className="text-sm font-medium text-muted-foreground">Location</h3>
                     <p className="text-base">{installation?.location || "N/A"}</p>
@@ -914,7 +913,7 @@ export default function InstallationDetailPage() {
                     </div>
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <h3 className="text-sm font-medium text-muted-foreground">Capacity</h3>
                     <p className="text-base">{installation?.installedCapacityKW ? `${installation.installedCapacityKW} kW` : "N/A"}</p>
@@ -928,7 +927,7 @@ export default function InstallationDetailPage() {
                     </Badge>
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <h3 className="text-sm font-medium text-muted-foreground">Customer ID</h3>
                     <p className="text-base">{installation?.userId || "N/A"}</p>
@@ -965,7 +964,7 @@ export default function InstallationDetailPage() {
               </div>
             ) : (
               <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <h3 className="text-sm font-medium text-muted-foreground">Efficiency</h3>
                     <div className="flex items-center gap-2 mt-1">
@@ -999,7 +998,7 @@ export default function InstallationDetailPage() {
                     </div>
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <h3 className="text-sm font-medium text-muted-foreground">Today's Yield</h3>
                     <p className="text-xl font-bold">{performance.dailyYield.toFixed(2)} kWh</p>
@@ -1054,49 +1053,79 @@ export default function InstallationDetailPage() {
               <Chart>
                 <ChartContainer>
                   <ResponsiveContainer width="100%" height={300}>
-                    <AreaChart data={energyData} margin={{ top: 10, right: 10, left: 10, bottom: 20 }}>
+                    <AreaChart data={energyData} margin={{ top: 20, right: 20, left: 20, bottom: 20 }}>
                       <defs>
                         <linearGradient id="colorGeneration" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#10b981" stopOpacity={0.8}/>
-                          <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                          <stop offset="0%" stopColor="hsl(142, 76%, 46%)" stopOpacity={0.9} />
+                          <stop offset="50%" stopColor="hsl(142, 76%, 36%)" stopOpacity={0.8} />
+                          <stop offset="100%" stopColor="hsl(142, 76%, 26%)" stopOpacity={0.6} />
                         </linearGradient>
+                        <filter id="generationGlow">
+                          <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+                          <feMerge>
+                            <feMergeNode in="coloredBlur"/>
+                            <feMergeNode in="SourceGraphic"/>
+                          </feMerge>
+                        </filter>
                       </defs>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                      <CartesianGrid strokeDasharray="3 3" className="stroke-muted/30" vertical={false} />
                       <XAxis 
-                        dataKey="name" 
-                        {...(timeRange === "month" ? {
-                          interval: 2,
-                          angle: -45,
-                          textAnchor: 'end',
-                          height: 60
-                        } : {})}
+                        dataKey="name"
+                        className="text-xs"
+                        tickLine={false}
+                        axisLine={false}
+                        tick={{ fill: 'hsl(var(--muted-foreground))' }}
+                        {...(timeRange === "day" ? { interval: 2 } :
+                           timeRange === "month" ? getMonthlyXAxisConfig() : {})}
                       />
-                      <YAxis 
-                        tickFormatter={(value) => {
-                          if (value === 0) return '0';
-                          if (value < 0.001) return value.toFixed(4);
-                          if (value < 1) return value.toFixed(3);
-                          if (value >= 1000) return `${(value / 1000).toFixed(1)}k`;
-                          return value.toFixed(1);
+                      <YAxis
+                        width={60}
+                        className="text-xs"
+                        tickLine={false}
+                        axisLine={false}
+                        tick={{ fill: 'hsl(var(--muted-foreground))' }}
+                        tickFormatter={formatChartYAxis}
+                      />
+                      <Tooltip 
+                        content={({ active, payload, label }) => {
+                          if (active && payload && payload.length) {
+                            return (
+                              <div className="rounded-lg border bg-background/95 backdrop-blur-sm p-3 shadow-lg">
+                                <p className="font-semibold text-sm mb-2">{label}</p>
+                                {payload.map((entry: any, index: number) => (
+                                  <div key={index} className="flex items-center gap-2">
+                                    <div
+                                      className="w-3 h-3 rounded-full"
+                                      style={{
+                                        backgroundColor: entry.color,
+                                        boxShadow: `0 0 8px ${entry.color}40`
+                                      }}
+                                    />
+                                    <span className="text-xs text-muted-foreground">{entry.name}:</span>
+                                    <span className="text-sm font-medium">
+                                      {formatChartTooltip(entry.value)}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            );
+                          }
+                          return null;
                         }}
-                        label={{ value: 'kW', angle: -90, position: 'insideLeft', offset: 0 }}
                       />
-                      <Tooltip formatter={(value: any) => {
-                        if (typeof value === 'number') {
-                          if (value === 0) return ['0 kW', 'Generation'];
-                          if (value < 0.01) return [`${value.toFixed(5)} kW`, 'Generation'];
-                          if (value < 1) return [`${value.toFixed(3)} kW`, 'Generation'];
-                          return [`${value.toFixed(2)} kW`, 'Generation'];
-                        }
-                        return [`${value} kW`, 'Generation'];
-                      }} />
+                      <Legend 
+                        wrapperStyle={{ paddingTop: '20px' }}
+                        iconType="circle"
+                      />
                       <Area 
                         type="monotone" 
                         dataKey="generation" 
-                        stroke="#10b981" 
+                        stroke="hsl(142, 76%, 36%)" 
+                        strokeWidth={2}
                         fillOpacity={1} 
                         fill="url(#colorGeneration)" 
                         name="Energy Generation"
+                        style={{ filter: 'url(#generationGlow)' }}
                       />
                     </AreaChart>
                   </ResponsiveContainer>
@@ -1133,50 +1162,80 @@ export default function InstallationDetailPage() {
               <Chart>
                 <ChartContainer>
                   <ResponsiveContainer width="100%" height={300}>
-                    <AreaChart data={energyData} margin={{ top: 10, right: 10, left: 10, bottom: 20 }}>
+                    <AreaChart data={energyData} margin={{ top: 20, right: 20, left: 20, bottom: 20 }}>
                       <defs>
                         <linearGradient id="colorConsumption" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#ef4444" stopOpacity={0.8}/>
-                          <stop offset="95%" stopColor="#ef4444" stopOpacity={0}/>
+                          <stop offset="0%" stopColor="hsl(0, 84%, 70%)" stopOpacity={0.9} />
+                          <stop offset="50%" stopColor="hsl(0, 84%, 60%)" stopOpacity={0.7} />
+                          <stop offset="100%" stopColor="hsl(0, 84%, 50%)" stopOpacity={0.2} />
                         </linearGradient>
+                        <filter id="consumptionGlowInst">
+                          <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+                          <feMerge>
+                            <feMergeNode in="coloredBlur"/>
+                            <feMergeNode in="SourceGraphic"/>
+                          </feMerge>
+                        </filter>
                       </defs>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                      <CartesianGrid strokeDasharray="3 3" className="stroke-muted/30" vertical={false} />
                       <XAxis 
-                        dataKey="name" 
-                        {...(timeRange === "month" ? {
-                          interval: 2,
-                          angle: -45,
-                          textAnchor: 'end',
-                          height: 60
-                        } : {})}
+                        dataKey="name"
+                        className="text-xs"
+                        tickLine={false}
+                        axisLine={false}
+                        tick={{ fill: 'hsl(var(--muted-foreground))' }}
+                        {...(timeRange === "day" ? { interval: 2 } :
+                           timeRange === "month" ? getMonthlyXAxisConfig() : {})}
                       />
-                      <YAxis 
-                        tickFormatter={(value) => {
-                          if (value === 0) return '0';
-                          if (value < 0.001) return value.toFixed(4);
-                          if (value < 1) return value.toFixed(3);
-                          if (value >= 1000) return `${(value / 1000).toFixed(1)}k`;
-                          return value.toFixed(1);
-                        }}
-                        label={{ value: 'kW', angle: -90, position: 'insideLeft', offset: 0 }}
+                      <YAxis
+                        width={60}
+                        className="text-xs"
+                        tickLine={false}
+                        axisLine={false}
+                        tick={{ fill: 'hsl(var(--muted-foreground))' }}
+                        tickFormatter={formatChartYAxis}
                         domain={['auto', 'auto']}
                       />
-                      <Tooltip formatter={(value: any) => {
-                        if (typeof value === 'number') {
-                          if (value === 0) return ['0 kW', 'Consumption'];
-                          if (value < 0.01) return [`${value.toFixed(5)} kW`, 'Consumption'];
-                          if (value < 1) return [`${value.toFixed(3)} kW`, 'Consumption'];
-                          return [`${value.toFixed(2)} kW`, 'Consumption'];
-                        }
-                        return [`${value} kW`, 'Consumption'];
-                      }} />
+                      <Tooltip 
+                        content={({ active, payload, label }) => {
+                          if (active && payload && payload.length) {
+                            return (
+                              <div className="rounded-lg border bg-background/95 backdrop-blur-sm p-3 shadow-lg">
+                                <p className="font-semibold text-sm mb-2">{label}</p>
+                                {payload.map((entry: any, index: number) => (
+                                  <div key={index} className="flex items-center gap-2">
+                                    <div
+                                      className="w-3 h-3 rounded-full"
+                                      style={{
+                                        backgroundColor: entry.color,
+                                        boxShadow: `0 0 8px ${entry.color}40`
+                                      }}
+                                    />
+                                    <span className="text-xs text-muted-foreground">{entry.name}:</span>
+                                    <span className="text-sm font-medium">
+                                      {formatChartTooltip(entry.value)}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            );
+                          }
+                          return null;
+                        }}
+                      />
+                      <Legend 
+                        wrapperStyle={{ paddingTop: '20px' }}
+                        iconType="circle"
+                      />
                       <Area 
                         type="monotone" 
                         dataKey="consumption" 
-                        stroke="#ef4444" 
+                        stroke="hsl(0, 84%, 60%)" 
+                        strokeWidth={2}
                         fillOpacity={1} 
                         fill="url(#colorConsumption)" 
                         name="Energy Consumption"
+                        style={{ filter: 'url(#consumptionGlowInst)' }}
                       />
                     </AreaChart>
                   </ResponsiveContainer>
@@ -1212,73 +1271,117 @@ export default function InstallationDetailPage() {
             <Chart>
               <ChartContainer>
                 <ResponsiveContainer width="100%" height={300}>
-                  <ComposedChart data={energyData} margin={{ top: 10, right: 70, left: 70, bottom: 20 }}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                  <ComposedChart data={energyData} margin={{ top: 20, right: 20, left: 20, bottom: 20 }}>
+                    <defs>
+                      <linearGradient id="productionGradientInst" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="hsl(142, 76%, 46%)" stopOpacity={0.9} />
+                        <stop offset="50%" stopColor="hsl(142, 76%, 36%)" stopOpacity={0.8} />
+                        <stop offset="100%" stopColor="hsl(142, 76%, 26%)" stopOpacity={0.6} />
+                      </linearGradient>
+                      <filter id="glowInst">
+                        <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+                        <feMerge>
+                          <feMergeNode in="coloredBlur"/>
+                          <feMergeNode in="SourceGraphic"/>
+                        </feMerge>
+                      </filter>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted/30" vertical={false} />
                     <XAxis 
-                      dataKey="name" 
-                      {...(timeRange === "month" ? {
-                        interval: 2,
-                        angle: -45,
-                        textAnchor: 'end',
-                        height: 60
-                      } : {})}
+                      dataKey="name"
+                      className="text-xs"
+                      tickLine={false}
+                      axisLine={false}
+                      tick={{ fill: 'hsl(var(--muted-foreground))' }}
+                      {...(timeRange === "day" ? { interval: 2 } :
+                         timeRange === "month" ? getMonthlyXAxisConfig() : {})}
                     />
                     <YAxis 
                       yAxisId="left"
                       orientation="left"
                       width={60}
-                      tickFormatter={(value) => {
-                        if (value === 0) return '0';
-                        if (value < 0.001) return value.toFixed(4);
-                        if (value < 1) return value.toFixed(3);
-                        if (value >= 1000) return `${(value / 1000).toFixed(1)}k`;
-                        return value.toFixed(2);
-                      }}
-                      label={{ value: 'Production (kW)', angle: -90, position: 'insideLeft', style: { textAnchor: 'middle' } }}
+                      className="text-xs"
+                      tickLine={false}
+                      axisLine={false}
+                      tick={{ fill: 'hsl(var(--muted-foreground))' }}
+                      tickFormatter={formatChartYAxis}
                     />
                     <YAxis 
                       yAxisId="right"
                       orientation="right"
                       width={60}
-                      tickFormatter={(value) => {
-                        if (value === 0) return '0';
-                        if (value < 0.001) return value.toFixed(4);
-                        if (value < 1) return value.toFixed(3);
-                        if (value >= 1000) return `${(value / 1000).toFixed(1)}k`;
-                        return value.toFixed(2);
-                      }}
-                      label={{ value: 'Consumption (kW)', angle: 90, position: 'insideRight', style: { textAnchor: 'middle' } }}
+                      className="text-xs"
+                      tickLine={false}
+                      axisLine={false}
+                      tick={{ fill: 'hsl(var(--muted-foreground))' }}
+                      tickFormatter={formatChartYAxis}
                     />
                     <Tooltip 
-                      formatter={(value: any, name: string) => {
-                        const label = name === 'Production' ? 'Production' : 'Consumption';
-                        if (typeof value === 'number') {
-                          if (value === 0) return ['0 kW', label];
-                          if (value < 0.01) return [`${value.toFixed(5)} kW`, label];
-                          if (value < 1) return [`${value.toFixed(3)} kW`, label];
-                          return [`${value.toFixed(2)} kW`, label];
+                      content={({ active, payload, label }) => {
+                        if (active && payload && payload.length) {
+                          return (
+                            <div className="rounded-lg border bg-background/95 backdrop-blur-sm p-3 shadow-lg">
+                              <p className="font-semibold text-sm mb-2">{label}</p>
+                              {payload.map((entry: any, index: number) => (
+                                <div key={index} className="flex items-center gap-2 mb-1">
+                                  <div
+                                    className="w-3 h-3 rounded-full"
+                                    style={{
+                                      backgroundColor: entry.color,
+                                      boxShadow: `0 0 8px ${entry.color}40`
+                                    }}
+                                  />
+                                  <span className="text-xs text-muted-foreground">{entry.name}:</span>
+                                  <span className="text-sm font-medium">
+                                    {formatChartTooltip(entry.value)}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          );
                         }
-                        return [`${value} kW`, label];
-                      }} 
+                        return null;
+                      }}
                     />
                     <Legend 
-                      wrapperStyle={{ paddingTop: '10px' }}
-                      iconType="rect"
+                      wrapperStyle={{ paddingTop: '20px' }}
+                      iconType="circle"
                     />
-                    <Bar 
+                    <Area
                       yAxisId="left"
-                      dataKey="generation" 
-                      name="Production" 
-                      fill="#10b981" 
-                      radius={[4, 4, 0, 0]}
+                      type="monotone"
+                      dataKey="generation"
+                      name="Production"
+                      fill="url(#productionGradientInst)"
+                      stroke="hsl(142, 76%, 36%)"
+                      strokeWidth={2}
+                      fillOpacity={0.7}
+                      style={{ filter: 'url(#glowInst)' }}
                     />
                     <Line 
                       yAxisId="right"
                       type="monotone" 
                       dataKey="consumption" 
                       name="Consumption" 
-                      stroke="#ef4444" 
-                      strokeWidth={2}
+                      stroke="hsl(0, 84%, 60%)" 
+                      strokeWidth={3}
+                      dot={{ 
+                        fill: "hsl(0, 84%, 60%)", 
+                        strokeWidth: 2, 
+                        r: 4,
+                        filter: 'drop-shadow(0 0 4px rgba(255, 100, 100, 0.6))'
+                      }}
+                      activeDot={{ 
+                        r: 6, 
+                        fill: "hsl(0, 84%, 60%)",
+                        stroke: 'white',
+                        strokeWidth: 2,
+                        filter: 'drop-shadow(0 0 8px rgba(255, 100, 100, 0.8))'
+                      }}
+                      style={{ 
+                        stroke: "hsl(0, 84%, 60%)",
+                        filter: 'drop-shadow(0 0 2px rgba(255, 100, 100, 0.4))'
+                      }}
                     />
                   </ComposedChart>
                 </ResponsiveContainer>
