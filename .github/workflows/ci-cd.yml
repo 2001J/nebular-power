@@ -46,7 +46,7 @@ jobs:
             solar_frontend/coverage
 
       - name: Lint
-        run: pnpm run lint --if-present
+        run: pnpm run lint
 
       - name: Build
         env:
