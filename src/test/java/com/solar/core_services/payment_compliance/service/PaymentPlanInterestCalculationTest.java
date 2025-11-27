@@ -4,7 +4,6 @@ import com.solar.core_services.energy_monitoring.model.SolarInstallation;
 import com.solar.core_services.energy_monitoring.repository.SolarInstallationRepository;
 import com.solar.core_services.payment_compliance.dto.PaymentPlanDTO;
 import com.solar.core_services.payment_compliance.dto.PaymentPlanRequest;
-import com.solar.core_services.payment_compliance.model.Payment;
 import com.solar.core_services.payment_compliance.model.PaymentPlan;
 import com.solar.core_services.payment_compliance.repository.PaymentPlanRepository;
 import com.solar.core_services.payment_compliance.repository.PaymentRepository;
@@ -20,15 +19,13 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
-import java.util.List;
 import java.util.Optional;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 

@@ -4,7 +4,6 @@
 package com.solar.user_management.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.solar.core_services.energy_monitoring.controller.TestSecurityConfig;
 import com.solar.user_management.dto.user.UpdateProfileRequest;
 import com.solar.user_management.model.User;
 import com.solar.user_management.model.UserActivityLog;
@@ -26,7 +25,6 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.LocalDateTime;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 

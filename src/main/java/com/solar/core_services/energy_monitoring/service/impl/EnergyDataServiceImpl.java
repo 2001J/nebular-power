@@ -1,16 +1,11 @@
 package com.solar.core_services.energy_monitoring.service.impl;
 
-import com.solar.core_services.energy_monitoring.dto.DashboardResponse;
-import com.solar.core_services.energy_monitoring.dto.EnergyChartPointDTO;
-import com.solar.core_services.energy_monitoring.dto.EnergyDataDTO;
-import com.solar.core_services.energy_monitoring.dto.EnergyDataRequest;
-import com.solar.core_services.energy_monitoring.dto.EnergyReadingBatchDTO;
-import com.solar.core_services.energy_monitoring.dto.SolarInstallationDTO;
+import com.solar.core_services.energy_monitoring.dto.*;
 import com.solar.core_services.energy_monitoring.model.EnergyData;
 import com.solar.core_services.energy_monitoring.model.SolarInstallation;
 import com.solar.core_services.energy_monitoring.repository.EnergyDataRepository;
-import com.solar.core_services.energy_monitoring.repository.SolarInstallationRepository;
 import com.solar.core_services.energy_monitoring.repository.EnergySummaryRepository;
+import com.solar.core_services.energy_monitoring.repository.SolarInstallationRepository;
 import com.solar.core_services.energy_monitoring.service.EnergyDataService;
 import com.solar.core_services.energy_monitoring.service.SolarInstallationService;
 import com.solar.core_services.energy_monitoring.service.WebSocketService;
@@ -25,11 +20,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.temporal.ChronoUnit;
-import java.util.List;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.LinkedHashMap;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service

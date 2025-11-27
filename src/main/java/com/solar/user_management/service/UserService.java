@@ -5,6 +5,7 @@ import com.solar.user_management.dto.auth.LoginRequest;
 import com.solar.user_management.dto.auth.SignupRequest;
 import com.solar.user_management.dto.user.UpdateProfileRequest;
 import com.solar.user_management.model.User;
+
 import java.util.List;
 
 public interface UserService {

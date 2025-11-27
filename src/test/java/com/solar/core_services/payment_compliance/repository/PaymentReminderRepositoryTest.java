@@ -1,13 +1,13 @@
 package com.solar.core_services.payment_compliance.repository;
 
 import com.solar.core_services.energy_monitoring.model.SolarInstallation;
-import com.solar.user_management.model.User;
+import com.solar.core_services.energy_monitoring.model.SolarInstallation.InstallationStatus;
 import com.solar.core_services.energy_monitoring.repository.SolarInstallationRepository;
-import com.solar.user_management.repository.UserRepository;
 import com.solar.core_services.payment_compliance.model.Payment;
 import com.solar.core_services.payment_compliance.model.PaymentPlan;
 import com.solar.core_services.payment_compliance.model.PaymentReminder;
-import com.solar.core_services.energy_monitoring.model.SolarInstallation.InstallationStatus;
+import com.solar.user_management.model.User;
+import com.solar.user_management.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

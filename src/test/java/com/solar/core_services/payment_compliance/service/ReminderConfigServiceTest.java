@@ -4,7 +4,6 @@ import com.solar.core_services.payment_compliance.dto.ReminderConfigDTO;
 import com.solar.core_services.payment_compliance.model.ReminderConfig;
 import com.solar.core_services.payment_compliance.repository.ReminderConfigRepository;
 import com.solar.core_services.payment_compliance.service.impl.ReminderConfigServiceImpl;
-import com.solar.exception.ResourceNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -18,7 +17,6 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.*;
 
 /**

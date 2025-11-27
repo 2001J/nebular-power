@@ -1,18 +1,18 @@
 package com.solar.core_services.payment_compliance.service;
 
 import com.solar.core_services.energy_monitoring.model.SolarInstallation;
-import com.solar.user_management.model.User;
+import com.solar.core_services.energy_monitoring.model.SolarInstallation.InstallationStatus;
 import com.solar.core_services.energy_monitoring.repository.SolarInstallationRepository;
 import com.solar.core_services.payment_compliance.dto.MakePaymentRequest;
 import com.solar.core_services.payment_compliance.dto.PaymentDTO;
 import com.solar.core_services.payment_compliance.dto.PaymentDashboardDTO;
 import com.solar.core_services.payment_compliance.model.Payment;
 import com.solar.core_services.payment_compliance.model.PaymentPlan;
-import com.solar.core_services.payment_compliance.repository.PaymentRepository;
 import com.solar.core_services.payment_compliance.repository.PaymentPlanRepository;
-import com.solar.user_management.repository.UserRepository;
+import com.solar.core_services.payment_compliance.repository.PaymentRepository;
 import com.solar.core_services.payment_compliance.service.impl.PaymentServiceImpl;
-import com.solar.core_services.payment_compliance.service.ReminderConfigService;
+import com.solar.user_management.model.User;
+import com.solar.user_management.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -33,21 +33,9 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.ArgumentMatchers.anyList;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.doNothing;
-import static org.mockito.Mockito.atLeastOnce;
-import static org.mockito.Mockito.lenient;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
-import static org.mockito.Mockito.never;
-
-import com.solar.core_services.energy_monitoring.model.SolarInstallation.InstallationStatus;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
 
 /**
  * Test class for PaymentService

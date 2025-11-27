@@ -5,6 +5,7 @@ import com.solar.core_services.energy_monitoring.model.EnergyData;
 import com.solar.core_services.energy_monitoring.model.SolarInstallation;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+
 import java.time.LocalDateTime;
 import java.util.List;
 

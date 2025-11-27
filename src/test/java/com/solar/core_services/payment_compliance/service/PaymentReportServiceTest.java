@@ -1,13 +1,14 @@
 package com.solar.core_services.payment_compliance.service;
 
 import com.solar.core_services.energy_monitoring.model.SolarInstallation;
-import com.solar.user_management.model.User;
+import com.solar.core_services.energy_monitoring.model.SolarInstallation.InstallationStatus;
 import com.solar.core_services.energy_monitoring.repository.SolarInstallationRepository;
 import com.solar.core_services.payment_compliance.model.Payment;
 import com.solar.core_services.payment_compliance.model.PaymentPlan;
 import com.solar.core_services.payment_compliance.repository.PaymentPlanRepository;
 import com.solar.core_services.payment_compliance.repository.PaymentRepository;
 import com.solar.core_services.payment_compliance.service.impl.PaymentReportServiceImpl;
+import com.solar.user_management.model.User;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -18,28 +19,11 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.HashMap;
+import java.util.*;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyList;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
-import static org.mockito.Mockito.doReturn;
-import static org.mockito.Mockito.spy;
-import static org.mockito.Mockito.lenient;
-
-// Add import for InstallationStatus enum
-import com.solar.core_services.energy_monitoring.model.SolarInstallation.InstallationStatus;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
 
 /**
  * Test class for PaymentReportService

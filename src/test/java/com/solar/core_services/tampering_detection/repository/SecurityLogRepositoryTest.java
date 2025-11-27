@@ -1,7 +1,6 @@
 package com.solar.core_services.tampering_detection.repository;
 
 import com.solar.core_services.energy_monitoring.model.SolarInstallation;
-import com.solar.core_services.energy_monitoring.model.SolarInstallation.InstallationStatus;
 import com.solar.core_services.energy_monitoring.repository.SolarInstallationRepository;
 import com.solar.core_services.tampering_detection.model.SecurityLog;
 import com.solar.core_services.tampering_detection.model.SecurityLog.ActivityType;

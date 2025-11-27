@@ -1,6 +1,7 @@
 package com.solar.core_services.payment_compliance.repository;
 
 import com.solar.core_services.energy_monitoring.model.SolarInstallation;
+import com.solar.core_services.energy_monitoring.model.SolarInstallation.InstallationStatus;
 import com.solar.core_services.energy_monitoring.repository.SolarInstallationRepository;
 import com.solar.core_services.payment_compliance.model.Payment;
 import com.solar.core_services.payment_compliance.model.PaymentPlan;
@@ -21,9 +22,6 @@ import java.util.Arrays;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
-
-// Add import for InstallationStatus enum
-import com.solar.core_services.energy_monitoring.model.SolarInstallation.InstallationStatus;
 
 /**
  * Test class for PaymentRepository

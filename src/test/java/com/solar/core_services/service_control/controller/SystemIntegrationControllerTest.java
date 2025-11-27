@@ -2,11 +2,7 @@ package com.solar.core_services.service_control.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.solar.core_services.energy_monitoring.controller.TestSecurityConfig;
-import com.solar.core_services.service_control.dto.CommandResponseRequest;
-import com.solar.core_services.service_control.dto.DeviceCommandDTO;
-import com.solar.core_services.service_control.dto.DeviceHeartbeatRequest;
-import com.solar.core_services.service_control.dto.OperationalLogDTO;
-import com.solar.core_services.service_control.dto.SystemOverviewResponse;
+import com.solar.core_services.service_control.dto.*;
 import com.solar.core_services.service_control.model.DeviceCommand;
 import com.solar.core_services.service_control.model.OperationalLog;
 import com.solar.core_services.service_control.service.OperationalLogService;
@@ -29,8 +25,10 @@ import java.util.Map;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(SystemIntegrationController.class)
 @Import(TestSecurityConfig.class)

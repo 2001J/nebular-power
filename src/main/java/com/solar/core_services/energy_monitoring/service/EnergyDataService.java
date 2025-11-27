@@ -1,10 +1,6 @@
 package com.solar.core_services.energy_monitoring.service;
 
-import com.solar.core_services.energy_monitoring.dto.DashboardResponse;
-import com.solar.core_services.energy_monitoring.dto.EnergyDataDTO;
-import com.solar.core_services.energy_monitoring.dto.EnergyDataRequest;
-import com.solar.core_services.energy_monitoring.dto.EnergyReadingBatchDTO;
-import com.solar.core_services.energy_monitoring.dto.EnergyChartPointDTO;
+import com.solar.core_services.energy_monitoring.dto.*;
 import com.solar.core_services.energy_monitoring.model.EnergyData;
 
 import java.time.LocalDateTime;

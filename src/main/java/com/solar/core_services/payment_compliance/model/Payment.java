@@ -1,12 +1,12 @@
 package com.solar.core_services.payment_compliance.model;
 
 import com.solar.core_services.energy_monitoring.model.SolarInstallation;
+import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import jakarta.persistence.*;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 

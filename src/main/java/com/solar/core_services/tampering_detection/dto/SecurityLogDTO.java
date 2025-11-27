@@ -1,6 +1,5 @@
 package com.solar.core_services.tampering_detection.dto;
 
-import com.solar.core_services.tampering_detection.model.SecurityLog;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;

@@ -1,7 +1,7 @@
 package com.solar.core_services.payment_compliance.service;
 
 import com.solar.core_services.energy_monitoring.model.SolarInstallation;
-import com.solar.user_management.model.User;
+import com.solar.core_services.energy_monitoring.model.SolarInstallation.InstallationStatus;
 import com.solar.core_services.energy_monitoring.repository.SolarInstallationRepository;
 import com.solar.core_services.payment_compliance.dto.PaymentPlanDTO;
 import com.solar.core_services.payment_compliance.dto.PaymentPlanRequest;
@@ -9,6 +9,7 @@ import com.solar.core_services.payment_compliance.model.PaymentPlan;
 import com.solar.core_services.payment_compliance.repository.PaymentPlanRepository;
 import com.solar.core_services.payment_compliance.repository.PaymentRepository;
 import com.solar.core_services.payment_compliance.service.impl.PaymentPlanServiceImpl;
+import com.solar.user_management.model.User;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -25,17 +26,10 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
-
-import com.solar.core_services.energy_monitoring.model.SolarInstallation.InstallationStatus;
+import static org.mockito.Mockito.*;
 
 /**
  * Test class for PaymentPlanService

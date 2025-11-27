@@ -9,7 +9,6 @@ import com.solar.core_services.tampering_detection.model.TamperEvent;
 import com.solar.core_services.tampering_detection.model.TamperEvent.TamperEventStatus;
 import com.solar.core_services.tampering_detection.model.TamperEvent.TamperEventType;
 import com.solar.core_services.tampering_detection.model.TamperEvent.TamperSeverity;
-import com.solar.core_services.tampering_detection.model.SecurityLog.ActivityType;
 import com.solar.core_services.tampering_detection.repository.TamperEventRepository;
 import com.solar.core_services.tampering_detection.service.impl.TamperEventServiceImpl;
 import com.solar.exception.ResourceNotFoundException;
@@ -26,13 +25,12 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 
 import java.time.LocalDateTime;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 /**

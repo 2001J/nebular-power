@@ -1,7 +1,7 @@
 package com.solar.core_services.payment_compliance.service;
 
 import com.solar.core_services.energy_monitoring.model.SolarInstallation;
-import com.solar.user_management.model.User;
+import com.solar.core_services.energy_monitoring.model.SolarInstallation.InstallationStatus;
 import com.solar.core_services.payment_compliance.dto.PaymentReminderDTO;
 import com.solar.core_services.payment_compliance.model.Payment;
 import com.solar.core_services.payment_compliance.model.PaymentPlan;
@@ -9,11 +9,12 @@ import com.solar.core_services.payment_compliance.model.PaymentReminder;
 import com.solar.core_services.payment_compliance.repository.PaymentReminderRepository;
 import com.solar.core_services.payment_compliance.repository.PaymentRepository;
 import com.solar.core_services.payment_compliance.service.impl.PaymentReminderServiceImpl;
-import com.solar.core_services.payment_compliance.service.ReminderConfigService;
+import com.solar.user_management.model.User;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -29,21 +30,10 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 
-import org.mockito.ArgumentCaptor;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.atLeast;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
-
-// Add import for InstallationStatus enum
-import com.solar.core_services.energy_monitoring.model.SolarInstallation.InstallationStatus;
+import static org.mockito.Mockito.*;
 
 /**
  * Test class for PaymentReminderService

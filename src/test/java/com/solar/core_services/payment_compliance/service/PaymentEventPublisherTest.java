@@ -1,10 +1,11 @@
 package com.solar.core_services.payment_compliance.service;
 
 import com.solar.core_services.energy_monitoring.model.SolarInstallation;
-import com.solar.user_management.model.User;
+import com.solar.core_services.energy_monitoring.model.SolarInstallation.InstallationStatus;
 import com.solar.core_services.payment_compliance.model.Payment;
 import com.solar.core_services.payment_compliance.model.PaymentPlan;
 import com.solar.core_services.payment_compliance.service.impl.PaymentEventPublisherImpl;
+import com.solar.user_management.model.User;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -17,17 +18,10 @@ import org.springframework.context.ApplicationEventPublisher;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.doNothing;
-import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
-
-// Add import for InstallationStatus enum
-import com.solar.core_services.energy_monitoring.model.SolarInstallation.InstallationStatus;
 
 /**
  * Test class for PaymentEventPublisher

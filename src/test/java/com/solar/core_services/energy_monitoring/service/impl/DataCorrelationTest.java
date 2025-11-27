@@ -1,8 +1,8 @@
 package com.solar.core_services.energy_monitoring.service.impl;
 
 import com.solar.core_services.energy_monitoring.dto.DashboardResponse;
-import com.solar.core_services.energy_monitoring.dto.SystemSeriesPointDTO;
 import com.solar.core_services.energy_monitoring.dto.SystemOverviewResponse;
+import com.solar.core_services.energy_monitoring.dto.SystemSeriesPointDTO;
 import com.solar.core_services.energy_monitoring.model.EnergyData;
 import com.solar.core_services.energy_monitoring.model.SolarInstallation;
 import com.solar.core_services.energy_monitoring.repository.EnergyDataRepository;
@@ -24,7 +24,8 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Data Correlation Tests

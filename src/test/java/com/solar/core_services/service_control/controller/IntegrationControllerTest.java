@@ -3,8 +3,8 @@ package com.solar.core_services.service_control.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.solar.core_services.energy_monitoring.controller.TestSecurityConfig;
 import com.solar.core_services.payment_compliance.model.Payment;
-import com.solar.core_services.service_control.model.OperationalLog;
 import com.solar.core_services.service_control.dto.OperationalLogDTO;
+import com.solar.core_services.service_control.model.OperationalLog;
 import com.solar.core_services.service_control.service.OperationalLogService;
 import com.solar.core_services.service_control.service.PaymentIntegrationService;
 import com.solar.core_services.service_control.service.SecurityIntegrationService;
@@ -21,7 +21,8 @@ import org.springframework.test.web.servlet.MockMvc;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(IntegrationController.class)

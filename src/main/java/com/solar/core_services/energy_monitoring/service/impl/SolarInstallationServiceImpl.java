@@ -1,10 +1,6 @@
 package com.solar.core_services.energy_monitoring.service.impl;
 
-import com.solar.core_services.energy_monitoring.dto.DeviceStatusRequest;
-import com.solar.core_services.energy_monitoring.dto.SolarInstallationDTO;
-import com.solar.core_services.energy_monitoring.dto.SystemOverviewResponse;
-import com.solar.core_services.energy_monitoring.dto.EnergyReadingDTO;
-import com.solar.core_services.energy_monitoring.dto.TopProducerDTO;
+import com.solar.core_services.energy_monitoring.dto.*;
 import com.solar.core_services.energy_monitoring.model.EnergyData;
 import com.solar.core_services.energy_monitoring.model.EnergySummary;
 import com.solar.core_services.energy_monitoring.model.SolarInstallation;

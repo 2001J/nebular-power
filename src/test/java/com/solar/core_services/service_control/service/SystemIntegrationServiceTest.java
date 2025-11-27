@@ -5,7 +5,6 @@ import com.solar.core_services.service_control.dto.DeviceCommandDTO;
 import com.solar.core_services.service_control.dto.DeviceHeartbeatRequest;
 import com.solar.core_services.service_control.dto.SystemOverviewResponse;
 import com.solar.core_services.service_control.model.DeviceCommand;
-import com.solar.core_services.service_control.model.OperationalLog;
 import com.solar.core_services.service_control.service.impl.SystemIntegrationServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -15,22 +14,12 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.time.LocalDateTime;
-import java.util.HashMap;
-import java.util.Map;
-
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyBoolean;
-import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.verify;
 
 /**
  * Test class for SystemIntegrationService implementation

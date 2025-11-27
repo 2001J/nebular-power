@@ -4,7 +4,6 @@ import com.solar.core_services.payment_compliance.dto.ReminderConfigDTO;
 import com.solar.core_services.payment_compliance.model.ReminderConfig;
 import com.solar.core_services.payment_compliance.repository.ReminderConfigRepository;
 import com.solar.core_services.payment_compliance.service.ReminderConfigService;
-import com.solar.exception.ResourceNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;

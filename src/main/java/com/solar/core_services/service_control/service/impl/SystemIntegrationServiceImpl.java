@@ -5,18 +5,13 @@ import com.solar.core_services.service_control.dto.DeviceCommandDTO;
 import com.solar.core_services.service_control.dto.DeviceHeartbeatRequest;
 import com.solar.core_services.service_control.dto.SystemOverviewResponse;
 import com.solar.core_services.service_control.model.OperationalLog;
-import com.solar.core_services.service_control.service.DeviceCommandService;
-import com.solar.core_services.service_control.service.DeviceTransmissionService;
-import com.solar.core_services.service_control.service.OperationalLogService;
-import com.solar.core_services.service_control.service.SystemIntegrationService;
-import com.solar.core_services.service_control.service.SystemMonitoringService;
+import com.solar.core_services.service_control.service.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 

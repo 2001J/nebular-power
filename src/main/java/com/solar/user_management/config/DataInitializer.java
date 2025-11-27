@@ -2,9 +2,9 @@ package com.solar.user_management.config;
 
 import com.solar.user_management.model.User;
 import com.solar.user_management.repository.UserRepository;
-import org.springframework.context.annotation.Profile;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.context.annotation.Profile;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 

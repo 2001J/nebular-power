@@ -1,6 +1,5 @@
 package com.solar.core_services.payment_compliance.service;
 
-import com.solar.core_services.energy_monitoring.model.SolarInstallation;
 import com.solar.core_services.payment_compliance.model.Payment;
 import com.solar.core_services.payment_compliance.model.PaymentPlan;
 

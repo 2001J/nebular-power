@@ -2,19 +2,10 @@ package com.solar.core_services.payment_compliance.controller;
 
 import com.solar.core_services.energy_monitoring.model.SolarInstallation;
 import com.solar.core_services.energy_monitoring.repository.SolarInstallationRepository;
-import com.solar.core_services.payment_compliance.dto.GracePeriodConfigDTO;
-import com.solar.core_services.payment_compliance.dto.MakePaymentRequest;
-import com.solar.core_services.payment_compliance.dto.PaymentDTO;
-import com.solar.core_services.payment_compliance.dto.PaymentPlanDTO;
-import com.solar.core_services.payment_compliance.dto.PaymentPlanRequest;
-import com.solar.core_services.payment_compliance.dto.ReminderConfigDTO;
+import com.solar.core_services.payment_compliance.dto.*;
 import com.solar.core_services.payment_compliance.model.Payment;
 import com.solar.core_services.payment_compliance.model.PaymentReminder;
-import com.solar.core_services.payment_compliance.service.GracePeriodConfigService;
-import com.solar.core_services.payment_compliance.service.PaymentPlanService;
-import com.solar.core_services.payment_compliance.service.PaymentReminderService;
-import com.solar.core_services.payment_compliance.service.PaymentService;
-import com.solar.core_services.payment_compliance.service.ReminderConfigService;
+import com.solar.core_services.payment_compliance.service.*;
 import com.solar.exception.ResourceNotFoundException;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -35,10 +26,10 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.HashMap;
-import java.util.ArrayList;
 
 @RestController
 @RequestMapping("/api/admin/payments")

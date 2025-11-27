@@ -1,10 +1,6 @@
 package com.solar.core_services.energy_monitoring.controller;
 
-import com.solar.core_services.energy_monitoring.dto.DashboardResponse;
-import com.solar.core_services.energy_monitoring.dto.EnergyDataDTO;
-import com.solar.core_services.energy_monitoring.dto.EnergyChartPointDTO;
-import com.solar.core_services.energy_monitoring.dto.EnergyDataRequest;
-import com.solar.core_services.energy_monitoring.dto.EnergyReadingBatchDTO;
+import com.solar.core_services.energy_monitoring.dto.*;
 import com.solar.core_services.energy_monitoring.service.EnergyDataService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;

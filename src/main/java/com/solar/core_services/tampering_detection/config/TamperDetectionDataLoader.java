@@ -3,7 +3,6 @@ package com.solar.core_services.tampering_detection.config;
 import com.solar.core_services.energy_monitoring.model.SolarInstallation;
 import com.solar.core_services.energy_monitoring.repository.SolarInstallationRepository;
 import com.solar.core_services.tampering_detection.model.AlertConfig;
-import com.solar.core_services.tampering_detection.model.TamperEvent;
 import com.solar.core_services.tampering_detection.repository.AlertConfigRepository;
 import com.solar.core_services.tampering_detection.repository.TamperEventRepository;
 import com.solar.core_services.tampering_detection.service.TamperDetectionService;

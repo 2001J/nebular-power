@@ -8,8 +8,6 @@ import com.solar.core_services.tampering_detection.model.TamperEvent.TamperEvent
 import com.solar.core_services.tampering_detection.model.TamperEvent.TamperSeverity;
 import com.solar.core_services.tampering_detection.model.TamperResponse;
 import com.solar.core_services.tampering_detection.model.TamperResponse.ResponseType;
-import com.solar.core_services.tampering_detection.model.SecurityLog;
-import com.solar.core_services.tampering_detection.model.SecurityLog.ActivityType;
 import com.solar.core_services.tampering_detection.repository.TamperEventRepository;
 import com.solar.core_services.tampering_detection.repository.TamperResponseRepository;
 import com.solar.core_services.tampering_detection.service.impl.TamperResponseServiceImpl;

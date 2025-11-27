@@ -1,8 +1,8 @@
 package com.solar.core_services.energy_monitoring.controller;
 
 import com.solar.SolarApplication;
-import com.solar.core_services.energy_monitoring.service.SolarInstallationService;
 import com.solar.core_services.energy_monitoring.service.SecurityService;
+import com.solar.core_services.energy_monitoring.service.SolarInstallationService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
