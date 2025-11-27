@@ -1,4 +1,4 @@
-import axios, { AxiosError, AxiosRequestConfig, AxiosResponse } from 'axios';
+import axios, { AxiosError } from 'axios';
 
 // Create a simple toast function that can be called directly
 // This is a placeholder for the actual toast implementation

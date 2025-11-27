@@ -38,7 +38,7 @@ export function ChartControls({
   showButtonVariant = false
 }: ChartControlsProps) {
   if (showButtonVariant) {
-    // Button variant - used in the content header
+    // Button variant - preset buttons for time range selection
     return (
       <div className="flex flex-wrap items-center gap-2">
         <Button
@@ -69,6 +69,21 @@ export function ChartControls({
         >
           Year
         </Button>
+        {onRefresh && (
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={onRefresh}
+            disabled={loading}
+            title="Refresh data"
+          >
+            {loading ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <RefreshCw className="h-4 w-4" />
+            )}
+          </Button>
+        )}
         {onExport && (
           <Button
             variant="outline"

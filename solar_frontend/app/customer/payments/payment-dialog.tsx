@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { CreditCard, DollarSign, Calendar } from "lucide-react"
+import { CreditCard, DollarSign } from "lucide-react"
 import { 
   Dialog, 
   DialogContent, 

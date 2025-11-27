@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { useRouter } from "next/navigation"
 import { format } from "date-fns"
 import {
   Activity,
@@ -9,11 +8,9 @@ import {
   Clock,
   Download,
   FileText,
-  Filter,
   Heart,
   RefreshCw,
   Server,
-  Settings,
   Zap,
   CheckCircle,
   XCircle
@@ -39,14 +36,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   Table,
   TableBody,
-  TableCaption,
   TableCell,
   TableHead,
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { toast } from "@/components/ui/use-toast"
 import {
@@ -246,7 +241,7 @@ export default function SystemLogsPage() {
       if (timeRange !== "custom") {
         // Calculate start time based on selected time range
         const end = new Date()
-        let start = new Date()
+        const start = new Date()
 
         switch (timeRange) {
           case "1h":

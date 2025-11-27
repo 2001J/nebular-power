@@ -81,7 +81,7 @@ export const paymentApi = {
   },
 
   // Admin summary used by admin dashboard
-  async getAdminPayments(page = 0, size = 20, sortBy = 'dueDate', direction = 'desc'): Promise<any> {
+  async getAdminPayments(page = 0, size = 20, _sortBy = 'dueDate', _direction = 'desc'): Promise<any> {
     // Compute last 30-day window
     const today = new Date();
     const thirtyDaysAgo = new Date();

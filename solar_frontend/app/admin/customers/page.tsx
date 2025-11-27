@@ -10,13 +10,9 @@ import {
   MoreHorizontal,
   AlertCircle,
   User,
-  Pencil,
   Clock,
   Ban,
-  CheckCircle,
-  Loader2,
-  UserX,
-  Key
+  CheckCircle
 } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -27,7 +23,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
@@ -38,7 +33,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
@@ -52,8 +46,7 @@ import {
 import { useToast } from "@/components/ui/use-toast"
 import { useAuth } from "@/components/auth-provider"
 import { customerApi } from "@/lib/api/customers"
-import type { Customer, PaginatedResponse } from "@/lib/api/types"
-import { debounce } from "lodash"
+import type { Customer } from "@/lib/api/types"
 import { Pagination, PaginationContent, PaginationEllipsis, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination"
 
 export default function CustomersPage() {
@@ -308,7 +301,7 @@ export default function CustomersPage() {
 
             // Check for any changes between current and new customers
             let hasChanges = false;
-            let verifiedCustomers: Customer[] = [];
+            const verifiedCustomers: Customer[] = [];
 
             for (const newCustomer of response.content) {
               // Store customers that have been newly verified

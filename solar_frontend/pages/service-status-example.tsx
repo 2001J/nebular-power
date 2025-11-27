@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { ServiceStatusCard } from '@/components/ServiceStatusCard';
 import { Container } from '@/components/ui/container';
 

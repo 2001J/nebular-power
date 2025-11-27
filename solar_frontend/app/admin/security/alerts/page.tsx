@@ -5,19 +5,12 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { format, parseISO, subDays } from "date-fns"
 import {
   AlertTriangle,
-  ArrowUpDown,
-  Calendar,
   CheckCircle2,
-  ChevronDown,
-  Clock,
   Eye,
-  Filter,
   MoreHorizontal,
   RefreshCw,
   Search,
-  Shield,
   ShieldAlert,
-  ShieldOff,
   X
 } from "lucide-react"
 
@@ -26,7 +19,6 @@ import {
   Card,
   CardContent,
   CardDescription,
-  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
@@ -37,37 +29,28 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog"
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover"
+
+
 import {
   Select,
   SelectContent,
-  SelectGroup,
   SelectItem,
-  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
 import {
   Table,
   TableBody,
-  TableCaption,
   TableCell,
   TableHead,
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { ScrollArea } from "@/components/ui/scroll-area"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -84,7 +67,7 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb"
-import { DatePickerWithRange } from "@/components/ui/date-range-picker"
+import { MuiDateRangePicker } from "@/components/ui/mui-date-range-picker"
 import { DateRange } from "react-day-picker"
 import { toast } from "@/components/ui/use-toast"
 import { securityApi } from "@/lib/api/security"
@@ -101,6 +84,7 @@ export default function SecurityAlertsPage() {
     from: subDays(new Date(), 30),
     to: new Date(),
   })
+  const [datePreset, setDatePreset] = useState<'today' | '7d' | '30d' | '90d' | null>(null)
   const [eventType, setEventType] = useState("all")
   const [severity, setSeverity] = useState("all")
   const [status, setStatus] = useState("NEW")
@@ -165,8 +149,23 @@ export default function SecurityAlertsPage() {
         if (dateRange?.from || dateRange?.to) {
           events = events.filter(event => {
             const eventDate = new Date(event.timestamp)
-            const isAfterStart = !dateRange?.from || eventDate >= dateRange.from
-            const isBeforeEnd = !dateRange?.to || eventDate <= dateRange.to
+            
+            // For "from" comparison, use start of day
+            let isAfterStart = true
+            if (dateRange?.from) {
+              const fromStart = new Date(dateRange.from)
+              fromStart.setHours(0, 0, 0, 0)
+              isAfterStart = eventDate >= fromStart
+            }
+            
+            // For "to" comparison, use end of day
+            let isBeforeEnd = true
+            if (dateRange?.to) {
+              const toEnd = new Date(dateRange.to)
+              toEnd.setHours(23, 59, 59, 999)
+              isBeforeEnd = eventDate <= toEnd
+            }
+            
             return isAfterStart && isBeforeEnd
           })
         }
@@ -252,8 +251,24 @@ export default function SecurityAlertsPage() {
   }, [applyFilters])
 
   // Refresh data
-  const refreshData = () => {
+  const refreshData = useCallback(() => {
     setIsRefreshing(true)
+    fetchTamperEvents()
+  }, [fetchTamperEvents])
+
+  // Clear all filters - the useEffect watching fetchTamperEvents will re-fetch
+  const clearFilters = () => {
+    setIsRefreshing(true)
+    setSearchTerm("")
+    setStatus("all")
+    setSeverity("all")
+    setEventType("all")
+    setInstallation("all")
+    setDatePreset(null) // Clear the preset highlight
+    setDateRange({
+      from: subDays(new Date(), 30),
+      to: new Date(),
+    })
   }
 
   // (moved up) getInstallationName
@@ -527,9 +542,10 @@ export default function SecurityAlertsPage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              <div className="flex flex-col sm:flex-row gap-4">
-                <div className="flex-1">
-                  <div className="relative">
+              <div className="flex flex-col gap-3">
+                {/* Row 1: Search and status filters */}
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="relative flex-1 min-w-[200px]">
                     <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                     <Input
                       placeholder="Search alerts..."
@@ -538,10 +554,8 @@ export default function SecurityAlertsPage() {
                       onChange={(e) => setSearchTerm(e.target.value)}
                     />
                   </div>
-                </div>
-                <div className="flex flex-row gap-2">
                   <Select value={status} onValueChange={setStatus}>
-                    <SelectTrigger className="w-[140px]">
+                    <SelectTrigger className="w-[130px]">
                       <SelectValue placeholder="Status" />
                     </SelectTrigger>
                     <SelectContent>
@@ -552,9 +566,8 @@ export default function SecurityAlertsPage() {
                       <SelectItem value="all">All Statuses</SelectItem>
                     </SelectContent>
                   </Select>
-
                   <Select value={severity} onValueChange={setSeverity}>
-                    <SelectTrigger className="w-[140px]">
+                    <SelectTrigger className="w-[130px]">
                       <SelectValue placeholder="Severity" />
                     </SelectTrigger>
                     <SelectContent>
@@ -565,9 +578,8 @@ export default function SecurityAlertsPage() {
                       <SelectItem value="all">All Severities</SelectItem>
                     </SelectContent>
                   </Select>
-
                   <Select value={eventType} onValueChange={setEventType}>
-                    <SelectTrigger className="w-[180px]">
+                    <SelectTrigger className="w-[150px]">
                       <SelectValue placeholder="Event Type" />
                     </SelectTrigger>
                     <SelectContent>
@@ -582,28 +594,39 @@ export default function SecurityAlertsPage() {
                     </SelectContent>
                   </Select>
                 </div>
-              </div>
 
-              <div className="flex flex-col sm:flex-row gap-4">
-                <Select value={installation} onValueChange={setInstallation}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select installation" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {installations.map(installation => (
-                      <SelectItem key={installation.id} value={installation.id}>
-                        {installation.name || `Installation #${installation.id}`}
-                      </SelectItem>
-                    ))}
-                    <SelectItem value="all">All Installations</SelectItem>
-                  </SelectContent>
-                </Select>
-
-                <DatePickerWithRange
-                  date={dateRange}
-                  setDate={setDateRange}
-                  className="w-full sm:w-auto"
-                />
+                {/* Row 2: Installation and date range */}
+                <div className="flex flex-wrap items-center gap-2">
+                  <Select value={installation} onValueChange={setInstallation}>
+                    <SelectTrigger className="w-[180px]">
+                      <SelectValue placeholder="Installation" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {installations.map(installation => (
+                        <SelectItem key={installation.id} value={installation.id}>
+                          {installation.name || `Installation #${installation.id}`}
+                        </SelectItem>
+                      ))}
+                      <SelectItem value="all">All Installations</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <MuiDateRangePicker
+                    date={dateRange}
+                    setDate={setDateRange}
+                    onDateChange={refreshData}
+                    selectedPreset={datePreset}
+                    onPresetChange={setDatePreset}
+                  />
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={clearFilters}
+                    className="text-muted-foreground hover:text-foreground"
+                  >
+                    <X className="h-4 w-4 mr-1" />
+                    Clear
+                  </Button>
+                </div>
               </div>
 
               {loading ? (

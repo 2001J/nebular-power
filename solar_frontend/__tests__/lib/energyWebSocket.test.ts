@@ -1,6 +1,6 @@
 import { describe, expect, test, vi } from 'vitest';
 
-const activateMock = vi.fn();
+const _activateMock = vi.fn();
 const deactivateMock = vi.fn();
 const subscribeMock = vi.fn();
 

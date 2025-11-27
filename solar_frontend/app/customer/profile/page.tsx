@@ -10,10 +10,9 @@ import { Switch } from "@/components/ui/switch"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { userApi, authApi } from "@/lib/api"
-import type { UserProfile, ActivityLogEntry, PaginatedResponse } from "@/lib/api/types"
+import type { UserProfile, ActivityLogEntry } from "@/lib/api/types"
 import { useToast } from "@/components/ui/use-toast"
 import { Skeleton } from "@/components/ui/skeleton"
-import Link from "next/link"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
 
@@ -196,7 +195,7 @@ export default function ProfilePage() {
       }
 
       // Call API to change password with email
-      await authApi.changePassword(currentPassword, newPassword)
+      await authApi.changePassword(userEmail, currentPassword, newPassword, confirmPassword)
       
       // Reset form
       setCurrentPassword('')

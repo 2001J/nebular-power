@@ -54,7 +54,7 @@ export const tamperDetectionApi = {
       }
 
       return status;
-    } catch (error) {
+    } catch (_error) {
       const fallback = readMonitoringState(installationId);
       return { isMonitoring: fallback ?? false };
     }

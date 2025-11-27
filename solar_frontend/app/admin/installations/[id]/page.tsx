@@ -3,20 +3,10 @@
 import { useState, useEffect } from "react"
 import { useParams, useRouter } from "next/navigation"
 import {
-  BarChart3,
-  Download,
-  Calendar,
-  Sun,
   Zap,
   Battery,
-  ArrowUp,
-  ArrowDown,
   RefreshCw,
-  Filter,
-  MapPin,
   AlertTriangle,
-  User,
-  Clock,
   Shield,
   Info,
   Check,
@@ -42,7 +32,6 @@ import {
   Area,
   AreaChart,
   ComposedChart,
-  Bar,
 } from "@/components/ui/direct-recharts"
 import { formatChartYAxis, formatChartTooltip, getMonthlyXAxisConfig } from "@/lib/energyUtils"
 import {
@@ -54,13 +43,6 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb"
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import {
   Table,
   TableBody,
   TableCell,
@@ -68,9 +50,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
-import { Progress } from "@/components/ui/progress"
 import { energyApi } from "@/lib/api/energy"
 import { installationApi } from "@/lib/api/installations"
 import { securityApi } from "@/lib/api/security"
@@ -235,29 +215,26 @@ export default function InstallationDetailPage() {
 
           setPerformance(perfMetrics)
 
-          // FIXED: Fetch pre-aggregated series data directly (values are already kWh)
-          try {
-            const series = await energyApi.getInstallationSeriesForTimeRange(
-              id,
-              timeRange as 'day' | 'week' | 'month' | 'year'
-            )
-            
-            if (Array.isArray(series) && series.length > 0) {
-              // Data is already in kWh - use directly without conversion or normalization
-              const chartData = transformSeriesForChart(series, timeRange)
-              console.log('Chart data from aggregated series:', {
-                points: chartData.length,
-                totalGeneration: chartData.reduce((s, p) => s + p.generation, 0).toFixed(3) + ' kWh',
-                totalConsumption: chartData.reduce((s, p) => s + p.consumption, 0).toFixed(3) + ' kWh'
-              })
-              setEnergyData(chartData)
-            } else {
-              setEnergyData([])
-            }
-          } catch (e) {
-            console.warn('Aggregated series fetch failed:', e)
-            setEnergyData([])
-          }
+                    // FIXED: Fetch pre-aggregated series data directly (values are already kWh)
+                    try {
+                      const series = await energyApi.getInstallationSeriesForTimeRange(
+                        id,
+                        timeRange as 'day' | 'week' | 'month' | 'year'
+                      )
+                      
+                      // Always generate full time range chart (even if no data)
+                      const chartData = transformSeriesForChart(series || [], timeRange)
+                      console.log('Chart data from aggregated series:', {
+                        points: chartData.length,
+                        totalGeneration: chartData.reduce((s, p) => s + p.generation, 0).toFixed(3) + ' kWh',
+                        totalConsumption: chartData.reduce((s, p) => s + p.consumption, 0).toFixed(3) + ' kWh'
+                      })
+                      setEnergyData(chartData)
+                    } catch (e) {
+                      console.warn('Aggregated series fetch failed:', e)
+                      // Generate empty chart with full time range
+                      setEnergyData(transformSeriesForChart([], timeRange))
+                    }
 
           // Fetch recent security events
           let recentEvents: SecurityEvent[] = []
@@ -389,17 +366,13 @@ export default function InstallationDetailPage() {
   /**
    * Transform pre-aggregated series data to chart format
    * IMPORTANT: Values from backend are ALREADY in kWh - use directly!
+   * This now generates a full time range with empty buckets for consistent charts
    */
   const transformSeriesForChart = (
     series: any[],
     timeRangeType: string
   ): ChartDataPoint[] => {
-    if (!series || series.length === 0) {
-      return []
-    }
-
     // Get bucket label based on time range
-    // Backend sends LocalDateTime (no timezone) - display as-is
     const getBucketLabel = (bucketStart: string): string => {
       const date = new Date(bucketStart)
       
@@ -417,17 +390,71 @@ export default function InstallationDetailPage() {
       }
     }
 
-    // Sort by timestamp
-    const sorted = [...series].sort(
-      (a, b) => new Date(a.bucketStart).getTime() - new Date(b.bucketStart).getTime()
-    )
+    // Initialize all time buckets for complete chart display
+    const initializeTimeBuckets = (): Record<string, ChartDataPoint> => {
+      const buckets: Record<string, ChartDataPoint> = {}
+      
+      if (timeRangeType === 'day') {
+        // Initialize all 24 hours
+        for (let h = 0; h < 24; h++) {
+          const label = `${h}:00`
+          buckets[label] = { name: label, generation: 0, consumption: 0 }
+        }
+      } else if (timeRangeType === 'week') {
+        // Initialize all days of week (Mon-Sun order)
+        const orderedDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+        orderedDays.forEach(day => {
+          buckets[day] = { name: day, generation: 0, consumption: 0 }
+        })
+      } else if (timeRangeType === 'month') {
+        // Initialize all days of current month
+        const now = new Date()
+        const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()
+        for (let d = 1; d <= daysInMonth; d++) {
+          const label = d.toString()
+          buckets[label] = { name: label, generation: 0, consumption: 0 }
+        }
+      } else { // year
+        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+        months.forEach(month => {
+          buckets[month] = { name: month, generation: 0, consumption: 0 }
+        })
+      }
+      
+      return buckets
+    }
 
-    // Map to chart format - values are ALREADY kWh!
-    return sorted.map(point => ({
-      name: getBucketLabel(point.bucketStart),
-      generation: point.generationKWh || 0,
-      consumption: point.consumptionKWh || 0
-    }))
+    // Initialize all buckets
+    const buckets = initializeTimeBuckets()
+
+    // Fill in actual data from series
+    if (series && series.length > 0) {
+      series.forEach(point => {
+        const label = getBucketLabel(point.bucketStart)
+        if (buckets[label]) {
+          buckets[label].generation += point.generationKWh || 0
+          buckets[label].consumption += point.consumptionKWh || 0
+        }
+      })
+    }
+
+    // Convert to array and sort properly
+    const result = Object.values(buckets)
+    
+    // Sort based on time range
+    if (timeRangeType === 'day') {
+      result.sort((a, b) => parseInt(a.name.split(':')[0]) - parseInt(b.name.split(':')[0]))
+    } else if (timeRangeType === 'week') {
+      const dayOrder = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+      result.sort((a, b) => dayOrder.indexOf(a.name) - dayOrder.indexOf(b.name))
+    } else if (timeRangeType === 'month') {
+      result.sort((a, b) => parseInt(a.name) - parseInt(b.name))
+    } else { // year
+      const monthOrder = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+      result.sort((a, b) => monthOrder.indexOf(a.name) - monthOrder.indexOf(b.name))
+    }
+
+    return result
   }
 
   /**
@@ -768,22 +795,48 @@ export default function InstallationDetailPage() {
             Detailed energy production and monitoring for this installation
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <Select value={timeRange} onValueChange={(value) => {
-            console.log(`Changing time range to: ${value}`);
-            setTimeRange(value);
-            // Data will refresh automatically due to timeRange dependency in useEffect
-          }}>
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="Select time range" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="day">Today</SelectItem>
-              <SelectItem value="week">This Week</SelectItem>
-              <SelectItem value="month">This Month</SelectItem>
-              <SelectItem value="year">This Year</SelectItem>
-            </SelectContent>
-          </Select>
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Time Range Preset Buttons */}
+          <Button
+            variant={timeRange === 'day' ? 'default' : 'outline'}
+            onClick={() => {
+              console.log('Changing time range to: day');
+              setTimeRange('day');
+            }}
+            disabled={loading}
+          >
+            Day
+          </Button>
+          <Button
+            variant={timeRange === 'week' ? 'default' : 'outline'}
+            onClick={() => {
+              console.log('Changing time range to: week');
+              setTimeRange('week');
+            }}
+            disabled={loading}
+          >
+            Week
+          </Button>
+          <Button
+            variant={timeRange === 'month' ? 'default' : 'outline'}
+            onClick={() => {
+              console.log('Changing time range to: month');
+              setTimeRange('month');
+            }}
+            disabled={loading}
+          >
+            Month
+          </Button>
+          <Button
+            variant={timeRange === 'year' ? 'default' : 'outline'}
+            onClick={() => {
+              console.log('Changing time range to: year');
+              setTimeRange('year');
+            }}
+            disabled={loading}
+          >
+            Year
+          </Button>
           <Button variant="outline" size="icon" onClick={() => {
             console.log("🔄 Manual refresh triggered for installation details");
             // Use the existing fetchInstallationData function
@@ -847,10 +900,25 @@ export default function InstallationDetailPage() {
 
                     setPerformance(perfMetrics)
 
-                    // Transform readings to chart data if available
-                    if (dashboardData.recentReadings && dashboardData.recentReadings.length > 0) {
-                      const chartData = processEnergyData(dashboardData.recentReadings, timeRange, dashboardData)
+                    // Fetch pre-aggregated series data for chart (same as initial load)
+                    try {
+                      const series = await energyApi.getInstallationSeriesForTimeRange(
+                        id,
+                        timeRange as 'day' | 'week' | 'month' | 'year'
+                      )
+                      
+                      // Transform series to chart data (generates full time range)
+                      const chartData = transformSeriesForChart(series || [], timeRange)
+                      console.log('Refresh: Chart data from aggregated series:', {
+                        points: chartData.length,
+                        totalGeneration: chartData.reduce((s, p) => s + p.generation, 0).toFixed(3) + ' kWh',
+                        totalConsumption: chartData.reduce((s, p) => s + p.consumption, 0).toFixed(3) + ' kWh'
+                      })
                       setEnergyData(chartData)
+                    } catch (e) {
+                      console.warn('Refresh: Aggregated series fetch failed:', e)
+                      // Fall back to empty chart with full time range
+                      setEnergyData(transformSeriesForChart([], timeRange))
                     }
                   }
                 } catch (error) {

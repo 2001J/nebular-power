@@ -4,16 +4,9 @@ import React, { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { format, parseISO, subDays } from "date-fns"
 import {
-  ArrowUpDown,
-  Calendar,
-  Check,
-  ChevronDown,
   Clock,
-  Database,
   Download,
   FileText,
-  Filter,
-  MoreHorizontal,
   RefreshCw,
   Search,
   Shield,
@@ -25,14 +18,12 @@ import {
   Card,
   CardContent,
   CardDescription,
-  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
 import {
   Select,
   SelectContent,
-  SelectGroup,
   SelectItem,
   SelectTrigger,
   SelectValue,
@@ -40,7 +31,6 @@ import {
 import {
   Table,
   TableBody,
-  TableCaption,
   TableCell,
   TableHead,
   TableHeader,
@@ -49,7 +39,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   Breadcrumb,
   BreadcrumbItem,

@@ -41,7 +41,7 @@ const createStompClient = (onConnect?: () => void, onDisconnect?: () => void) =>
   
   // Create custom SockJS instance with authentication
   const createWebSocket = () => {
-    let wsEndpoint = `${wsUrl}/ws`;
+    const wsEndpoint = `${wsUrl}/ws`;
     
     // Using SockJS without query parameters for the initial connection
     console.log(`Creating SockJS connection to: ${wsEndpoint}`);

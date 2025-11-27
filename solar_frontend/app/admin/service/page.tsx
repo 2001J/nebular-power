@@ -1,8 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { useRouter } from "next/navigation"
-import { ArrowUpDown, CheckCircle, Clock, Settings, ShieldAlert, AlertTriangle, Clock4, RefreshCw, Plus, Activity, BarChart2, Zap, Signal, Server, Loader2, Search } from "lucide-react"
+import { Clock, RefreshCw, Plus, Loader2, Search } from "lucide-react"
 import { format } from "date-fns"
 
 import { Badge } from "@/components/ui/badge"
@@ -11,7 +10,6 @@ import {
   Card,
   CardContent,
   CardDescription,
-  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
@@ -36,7 +34,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   Table,
   TableBody,
-  TableCaption,
   TableCell,
   TableHead,
   TableHeader,
@@ -51,7 +48,6 @@ import { cn } from "@/lib/utils"
 import { serviceControlApi } from "@/lib/api/serviceControl"
 import { installationApi } from "@/lib/api/installations"
 import { serviceApi } from "@/lib/api/service"
-import { ServiceStatusCard } from "./components/ServiceStatusCard"
 import { ServiceStatusTable } from "./components/ServiceStatusTable"
 
 const VALID_STATUS_FILTERS = new Set([

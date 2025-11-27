@@ -4,7 +4,6 @@ import { server } from '@/test/mocks/server';
 import {
   getInstallationChartData,
   getSystemChartData,
-  TimeRange,
 } from '@/lib/api/chartData';
 
 // Mock console methods to avoid noisy output in tests
@@ -597,7 +596,7 @@ describe('getSystemChartData', () => {
 
 describe('TimeRange bucket size mapping', () => {
   test('day uses hour bucket', async () => {
-    let capturedParams: URLSearchParams | null = null;
+    let capturedParams: URLSearchParams | undefined;
     
     server.use(
       http.get('*/monitoring/readings/series/:id', ({ request }) => {
@@ -609,11 +608,12 @@ describe('TimeRange bucket size mapping', () => {
 
     await getInstallationChartData('inst-123', 'day');
 
-    expect(capturedParams?.get('bucket')).toBe('hour');
+    expect(capturedParams).toBeDefined();
+    expect(capturedParams!.get('bucket')).toBe('hour');
   });
 
   test('week uses day bucket', async () => {
-    let capturedParams: URLSearchParams | null = null;
+    let capturedParams: URLSearchParams | undefined;
     
     server.use(
       http.get('*/monitoring/readings/series/:id', ({ request }) => {
@@ -625,11 +625,12 @@ describe('TimeRange bucket size mapping', () => {
 
     await getInstallationChartData('inst-123', 'week');
 
-    expect(capturedParams?.get('bucket')).toBe('day');
+    expect(capturedParams).toBeDefined();
+    expect(capturedParams!.get('bucket')).toBe('day');
   });
 
   test('month uses day bucket', async () => {
-    let capturedParams: URLSearchParams | null = null;
+    let capturedParams: URLSearchParams | undefined;
     
     server.use(
       http.get('*/monitoring/readings/series/:id', ({ request }) => {
@@ -641,11 +642,12 @@ describe('TimeRange bucket size mapping', () => {
 
     await getInstallationChartData('inst-123', 'month');
 
-    expect(capturedParams?.get('bucket')).toBe('day');
+    expect(capturedParams).toBeDefined();
+    expect(capturedParams!.get('bucket')).toBe('day');
   });
 
   test('year uses month bucket', async () => {
-    let capturedParams: URLSearchParams | null = null;
+    let capturedParams: URLSearchParams | undefined;
     
     server.use(
       http.get('*/monitoring/readings/series/:id', ({ request }) => {
@@ -657,7 +659,8 @@ describe('TimeRange bucket size mapping', () => {
 
     await getInstallationChartData('inst-123', 'year');
 
-    expect(capturedParams?.get('bucket')).toBe('month');
+    expect(capturedParams).toBeDefined();
+    expect(capturedParams!.get('bucket')).toBe('month');
   });
 });
 

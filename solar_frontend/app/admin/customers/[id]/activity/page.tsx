@@ -2,12 +2,11 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { ArrowLeft, Calendar, Clock, Search, User, Loader2, Server } from "lucide-react"
+import { ArrowLeft, Calendar, Clock, Search, Loader2, Server } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import {
   Breadcrumb,
@@ -28,7 +27,7 @@ import {
 import { useToast } from "@/components/ui/use-toast"
 import { useAuth } from "@/components/auth-provider"
 import { customerApi } from "@/lib/api"
-import type { Customer, CustomerActivityLog, PaginatedResponse } from "@/lib/api/types"
+import type { Customer, CustomerActivityLog } from "@/lib/api/types"
 
 export default function CustomerActivityPage({ params }: { params: { id: string } }) {
   const { user } = useAuth()

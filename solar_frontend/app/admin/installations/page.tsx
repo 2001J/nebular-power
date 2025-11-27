@@ -5,7 +5,6 @@ import {
   Sun,
   Download,
   Search,
-  Filter,
   Plus,
   MapPin,
   CalendarClock,
@@ -58,7 +57,7 @@ export default function InstallationsPage() {
       setLoading(true)
       try {
         // Prepare filter parameters
-        let params: Parameters<typeof installationApi.getAllInstallations>[0] = {
+        const params: Parameters<typeof installationApi.getAllInstallations>[0] = {
           page: 0,
           size: 100,
         }

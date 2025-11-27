@@ -151,13 +151,23 @@ export const authApi = {
 
   /**
    * Change password for authenticated user
+   * @param email - User's email address
+   * @param currentPassword - Current password (sent as query parameter)
+   * @param newPassword - New password to set
+   * @param confirmPassword - Confirmation of new password
    */
-  async changePassword(currentPassword: string, newPassword: string): Promise<ApiResponse<{ message: string }>> {
+  async changePassword(
+    email: string,
+    currentPassword: string,
+    newPassword: string,
+    confirmPassword: string
+  ): Promise<ApiResponse<{ message: string }>> {
     return makeApiRequest(() =>
-      apiClient.post<ApiResponse<{ message: string }>>('/api/auth/change-password', {
-        currentPassword,
-        newPassword
-      })
+      apiClient.post<ApiResponse<{ message: string }>>(
+        '/api/auth/change-password',
+        { email, newPassword, confirmPassword },
+        { params: { currentPassword } }
+      )
     );
   },
 

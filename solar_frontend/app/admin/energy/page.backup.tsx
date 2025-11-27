@@ -5,17 +5,10 @@ import { useRouter } from "next/navigation"
 import {
   BarChart3,
   Download,
-  Calendar,
   Sun,
   Zap,
-  Battery,
   ArrowUp,
-  ArrowDown,
   RefreshCw,
-  Filter,
-  MapPin,
-  AlertTriangle,
-  User,
   Loader2,
 } from "lucide-react"
 
@@ -27,10 +20,6 @@ import {
   CartesianGrid,
   Legend,
   Line,
-  LineChart,
-  Pie,
-  PieChart,
-  Cell,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -66,10 +55,7 @@ import {
 } from "@/components/ui/table"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
-import { Progress } from "@/components/ui/progress"
 import { energyApi } from "@/lib/api/energy"
-import { installationApi } from "@/lib/api/installations"
-import { energyWebSocket } from "@/lib/energyWebSocket"
 
 export default function EnergyMonitoringPage() {
   const router = useRouter()
@@ -1186,7 +1172,7 @@ export default function EnergyMonitoringPage() {
 
   // Create basic chart data when real readings aren't available
   const createBasicChartData = (systemResponse: any, timeRangeType: string) => {
-    let basicChartData: Array<{
+    const basicChartData: Array<{
       name: string;
       total: number;
       residential: number;

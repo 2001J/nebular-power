@@ -323,12 +323,12 @@ describe('useInstallationChartData', () => {
       );
 
       const { result, rerender } = renderHook(
-        ({ timeRange }) =>
+        ({ timeRange }: { timeRange: 'day' | 'week' | 'month' | 'year' }) =>
           useInstallationChartData({
             installationId: 'inst-123',
             timeRange,
           }),
-        { initialProps: { timeRange: 'day' as const } }
+        { initialProps: { timeRange: 'day' as 'day' | 'week' | 'month' | 'year' } }
       );
 
       await waitFor(() => {

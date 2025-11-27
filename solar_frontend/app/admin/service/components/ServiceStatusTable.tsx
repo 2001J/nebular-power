@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { 
   Table, 
   TableBody, 
@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Clock, RefreshCw, AlertTriangle, CheckCircle, Clock4 } from "lucide-react";
+import { Clock, RefreshCw, AlertTriangle, CheckCircle } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import {
   Pagination,

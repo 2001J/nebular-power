@@ -1,10 +1,9 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { AlertCircle, FileBarChart, FileCheck, ShieldAlert, RefreshCw, Loader2 } from "lucide-react"
+import { FileBarChart, FileCheck, ShieldAlert, RefreshCw, Loader2 } from "lucide-react"
 import { useRouter } from "next/navigation"
 
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
   Card,

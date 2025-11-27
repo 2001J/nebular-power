@@ -3,37 +3,31 @@
 import type React from "react"
 
 import { useState, useEffect } from "react"
-import { useTheme } from "next-themes"
-import { AlertCircle, ArrowRight, Battery, Check, Download, Home, Info, Shield, Sun, Zap, ArrowUp, ArrowDown, RefreshCw, BarChart3 } from "lucide-react"
+import { AlertCircle, Home, Info, Shield, Sun, ArrowUp, RefreshCw } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
 import { useAuth } from "@/components/auth-provider"
 import { useToast } from "@/components/ui/use-toast"
-import { Chart, ChartContainer } from "@/components/ui/chart"
 import {
   Area,
-  AreaChart,
   CartesianGrid,
   Legend,
-  Line,
-  LineChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
-  Bar,
-  BarChart,
-  ReferenceLine,
+  ComposedChart,
+  Line,
 } from "@/components/ui/direct-recharts"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Checkbox } from "@/components/ui/checkbox"
 import { energyApi } from "@/lib/api/energy"
 import { installationApi } from "@/lib/api/installations"
 import { securityApi } from "@/lib/api/security"
 import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Progress } from "@/components/ui/progress"
+import { formatChartYAxis, formatChartTooltip, getMonthlyXAxisConfig } from "@/lib/energyUtils"
+import { ChartContainer } from "@/components/ui/chart"
 
 // Feature flag to control sample data fallback in charts
 const ENABLE_SAMPLE_DATA = process.env.NEXT_PUBLIC_ENABLE_SAMPLE_DATA === 'true'
@@ -120,7 +114,6 @@ interface SystemAlert {
 export default function DashboardPage() {
   const { user } = useAuth()
   const { toast } = useToast()
-  const { theme } = useTheme()
   const [selectedPeriod, setSelectedPeriod] = useState("day")
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split("T")[0])
   const [selectedInstallation, setSelectedInstallation] = useState<string | null>(null)
@@ -130,28 +123,6 @@ export default function DashboardPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [hasError, setHasError] = useState(false)
   const [systemStatus, setSystemStatus] = useState<SystemStatus | null>(null)
-
-  // Theme-aware chart colors based on CSS variables for consistency
-  const chartColors = {
-    grid: 'hsl(var(--border))',
-    referenceLine: 'hsl(var(--muted-foreground))',
-    production: {
-      stroke: 'hsl(var(--chart-1))',
-      fill: 'hsl(var(--chart-1) / 0.35)'
-    },
-    consumption: {
-      stroke: 'hsl(var(--chart-2))',
-      fill: 'hsl(var(--chart-2) / 0.35)'
-    },
-    axis: {
-      tick: 'hsl(var(--muted-foreground))'
-    },
-    tooltip: {
-      bg: 'hsl(var(--popover))',
-      fg: 'hsl(var(--popover-foreground))',
-      border: 'hsl(var(--border))'
-    }
-  }
 
   // State for toggling data series visibility
   const [visibleSeries, setVisibleSeries] = useState({
@@ -411,12 +382,35 @@ export default function DashboardPage() {
 
       setDashboardData(calculatedDashboard)
 
-      // Refresh energy readings
-      const readingsResponse = await energyApi.getRecentReadings(selectedInstallation, 24)
-
-      if (Array.isArray(readingsResponse)) {
-        setEnergyReadings(readingsResponse)
+      // FIXED: Use pre-aggregated series data (same as initial load)
+      // This ensures consistent chart display between initial load and refresh
+      console.log(`Refresh: Fetching aggregated series for installation ${selectedInstallation}, period: ${selectedPeriod}`)
+      
+      const seriesData = await energyApi.getInstallationSeriesForTimeRange(
+        selectedInstallation,
+        selectedPeriod as 'day' | 'week' | 'month' | 'year'
+      )
+      
+      let energyData: any[] = []
+      
+      if (Array.isArray(seriesData) && seriesData.length > 0) {
+        console.log(`Refresh: Received ${seriesData.length} pre-aggregated data points`)
+        // Map to format expected by chart (values are ALREADY in kWh)
+        energyData = seriesData.map((point: any) => ({
+          timestamp: point.bucketStart,
+          totalGenerationKWh: point.generationKWh || 0,
+          totalConsumptionKWh: point.consumptionKWh || 0,
+          powerGenerationWatts: point.avgGenerationWatts || 0,
+          powerConsumptionWatts: point.avgConsumptionWatts || 0,
+          isSimulated: false
+        }))
+      } else {
+        console.warn(`Refresh: No series data available for ${selectedPeriod} period`)
+        energyData = []
       }
+
+      setEnergyReadings(energyData)
+      console.log(`Refresh: Set ${energyData.length} energy readings for charts`)
 
       toast({
         title: "Dashboard Updated",
@@ -764,185 +758,156 @@ export default function DashboardPage() {
   const totalProduction = chartData.reduce((sum, item) => sum + item.production, 0)
   const totalConsumption = chartData.reduce((sum, item) => sum + item.consumption, 0)
 
-  // Determine the right chart type based on selectedPeriod
+  // Get X-axis config based on time range (matches admin style)
+  const getXAxisConfig = () => {
+    if (selectedPeriod === 'day') {
+      return { interval: 2 }; // Show every 3rd hour
+    }
+    if (selectedPeriod === 'month') {
+      return getMonthlyXAxisConfig();
+    }
+    return {}; // Default for week and year
+  };
+
+  // Custom tooltip component (matches admin style)
+  const CustomTooltip = ({ active, payload, label }: any) => {
+    if (active && payload && payload.length) {
+      return (
+        <div className="rounded-lg border bg-background/95 backdrop-blur-sm p-3 shadow-lg">
+          <p className="font-semibold text-sm mb-2">{label}</p>
+          {payload.map((entry: any, index: number) => (
+            <div key={index} className="flex items-center gap-2 mb-1">
+              <div
+                className="w-3 h-3 rounded-full"
+                style={{
+                  backgroundColor: entry.color,
+                  boxShadow: `0 0 8px ${entry.color}40`
+                }}
+              />
+              <span className="text-xs text-muted-foreground">{entry.name}:</span>
+              <span className="text-sm font-medium">
+                {formatChartTooltip(entry.value)}
+              </span>
+            </div>
+          ))}
+        </div>
+      );
+    }
+    return null;
+  };
+
+  // Render energy chart - matches admin style exactly
   const renderEnergyChart = () => {
     if (chartData.length === 0) {
       return (
         <div className="flex flex-col items-center justify-center h-full py-12">
           <div className="text-muted-foreground mb-4">
-            <BarChart3 className="h-12 w-12" />
+            <Sun className="h-16 w-16" />
           </div>
           <h3 className="text-lg font-medium">No Energy Data Available</h3>
           <p className="text-sm text-muted-foreground max-w-md mt-2 text-center">
-            There is no energy data available for the selected time period or installation.
+            Energy data will appear here once your installation starts generating power.
           </p>
         </div>
       )
     }
 
-    if (selectedPeriod === 'day') {
-      return (
-        <div className="w-full" style={{ height: 350 }}>
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart
-              data={chartData}
-              margin={{
-                top: 20,
-                right: 20,
-                left: 20,
-                bottom: 20,
-              }}
-            >
-              <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-              <XAxis 
-                dataKey="time"
-                className="text-xs"
-                tickLine={false}
-                axisLine={false}
-                interval={2}
-                tickFormatter={(time) => time.split(':')[0]}
-              />
-              <YAxis
-                width={60}
-                className="text-xs"
-                tickLine={false}
-                axisLine={false}
-                tickFormatter={(value) => {
-                  if (value === 0) return '0';
-                  if (value < 0.001) return value.toFixed(4);
-                  if (value < 1) return value.toFixed(3);
-                  if (value >= 1000) return `${(value / 1000).toFixed(1)}k`;
-                  return value.toFixed(1);
-                }}
-              />
-              <Tooltip 
-                formatter={(value: number) => {
-                  if (value === 0) return ['0 kW', ''];
-                  if (value < 0.01) return [`${value.toFixed(5)} kW`, ''];
-                  if (value < 1) return [`${value.toFixed(3)} kW`, ''];
-                  return [`${value.toFixed(2)} kW`, ''];
-                }} 
-                labelFormatter={(label) => `${label} (Hour)`}
-                contentStyle={{ background: chartColors.tooltip.bg, border: `1px solid ${chartColors.tooltip.border}`, borderRadius: 8, color: chartColors.tooltip.fg }}
-                labelStyle={{ color: chartColors.axis.tick }}
-              />
-              <Legend content={<CustomLegend />} />
-              {visibleSeries.production && (
-                <Area
-                  type="monotone"
-                  dataKey="production"
-                  name="Generation"
-                  stackId="1"
-                  stroke={chartColors.production.stroke}
-                  fill={chartColors.production.fill}
-                />
-              )}
-              {visibleSeries.consumption && (
-                <Area
-                  type="monotone"
-                  dataKey="consumption"
-                  name="Consumption"
-                  stackId="2"
-                  stroke={chartColors.consumption.stroke}
-                  fill={chartColors.consumption.fill}
-                />
-              )}
-            </AreaChart>
-          </ResponsiveContainer>
-        </div>
-      )
-    } else {
-      // For week, month, and year views, use a bar chart
-      return (
-        <div className="w-full" style={{ height: 350 }}>
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart
-              data={chartData}
-              margin={{
-                top: 20,
-                right: 20,
-                left: 20,
-                bottom: 20,
-              }}
-            >
-              <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-              <XAxis 
-                dataKey="time"
-                className="text-xs"
-                tickLine={false}
-                axisLine={false}
-                {...(selectedPeriod === 'month' ? {
-                  interval: 2,
-                  angle: -45,
-                  textAnchor: 'end',
-                  height: 60
-                } : {})}
-              />
-              <YAxis
-                width={60}
-                className="text-xs"
-                tickLine={false}
-                axisLine={false}
-                tickFormatter={(value) => {
-                  if (value === 0) return '0';
-                  if (value < 0.001) return value.toFixed(4);
-                  if (value < 1) return value.toFixed(3);
-                  if (value >= 1000) return `${(value / 1000).toFixed(1)}k`;
-                  return value.toFixed(1);
-                }}
-              />
-              <Tooltip 
-                formatter={(value: number) => {
-                  if (value === 0) return ['0 kWh', ''];
-                  if (value < 0.01) return [`${value.toFixed(5)} kWh`, ''];
-                  if (value < 1) return [`${value.toFixed(3)} kWh`, ''];
-                  return [`${value.toFixed(2)} kWh`, ''];
-                }} 
-                contentStyle={{ background: chartColors.tooltip.bg, border: `1px solid ${chartColors.tooltip.border}`, borderRadius: 8, color: chartColors.tooltip.fg }}
-                labelStyle={{ color: chartColors.axis.tick }}
-              />
-              <Legend content={<CustomLegend />} />
-              {visibleSeries.production && (
-                <Bar
-                  dataKey="production"
-                  name="Generation"
-                  fill={chartColors.production.fill}
-                  radius={[4, 4, 0, 0]}
-                />
-              )}
-              {visibleSeries.consumption && (
-                <Bar
-                  dataKey="consumption"
-                  name="Consumption"
-                  fill={chartColors.consumption.fill}
-                  radius={[4, 4, 0, 0]}
-                />
-              )}
-              <ReferenceLine y={0} stroke={chartColors.referenceLine} />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      )
-    }
-  }
-
-  // Custom legend that allows toggling series visibility
-  const CustomLegend = ({ payload }: any) => {
-    if (!payload) return null
-
+    // Use ComposedChart for all time ranges (same as admin)
     return (
-      <div className="flex flex-wrap gap-4 justify-center mt-2">
-        {payload.map((entry: any, index: number) => (
-          <div
-            key={`item-${index}`}
-            className={`flex items-center gap-2 cursor-pointer ${!visibleSeries[entry.dataKey as keyof typeof visibleSeries] ? "opacity-50" : ""}`}
-            onClick={() => toggleSeries(entry.dataKey)}
-          >
-            <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: entry.color }} />
-            <span className="text-sm">{entry.value}</span>
-          </div>
-        ))}
-      </div>
+      <ChartContainer className="h-[350px] w-full">
+        <ResponsiveContainer width="100%" height="100%">
+          <ComposedChart data={chartData} margin={{ top: 20, right: 20, left: 20, bottom: 20 }}>
+            <defs>
+              <linearGradient id="productionGradientCustomer" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="hsl(142, 76%, 46%)" stopOpacity={0.9} />
+                <stop offset="50%" stopColor="hsl(142, 76%, 36%)" stopOpacity={0.8} />
+                <stop offset="100%" stopColor="hsl(142, 76%, 26%)" stopOpacity={0.6} />
+              </linearGradient>
+              <filter id="glowCustomer">
+                <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+                <feMerge>
+                  <feMergeNode in="coloredBlur"/>
+                  <feMergeNode in="SourceGraphic"/>
+                </feMerge>
+              </filter>
+            </defs>
+            <CartesianGrid strokeDasharray="3 3" className="stroke-muted/30" vertical={false} />
+            <XAxis 
+              dataKey="time"
+              className="text-xs"
+              tickLine={false}
+              axisLine={false}
+              tick={{ fill: 'hsl(var(--muted-foreground))' }}
+              {...getXAxisConfig()}
+            />
+            <YAxis 
+              yAxisId="left"
+              orientation="left"
+              width={60}
+              className="text-xs"
+              tickLine={false}
+              axisLine={false}
+              tick={{ fill: 'hsl(var(--muted-foreground))' }}
+              tickFormatter={formatChartYAxis}
+            />
+            <YAxis 
+              yAxisId="right"
+              orientation="right"
+              width={60}
+              className="text-xs"
+              tickLine={false}
+              axisLine={false}
+              tick={{ fill: 'hsl(var(--muted-foreground))' }}
+              tickFormatter={formatChartYAxis}
+            />
+            <Tooltip content={<CustomTooltip />} />
+            <Legend 
+              wrapperStyle={{ paddingTop: '20px' }}
+              iconType="circle"
+            />
+            {visibleSeries.production && (
+              <Area
+                yAxisId="left"
+                type="monotone"
+                dataKey="production"
+                name="Generation"
+                fill="url(#productionGradientCustomer)"
+                stroke="hsl(142, 76%, 36%)"
+                strokeWidth={2}
+                fillOpacity={0.7}
+                style={{ filter: 'url(#glowCustomer)' }}
+              />
+            )}
+            {visibleSeries.consumption && (
+              <Line 
+                yAxisId="right"
+                type="monotone" 
+                dataKey="consumption" 
+                name="Consumption" 
+                stroke="hsl(0, 84%, 60%)" 
+                strokeWidth={3}
+                dot={{ 
+                  fill: "hsl(0, 84%, 60%)", 
+                  strokeWidth: 2, 
+                  r: 4,
+                  filter: 'drop-shadow(0 0 4px rgba(255, 100, 100, 0.6))'
+                }}
+                activeDot={{ 
+                  r: 6, 
+                  fill: "hsl(0, 84%, 60%)",
+                  stroke: 'white',
+                  strokeWidth: 2,
+                  filter: 'drop-shadow(0 0 8px rgba(255, 100, 100, 0.8))'
+                }}
+                style={{ 
+                  stroke: "hsl(0, 84%, 60%)",
+                  filter: 'drop-shadow(0 0 2px rgba(255, 100, 100, 0.4))'
+                }}
+              />
+            )}
+          </ComposedChart>
+        </ResponsiveContainer>
+      </ChartContainer>
     )
   }
 
@@ -1131,20 +1096,40 @@ export default function DashboardPage() {
             <Card className="bg-white dark:bg-[#111318] border-gray-200 dark:border-white/10 rounded-2xl shadow-sm dark:shadow-none col-span-2">
               <CardHeader className="pb-4 px-6 pt-6 flex flex-row items-center justify-between">
                 <CardTitle className="text-gray-900 dark:text-white/90">Energy Production</CardTitle>
-                <Select 
-                  value={selectedPeriod} 
-                  onValueChange={handlePeriodChange}
-                >
-                  <SelectTrigger className="w-[150px]">
-                    <SelectValue placeholder="Select period" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="day">Today (Hourly)</SelectItem>
-                    <SelectItem value="week">This Week (Daily)</SelectItem>
-                    <SelectItem value="month">This Month (Daily)</SelectItem>
-                    <SelectItem value="year">This Year (Monthly)</SelectItem>
-                  </SelectContent>
-                </Select>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    variant={selectedPeriod === 'day' ? 'default' : 'outline'}
+                    onClick={() => handlePeriodChange('day')}
+                    disabled={isLoading}
+                    size="sm"
+                  >
+                    Day
+                  </Button>
+                  <Button
+                    variant={selectedPeriod === 'week' ? 'default' : 'outline'}
+                    onClick={() => handlePeriodChange('week')}
+                    disabled={isLoading}
+                    size="sm"
+                  >
+                    Week
+                  </Button>
+                  <Button
+                    variant={selectedPeriod === 'month' ? 'default' : 'outline'}
+                    onClick={() => handlePeriodChange('month')}
+                    disabled={isLoading}
+                    size="sm"
+                  >
+                    Month
+                  </Button>
+                  <Button
+                    variant={selectedPeriod === 'year' ? 'default' : 'outline'}
+                    onClick={() => handlePeriodChange('year')}
+                    disabled={isLoading}
+                    size="sm"
+                  >
+                    Year
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent className="pt-4">
                 <div className="h-80">

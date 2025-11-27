@@ -165,13 +165,14 @@ export default function EnergyMonitoringPage() {
           </p>
         </div>
         
-        {/* Header Controls */}
+        {/* Header Controls - Preset buttons only */}
         <ChartControls
           timeRange={timeRange}
           onTimeRangeChange={handleTimeRangeChange}
           onRefresh={handleRefresh}
           onExport={handleExportData}
           loading={loading}
+          showButtonVariant={true}
         />
       </div>
 
@@ -190,15 +191,6 @@ export default function EnergyMonitoringPage() {
                 </span>
               </p>
             </div>
-            
-            {/* Button Variant Controls */}
-            <ChartControls
-              timeRange={timeRange}
-              onTimeRangeChange={handleTimeRangeChange}
-              onExport={handleExportData}
-              loading={loading}
-              showButtonVariant={true}
-            />
           </div>
         </CardContent>
       </Card>

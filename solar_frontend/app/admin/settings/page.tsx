@@ -2,14 +2,11 @@
 
 import { useState, useEffect } from "react"
 import {
-  Settings,
   Save,
   User,
   Building,
   Mail,
-  Bell,
   Lock,
-  Cloud,
   Database,
   Layers,
   AlertCircle,
@@ -17,7 +14,7 @@ import {
   Server,
   Clock
 } from "lucide-react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Switch } from "@/components/ui/switch"

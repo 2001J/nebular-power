@@ -9,9 +9,7 @@ import React from 'react';
 import {
   ResponsiveContainer,
   ComposedChart,
-  BarChart,
   AreaChart,
-  Bar,
   Area,
   Line,
   XAxis,

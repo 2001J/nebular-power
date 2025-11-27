@@ -28,11 +28,9 @@ const nextConfig = {
   },
   // Add rewrites for API proxy to solve CORS issues
   async rewrites() {
-    // Determine if we're in development or production
-    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || 
-                      (process.env.NODE_ENV === 'production' 
-                        ? 'http://backend:8080' 
-                        : 'http://localhost:8080');
+    // Use NEXT_PUBLIC_API_URL if set (Docker sets this), otherwise default to localhost
+    // Docker Compose will override this with http://backend:8080 via environment variable
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
     
     console.log(`Using API base URL: ${apiBaseUrl}`);
     

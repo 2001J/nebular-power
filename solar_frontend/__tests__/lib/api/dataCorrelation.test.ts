@@ -7,7 +7,7 @@
  * - No data loss or incorrect transformations
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import type { SystemSeriesPoint, SystemOverview, ChartDataPoint } from '@/src/types/energyTypes';
 
 // Mock the API client

@@ -10,9 +10,7 @@ import {
 } from '../utils/dataTransformers';
 import type {
   EnergyReading,
-  SystemOverview,
-  TimeRange,
-  ChartDataPoint
+  SystemOverview
 } from '@/src/types/energyTypes';
 
 describe('EnergyChartDataTransformer', () => {

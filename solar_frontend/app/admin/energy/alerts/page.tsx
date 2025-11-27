@@ -5,13 +5,10 @@ import { useRouter } from "next/navigation"
 import {
   AlertTriangle,
   ArrowLeft,
-  CheckCircle2,
   Clock,
   Download,
-  Filter,
   Search,
   ShieldAlert,
-  XCircle,
   Zap,
   MoreHorizontal,
 } from "lucide-react"
@@ -44,7 +41,6 @@ import {
 } from "@/components/ui/table"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useToast } from "@/components/ui/use-toast"
-import { energyApi } from "@/lib/api/energy"
 import { securityApi } from "@/lib/api/security"
 import { energyWebSocket } from "@/lib/energyWebSocket"
 

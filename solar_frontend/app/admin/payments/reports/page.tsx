@@ -4,36 +4,20 @@ import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { format, subDays } from "date-fns"
 import {
-  ArrowLeft,
   Calendar,
-  Download,
   FileText,
-  Filter,
   RefreshCw,
-  Search,
-  XCircle,
-  BarChart,
-  PieChart,
-  LineChart as LineChartIcon,
-  Clock
+  XCircle
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+
+
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   Table,
   TableBody,
-  TableCaption,
   TableCell,
   TableHead,
   TableHeader,
@@ -49,16 +33,9 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb"
-import {
-  Pagination,
-  PaginationContent,
-  PaginationEllipsis,
-  PaginationItem,
-  PaginationLink,
-  PaginationNext,
-  PaginationPrevious,
-} from "@/components/ui/pagination"
-import { DatePickerWithRange } from "@/components/ui/date-range-picker"
+
+
+import { MuiDateRangePicker } from "@/components/ui/mui-date-range-picker"
 import { DateRange } from "react-day-picker"
 import { paymentComplianceApi } from "@/lib/api/paymentCompliance"
 import { paymentApi } from "@/lib/api/payments"
@@ -75,19 +52,37 @@ export default function PaymentReportsPage() {
     from: subDays(new Date(), 30),
     to: new Date(),
   })
+  const [datePreset, setDatePreset] = useState<'today' | '7d' | '30d' | '90d' | null>(null)
 
-  // Fetch report data
-  const fetchReportData = async (reportType: string) => {
+  // Clear date filter to default (last 30 days) and refetch
+  const clearDateFilter = () => {
+    const defaultFrom = subDays(new Date(), 30)
+    const defaultTo = new Date()
+    setDatePreset(null) // Clear the preset highlight
+    setDateRange({
+      from: defaultFrom,
+      to: defaultTo,
+    })
+    // Fetch with the new dates immediately
+    fetchReportData(activeTab, defaultFrom, defaultTo)
+  }
+
+  // Fetch report data - optionally accepts date overrides for immediate use after state changes
+  const fetchReportData = async (reportType: string, fromDate?: Date, toDate?: Date) => {
     try {
       setLoading(true)
 
       let data
+      // Use provided dates or fall back to state
+      const effectiveFrom = fromDate || dateRange?.from
+      const effectiveTo = toDate || dateRange?.to
+      
       // Format dates as ISO strings but only use the date part (YYYY-MM-DD)
-      const startDate = dateRange?.from 
-        ? dateRange.from.toISOString().split('T')[0] 
+      const startDate = effectiveFrom 
+        ? effectiveFrom.toISOString().split('T')[0] 
         : undefined;
-      const endDate = dateRange?.to 
-        ? dateRange.to.toISOString().split('T')[0]
+      const endDate = effectiveTo 
+        ? effectiveTo.toISOString().split('T')[0]
         : undefined;
 
       console.log(`Fetching ${reportType} report with date range:`, { startDate, endDate });
@@ -523,36 +518,52 @@ export default function PaymentReportsPage() {
         </BreadcrumbList>
       </Breadcrumb>
 
-      <div className="flex justify-between items-center">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Payment Analytics</h1>
           <p className="text-muted-foreground">
             Track payment performance and analyze payment trends over time
           </p>
         </div>
-        <div className="flex items-center space-x-2">
-          <DatePickerWithRange date={dateRange} setDate={setDateRange} />
+        <Button
+          onClick={() => fetchReportData(activeTab)}
+          variant="outline"
+          size="sm"
+          disabled={loading}
+        >
+          <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />
+          Refresh
+        </Button>
+      </div>
+
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <Tabs value={activeTab} onValueChange={handleTabChange}>
+          <TabsList className="grid grid-cols-4 w-fit">
+            <TabsTrigger value="compliance">Compliance</TabsTrigger>
+            <TabsTrigger value="revenue">Revenue</TabsTrigger>
+            <TabsTrigger value="upcoming">Upcoming</TabsTrigger>
+            <TabsTrigger value="overdue">Overdue</TabsTrigger>
+          </TabsList>
+        </Tabs>
+        <div className="flex items-center gap-2">
+          <MuiDateRangePicker 
+            date={dateRange} 
+            setDate={setDateRange} 
+            onDateChange={() => fetchReportData(activeTab)}
+            selectedPreset={datePreset}
+            onPresetChange={setDatePreset}
+          />
           <Button
-            onClick={() => fetchReportData(activeTab)}
-            variant="outline"
+            variant="ghost"
             size="sm"
-            className="h-10"
-            disabled={loading}
+            onClick={clearDateFilter}
+            className="text-muted-foreground hover:text-foreground"
           >
-            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />
-            Refresh
+            <XCircle className="h-4 w-4 mr-1" />
+            Clear
           </Button>
         </div>
       </div>
-
-      <Tabs value={activeTab} onValueChange={handleTabChange}>
-        <TabsList className="grid grid-cols-4 md:w-[600px]">
-          <TabsTrigger value="compliance">Compliance</TabsTrigger>
-          <TabsTrigger value="revenue">Revenue</TabsTrigger>
-          <TabsTrigger value="upcoming">Upcoming</TabsTrigger>
-          <TabsTrigger value="overdue">Overdue</TabsTrigger>
-        </TabsList>
-      </Tabs>
 
       {loading ? (
         <div className="flex items-center justify-center h-64">

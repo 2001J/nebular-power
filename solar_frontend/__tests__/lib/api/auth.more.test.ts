@@ -62,7 +62,7 @@ describe('authApi additional coverage', () => {
     const rp = await authApi.resetPassword('tok', 'np');
     expect(rp.message).toBe('ok');
 
-    const ch = await authApi.changePassword('cp', 'np');
+    const ch = await authApi.changePassword('test@example.com', 'cp', 'np', 'np');
     expect(ch.message).toBe('ok');
 
     const val = await authApi.validateSession();

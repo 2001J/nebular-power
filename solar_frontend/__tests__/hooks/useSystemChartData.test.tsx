@@ -346,11 +346,11 @@ describe('useSystemChartData', () => {
       );
 
       const { result, rerender } = renderHook(
-        ({ timeRange }) =>
+        ({ timeRange }: { timeRange: 'day' | 'week' | 'month' | 'year' }) =>
           useSystemChartData({
             timeRange,
           }),
-        { initialProps: { timeRange: 'day' as const } }
+        { initialProps: { timeRange: 'day' as 'day' | 'week' | 'month' | 'year' } }
       );
 
       await waitFor(() => {

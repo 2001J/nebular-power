@@ -5,16 +5,11 @@ import { useRouter } from "next/navigation"
 import React from "react"
 import {
   ArrowLeft,
-  Calendar,
-  DollarSign,
-  CreditCard,
   Pencil,
-  Trash,
-  Clock,
   Loader2,
   Receipt
 } from "lucide-react"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
@@ -379,7 +374,7 @@ export default function LoanDetailsPage({ params }: { params: Promise<LoanParams
       }
       
       // Calculate the next payment date based on frequency
-      let nextDate = new Date(startDate);
+      const nextDate = new Date(startDate);
       const frequencyMap = {
         'MONTHLY': 1,
         'QUARTERLY': 3,

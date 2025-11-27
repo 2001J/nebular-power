@@ -3,35 +3,22 @@
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import {
-  ArrowRight, 
-  Calendar,
-  CreditCard,
-  DollarSign,
-  Home,
+  ArrowRight,
   Info,
-  Receipt,
   Shield,
   Sun,
   Zap
 } from "lucide-react"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { useAuth } from "@/components/auth-provider"
 import { useToast } from "@/components/ui/use-toast"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Progress } from "@/components/ui/progress"
-import { Separator } from "@/components/ui/separator"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb"
+
+
 import { paymentApi } from "@/lib/api/payments"
 import { installationApi } from "@/lib/api/installations"
 import { format } from "date-fns"

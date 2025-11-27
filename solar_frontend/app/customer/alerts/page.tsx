@@ -3,12 +3,11 @@
 import type React from "react"
 
 import { useEffect, useState, useCallback } from "react"
-import { AlertTriangle, Bell, BellOff, Check, Clock, Filter, RefreshCw, Search, Settings, Shield, ShieldAlert, Zap } from "lucide-react"
+import { AlertTriangle, Bell, BellOff, Check, Clock, RefreshCw, Search, ShieldAlert } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
 import { Badge } from "@/components/ui/badge"
 import { useToast } from "@/components/ui/use-toast"

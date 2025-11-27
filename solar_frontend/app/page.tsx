@@ -5,26 +5,19 @@ import { useAuth } from "@/components/auth-provider"
 import { Button } from "@/components/ui/button"
 import {
   Activity,
-  BarChart,
-  Battery,
   Bell,
-  Check,
   ClipboardList,
   CreditCard,
-  Github,
   Layout,
   Linkedin,
-  Lock,
   Mail,
   Menu,
   Phone,
   Power,
   Shield,
-  ShieldCheck,
   Sun,
   UserPlus,
-  Users,
-  Zap
+  Users
 } from "lucide-react"
 import { useState, FormEvent } from "react"
 import { Input } from "@/components/ui/input"
