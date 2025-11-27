@@ -8,7 +8,7 @@ services:
     ports:
       - '${POSTGRES_HOST_PORT:-5433}:5432'
     volumes:
-      - postgres-data:/var/lib/postgresql/data
+      - postgres-data:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-solaruser} -d ${DB_NAME:-solardb}"]
       interval: 10s
@@ -21,9 +21,13 @@ services:
       dockerfile: Dockerfile
     container_name: solar_backend
     ports:
-      - '8080:8080'
+      - '${BACKEND_HOST_PORT:-8080}:8080'
     env_file:
-      - .env  # Simpler: passes all variables to backend
+      - .env
+    environment:
+      # Automatically construct URLs based on host ports
+      - 'FRONTEND_URL=http://localhost:${FRONTEND_HOST_PORT:-3000}'
+      - 'BACKEND_URL=http://localhost:${BACKEND_HOST_PORT:-8080}'
     depends_on:
       postgres:
         condition: service_healthy
@@ -34,10 +38,10 @@ services:
       dockerfile: Dockerfile.frontend
     container_name: solar_frontend
     ports:
-      - '3000:3000'
+      - '${FRONTEND_HOST_PORT:-3000}:3000'
     environment:
-      # Frontend only needs backend URL (security: doesn't get DB credentials)
-      - 'NEXT_PUBLIC_API_URL=${BACKEND_URL:-http://localhost:8080}'
+      # For server-side API calls (inside Docker network)
+      - 'NEXT_PUBLIC_API_URL=http://backend:8080'
     depends_on:
       - backend
 

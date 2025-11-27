@@ -63,3 +63,5 @@ ikthesis_template/
 ### Pi Simulation Runtime Files ###
 pi_simulation/service_state_*.json
 pi_simulation_http/service_state_*.json
+
+.env

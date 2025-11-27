@@ -1,14 +1,17 @@
 FROM node:20-alpine AS base
 
+# Install pnpm globally
+RUN corepack enable && corepack prepare pnpm@latest --activate
+
 # Install dependencies only when needed
 FROM base AS deps
 WORKDIR /app
 
 # Copy only package files first
-COPY solar_frontend/package.json solar_frontend/package-lock.json* solar_frontend/pnpm-lock.yaml* ./
+COPY solar_frontend/package.json solar_frontend/pnpm-lock.yaml* ./
 
-# Install dependencies using npm (switching from pnpm as it might not be correctly set up)
-RUN npm install
+# Install dependencies using pnpm
+RUN pnpm install --frozen-lockfile
 
 # Rebuild the source code only when needed
 FROM base AS builder
@@ -19,7 +22,7 @@ COPY solar_frontend .
 
 # Build the application
 ENV NEXT_TELEMETRY_DISABLED 1
-RUN npm run build
+RUN pnpm run build
 
 # Production image, copy all the files and run next
 FROM base AS runner
