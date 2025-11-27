@@ -1,12 +1,11 @@
-FROM eclipse-temurin:21-jdk AS build
+FROM maven:3.9.6-eclipse-temurin-21 AS build
 WORKDIR /workspace/app
 
-COPY mvnw .
-COPY .mvn .mvn
+# Use the container's Maven (no mvnw/.mvn required)
 COPY pom.xml .
 COPY src src
 
-RUN ./mvnw package -DskipTests
+RUN mvn -B package -DskipTests
 RUN mkdir -p target/dependency && (cd target/dependency; jar -xf ../*.jar)
 
 FROM eclipse-temurin:21-jre
