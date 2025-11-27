@@ -195,6 +195,8 @@ class EnergySimulator:
         current_amps = power_consumption / voltage if voltage > 0 else 0
         
         # Create the energy data payload
+        # Note: Efficiency is calculated server-side using the installation's stored capacity
+        # (from when the installation was created in the admin dashboard)
         energy_data = {
             "installationId": self.installation_id,
             "deviceToken": f"SIM-TOKEN-{self.installation_id}",

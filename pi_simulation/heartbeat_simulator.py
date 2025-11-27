@@ -78,8 +78,8 @@ class HeartbeatSimulator:
                 # Update device state
                 self._update_device_state()
                 
-                # Generate and send heartbeat
-                self._send_heartbeat()
+                # Generate and send heartbeat (pass is_running for interruptible requests)
+                self._send_heartbeat(is_running)
                 
                 # Wait for the next interval with interruptible sleep
                 sleep_remaining = self.interval
@@ -144,7 +144,7 @@ class HeartbeatSimulator:
             self.error_countdown = self.error_duration
             logger.info(f"Simulating error condition: {self.current_error} - {self.possible_errors[self.current_error]}")
     
-    def _send_heartbeat(self):
+    def _send_heartbeat(self, is_running=None):
         """Generate and send a heartbeat message."""
         # Base heartbeat data
         heartbeat_data = {
@@ -182,6 +182,11 @@ class HeartbeatSimulator:
         timeout = 5  # Reduced from 10 seconds
         
         for attempt in range(max_retries):
+            # Check if we should stop before each attempt
+            if is_running and not is_running():
+                logger.debug("Stopping heartbeat send due to shutdown signal")
+                return False
+            
             try:
                 # Get authentication headers
                 from auth_helper import get_auth_helper
@@ -201,7 +206,14 @@ class HeartbeatSimulator:
                     logger.warning(f"Failed to send heartbeat for device {self.device_id}: "
                                  f"{response.status_code} - {response.text}")
                     if attempt < max_retries - 1:
-                        time.sleep(1)
+                        # Interruptible sleep before retry
+                        if is_running:
+                            for _ in range(10):  # 1 second total, checking every 0.1s
+                                if not is_running():
+                                    return False
+                                time.sleep(0.1)
+                        else:
+                            time.sleep(1)
             
             except requests.Timeout:
                 logger.warning(f"Heartbeat request timeout (attempt {attempt + 1}/{max_retries})")
@@ -210,7 +222,14 @@ class HeartbeatSimulator:
             except RequestException as e:
                 logger.error(f"Error sending heartbeat for device {self.device_id}: {e}")
                 if attempt < max_retries - 1:
-                    time.sleep(1)
+                    # Interruptible sleep before retry
+                    if is_running:
+                        for _ in range(10):  # 1 second total
+                            if not is_running():
+                                return False
+                            time.sleep(0.1)
+                    else:
+                        time.sleep(1)
                 break
         
         return False
