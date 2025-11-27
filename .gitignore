@@ -57,3 +57,4 @@ __pycache__
 ### thesis template ###
 ikthesis_template/
 
+*.class
