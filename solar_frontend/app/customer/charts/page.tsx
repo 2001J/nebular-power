@@ -23,7 +23,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { energyApi } from "@/lib/api/energy"
 import { installationApi } from "@/lib/api/installations"
 import { securityApi } from "@/lib/api/security"
-import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Progress } from "@/components/ui/progress"
 import { formatChartYAxis, formatChartTooltip, getMonthlyXAxisConfig } from "@/lib/energyUtils"
