@@ -501,30 +501,50 @@ public class SolarInstallationServiceImpl implements SolarInstallationService {
         // Cap efficiency at 100% for more reasonable values
         double cappedEfficiency = Math.min(100.0, efficiency);
 
-        // Calculate average efficiency based on utilization and capacity
+        // Calculate average efficiency from today's readings (same as DashboardResponse)
+        // This ensures consistency between TopProducerDTO and DashboardResponse
         double averageEfficiency = 0;
+        double capacityWatts = installation.getInstalledCapacityKW() * 1000;
+        
+        // Fetch today's readings for this installation
+        LocalDate todayDate = LocalDate.now();
+        LocalDateTime startOfDay = todayDate.atStartOfDay();
+        LocalDateTime endOfDay = todayDate.atTime(23, 59, 59);
+        List<EnergyData> todayReadings = energyDataRepository.findByInstallationAndTimestampBetweenOrderByTimestampAsc(
+                installation, startOfDay, endOfDay);
+        
+        if (!todayReadings.isEmpty() && capacityWatts > 0) {
+            double totalEfficiency = 0;
+            int countWithGeneration = 0;
+            
+            for (EnergyData reading : todayReadings) {
+                if (reading.getEfficiencyPercentage() > 0) {
+                    // Use stored efficiency if available
+                    totalEfficiency += reading.getEfficiencyPercentage();
+                    countWithGeneration++;
+                } else if (reading.getPowerGenerationWatts() > 0) {
+                    // Calculate from power if efficiency not stored
+                    double readingEfficiency = Math.min(100.0, 
+                        (reading.getPowerGenerationWatts() / capacityWatts) * 100);
+                    totalEfficiency += readingEfficiency;
+                    countWithGeneration++;
+                }
+            }
+            
+            if (countWithGeneration > 0) {
+                averageEfficiency = totalEfficiency / countWithGeneration;
+            }
+        }
+        
+        // If no average calculated, use current efficiency
+        if (averageEfficiency == 0) {
+            averageEfficiency = cappedEfficiency;
+        }
 
-        // Calculate utilization rate (currentGeneration as percentage of installed capacity)
+        // Calculate utilization rate for display purposes
         double utilizationRate = 0;
         if (installation.getInstalledCapacityKW() > 0) {
             utilizationRate = Math.min(1.0, currentGeneration / (installation.getInstalledCapacityKW() * 1000));
-
-            // Calculate average efficiency based on utilization rate
-            // At high utilization (near capacity), efficiency should be close to 100%
-            // At low utilization, use the capped efficiency value
-            if (utilizationRate > 0.7) {
-                // High production time - efficiency close to 100%
-                averageEfficiency = 90.0 + (10.0 * utilizationRate);
-            } else if (utilizationRate > 0.3) {
-                // Medium production time - efficiency between 70-90%
-                averageEfficiency = 70.0 + (20.0 * ((utilizationRate - 0.3) / 0.4));
-            } else if (utilizationRate > 0) {
-                // Low production time - efficiency between 0-70% based on utilization
-                averageEfficiency = Math.max(cappedEfficiency, utilizationRate * 70.0 / 0.3);
-            } else {
-                // No production - use capped efficiency or 0
-                averageEfficiency = cappedEfficiency;
-            }
         }
 
         return TopProducerDTO.builder()

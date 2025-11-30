@@ -36,6 +36,15 @@ public class EnergyData {
     @Column(nullable = false)
     private double totalYieldKWh;
 
+    /**
+     * Panel efficiency percentage (0-100).
+     * Calculated as: (currentGeneration / installedCapacity) * 100
+     * This represents how much of the rated capacity is being utilized.
+     * A value of 85% means the panels are producing 85% of their rated capacity.
+     */
+    @Column(nullable = false)
+    private double efficiencyPercentage = 0.0;
+
     @Column(nullable = false)
     private boolean isSimulated = true;
 } 

@@ -42,6 +42,15 @@ public class EnergyDataRequest {
     @PositiveOrZero(message = "Voltage must be zero or positive")
     private double voltage;
 
+    /**
+     * Panel efficiency percentage (0-100). Optional field.
+     * If not provided (or 0), the server will calculate it using the 
+     * installation's stored capacity from the database.
+     * Formula: (currentGeneration / installedCapacity) * 100
+     */
+    @PositiveOrZero(message = "Efficiency percentage must be zero or positive")
+    private double efficiencyPercentage;
+
     // Optional unit hints (non-functional, for clarity and future expansion)
     private String powerUnit;   // expected: "W"
     private String energyUnit;  // expected: "kWh"

@@ -50,6 +50,16 @@ public class EnergyDataServiceImpl implements EnergyDataService {
         energyData.setTimestamp(request.getTimestamp() != null ? request.getTimestamp() : LocalDateTime.now());
         energyData.setDailyYieldKWh(request.getDailyYieldKWh());
         energyData.setTotalYieldKWh(request.getTotalYieldKWh());
+        
+        // Use efficiency from request if provided, otherwise calculate from capacity
+        double efficiency = request.getEfficiencyPercentage();
+        if (efficiency <= 0 && installation.getInstalledCapacityKW() > 0) {
+            // Calculate efficiency as percentage of installed capacity
+            double capacityWatts = installation.getInstalledCapacityKW() * 1000;
+            efficiency = Math.min(100.0, (request.getPowerGenerationWatts() / capacityWatts) * 100);
+        }
+        energyData.setEfficiencyPercentage(efficiency);
+        
         energyData.setSimulated(true); // Assuming all data is simulated for now
 
         // Calculate derived metrics
@@ -248,44 +258,45 @@ public class EnergyDataServiceImpl implements EnergyDataService {
 
         // Values already calculated in kWh via integration and summaries
 
-        // Calculate efficiency
+        // Calculate REAL efficiency based on capacity utilization, not generation/consumption ratio
+        // Efficiency = (actual output / rated capacity) * 100
         double currentEfficiency = 0;
-        if (currentPowerConsumption > 0) {
-            currentEfficiency = (currentPowerGeneration / currentPowerConsumption) * 100;
+        double capacityWatts = installation.getInstalledCapacityKW() * 1000;
+        
+        // First, try to get efficiency from the most recent reading (sent by Pi)
+        if (!recentReadings.isEmpty() && recentReadings.get(0).getEfficiencyPercentage() > 0) {
+            currentEfficiency = recentReadings.get(0).getEfficiencyPercentage();
+        } else if (capacityWatts > 0 && currentPowerGeneration > 0) {
+            // Calculate efficiency as percentage of installed capacity being used
+            currentEfficiency = Math.min(100.0, (currentPowerGeneration / capacityWatts) * 100);
         }
-
-        // Make sure efficiency is a percentage value (0-100 range)
-        if (currentEfficiency > 0 && currentEfficiency <= 1.0) {
-            currentEfficiency = currentEfficiency * 100.0; // Convert from decimal to percentage
-        }
-
-        // Cap efficiency at 100% for more reasonable values
-        double cappedEfficiency = Math.min(100.0, currentEfficiency);
-
-        // Calculate average efficiency based on utilization and capacity
+        
+        // Calculate average efficiency from today's readings
         double averageEfficiency = 0;
-
-        // Calculate utilization rate (currentGeneration as percentage of installed capacity)
-        double utilizationRate = 0;
-        if (installation.getInstalledCapacityKW() > 0) {
-            utilizationRate = Math.min(1.0, currentPowerGeneration / (installation.getInstalledCapacityKW() * 1000));
-
-            // Calculate average efficiency based on utilization rate
-            // At high utilization (near capacity), efficiency should be close to 100%
-            // At low utilization, use the capped efficiency value
-            if (utilizationRate > 0.7) {
-                // High production time - efficiency close to 100%
-                averageEfficiency = 90.0 + (10.0 * utilizationRate);
-            } else if (utilizationRate > 0.3) {
-                // Medium production time - efficiency between 70-90%
-                averageEfficiency = 70.0 + (20.0 * ((utilizationRate - 0.3) / 0.4));
-            } else if (utilizationRate > 0) {
-                // Low production time - efficiency between 0-70% based on utilization
-                averageEfficiency = Math.max(cappedEfficiency, utilizationRate * 70.0 / 0.3);
-            } else {
-                // No production - use capped efficiency or 0
-                averageEfficiency = cappedEfficiency;
+        if (!todayAsc.isEmpty()) {
+            // Average the efficiency from all readings that have generation
+            double totalEfficiency = 0;
+            int countWithGeneration = 0;
+            for (EnergyData reading : todayAsc) {
+                if (reading.getEfficiencyPercentage() > 0) {
+                    totalEfficiency += reading.getEfficiencyPercentage();
+                    countWithGeneration++;
+                } else if (reading.getPowerGenerationWatts() > 0 && capacityWatts > 0) {
+                    // Calculate from power if efficiency not stored
+                    double readingEfficiency = Math.min(100.0, 
+                        (reading.getPowerGenerationWatts() / capacityWatts) * 100);
+                    totalEfficiency += readingEfficiency;
+                    countWithGeneration++;
+                }
             }
+            if (countWithGeneration > 0) {
+                averageEfficiency = totalEfficiency / countWithGeneration;
+            }
+        }
+        
+        // If no average calculated, use current efficiency
+        if (averageEfficiency == 0) {
+            averageEfficiency = currentEfficiency;
         }
 
         // Build the dashboard response
@@ -333,6 +344,7 @@ public class EnergyDataServiceImpl implements EnergyDataService {
                 .timestamp(energyData.getTimestamp())
                 .dailyYieldKWh(energyData.getDailyYieldKWh())
                 .totalYieldKWh(energyData.getTotalYieldKWh())
+                .efficiencyPercentage(energyData.getEfficiencyPercentage())
                 .isSimulated(energyData.isSimulated())
                 .powerUnit("W")
                 .energyUnit("kWh")
