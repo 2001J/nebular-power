@@ -203,7 +203,24 @@ export default function DashboardPage() {
         }
 
         console.log("Installation dashboard data:", dashboardResponse)
-        setDashboardData(dashboardResponse)
+        
+        // Calculate environmental impact for initial load (same as in refreshDashboard)
+        if (dashboardResponse) {
+          const calculatedDashboard = {
+            ...dashboardResponse,
+            environmentalImpact: {
+              co2Saved: dashboardResponse.lifetimeGenerationKWh * 0.85,
+              treesEquivalent: Math.max(0.1, (dashboardResponse.lifetimeGenerationKWh * 0.85) / 21),
+              carbonFootprintReduction: 
+                dashboardResponse.installationDetails?.type === "RESIDENTIAL" 
+                  ? Math.min(100, (dashboardResponse.monthToDateGenerationKWh / 600) * 100)
+                  : Math.min(100, (dashboardResponse.monthToDateGenerationKWh / 2000) * 100)
+            }
+          }
+          setDashboardData(calculatedDashboard)
+        } else {
+          setDashboardData(dashboardResponse)
+        }
 
         // FIXED: Use pre-aggregated series data from backend
         // This endpoint returns kWh values that are already properly integrated
@@ -248,13 +265,15 @@ export default function DashboardPage() {
               console.log("Security status response:", securityResponse)
 
               // Build system status from security data
+              // FIXED: Only count unresolved alerts for system health calculation
+              const unresolvedAlertCount = securityResponse.alerts?.filter((a: any) => !a.resolved)?.length || 0
               const systemStatusData = {
                 tamperDetected: securityResponse.tamperDetected || dashboardResponse.installationDetails?.tamperDetected || false,
                 lastTamperCheck: securityResponse.lastCheck || dashboardResponse.installationDetails?.lastTamperCheck || new Date().toISOString(),
                 systemHealth: determineSystemHealth(
                   (dashboardResponse?.averageEfficiencyPercentage ?? dashboardResponse?.currentEfficiencyPercentage ?? 0), 
                   securityResponse.tamperDetected || false,
-                  securityResponse.alerts?.length || 0
+                  unresolvedAlertCount
                 ),
                 efficiency: (dashboardResponse?.averageEfficiencyPercentage ?? dashboardResponse?.currentEfficiencyPercentage ?? 0),
                 lastMaintenance: securityResponse.lastMaintenance || null,
@@ -262,7 +281,8 @@ export default function DashboardPage() {
                 recommendations: generateRecommendations(
                   (dashboardResponse?.averageEfficiencyPercentage ?? dashboardResponse?.currentEfficiencyPercentage ?? 0),
                   securityResponse.tamperDetected || false,
-                  securityResponse.alerts || []
+                  // FIXED: Only pass unresolved alerts for recommendations
+                  (securityResponse.alerts || []).filter((a: any) => !a.resolved)
                 )
               }
 
@@ -307,37 +327,37 @@ export default function DashboardPage() {
     }
   }, [selectedInstallation, selectedPeriod, toast])
 
-  // Determine system health based on efficiency and other factors
+  // Determine system health based ONLY on alerts and tampering
+  // This is about actual system problems, NOT production levels
+  // Production efficiency is displayed separately as an informational metric
   const determineSystemHealth = (efficiency: number, tamperDetected: boolean, alertCount: number): "GOOD" | "FAIR" | "POOR" | "UNKNOWN" => {
+    // Tamper detection is a critical system problem
     if (tamperDetected) return "POOR"
-    if (alertCount > 3) return "POOR"
+    
+    // Alert-based health (the only thing that matters for "system health")
+    if (alertCount > 5) return "POOR"
+    if (alertCount > 2) return "FAIR"
     if (alertCount > 0) return "FAIR"
-    if (efficiency >= 90) return "GOOD"
-    if (efficiency >= 75) return "FAIR"
-    if (efficiency < 75) return "POOR"
-    return "UNKNOWN"
+    
+    // No alerts, no tampering = system is healthy
+    return "GOOD"
   }
 
-  // Generate recommendations based on system state
+  // Generate practical recommendations for customers
   const generateRecommendations = (efficiency: number, tamperDetected: boolean, alerts: SystemAlert[]): string[] => {
     const recommendations: string[] = []
+    const unresolvedAlerts = alerts.filter(a => !a.resolved)
 
-    if (tamperDetected) {
-      recommendations.push("Contact support immediately: potential tampering detected")
-    }
-
-    if (alerts.some(a => a.severity === "CRITICAL" || a.severity === "HIGH")) {
-      recommendations.push("Address high-priority system alerts")
-    }
-
-    if (efficiency < 75) {
-      recommendations.push("Schedule a maintenance check to improve system efficiency")
-    } else if (efficiency < 90) {
-      recommendations.push("Consider panel cleaning to optimize performance")
-    }
-
-    if (recommendations.length === 0) {
-      recommendations.push("Your system is performing well. Continue regular monitoring.")
+    if (unresolvedAlerts.length > 0) {
+      // There are issues - give practical customer guidance
+      recommendations.push("Our team has been notified and is looking into the issue.")
+      recommendations.push("You can check the System Alerts page for more details.")
+      recommendations.push("If you have questions, contact support at support@nebulapower.com")
+    } else {
+      // No issues - helpful tips
+      recommendations.push("Your system is running smoothly.")
+      recommendations.push("Keep panels clean and free of debris for optimal performance.")
+      recommendations.push("Check your energy production regularly to spot any changes.")
     }
 
     return recommendations
@@ -411,6 +431,42 @@ export default function DashboardPage() {
 
       setEnergyReadings(energyData)
       console.log(`Refresh: Set ${energyData.length} energy readings for charts`)
+
+      // FIXED: Also re-fetch security status to update alerts and system health
+      try {
+        console.log(`Refresh: Fetching security status for installation ${selectedInstallation}`)
+        const securityResponse = await securityApi.getInstallationSecurityStatus(selectedInstallation)
+
+        if (securityResponse) {
+          console.log("Refresh: Security status response:", securityResponse)
+
+          // Build system status from fresh security data
+          const systemStatusData = {
+            tamperDetected: securityResponse.tamperDetected || calculatedDashboard.installationDetails?.tamperDetected || false,
+            lastTamperCheck: securityResponse.lastCheck || calculatedDashboard.installationDetails?.lastTamperCheck || new Date().toISOString(),
+            systemHealth: determineSystemHealth(
+              (calculatedDashboard?.averageEfficiencyPercentage ?? calculatedDashboard?.currentEfficiencyPercentage ?? 0), 
+              securityResponse.tamperDetected || false,
+              securityResponse.alerts?.filter((a: any) => !a.resolved)?.length || 0
+            ),
+            efficiency: (calculatedDashboard?.averageEfficiencyPercentage ?? calculatedDashboard?.currentEfficiencyPercentage ?? 0),
+            lastMaintenance: securityResponse.lastMaintenance || null,
+            alerts: securityResponse.alerts || [],
+            recommendations: generateRecommendations(
+              (calculatedDashboard?.averageEfficiencyPercentage ?? calculatedDashboard?.currentEfficiencyPercentage ?? 0),
+              securityResponse.tamperDetected || false,
+              // Pass only unresolved alerts for recommendations
+              (securityResponse.alerts || []).filter((a: any) => !a.resolved)
+            )
+          }
+
+          setSystemStatus(systemStatusData)
+          console.log("Refresh: Updated system status with fresh security data")
+        }
+      } catch (securityError) {
+        console.error("Refresh: Error fetching security status:", securityError)
+        // Security refresh failed, but energy data refresh succeeded - don't fail the whole refresh
+      }
 
       toast({
         title: "Dashboard Updated",
@@ -987,13 +1043,19 @@ export default function DashboardPage() {
         </div>
       ) : (
         <>
-          {/* System status alert for critical issues */}
-          {systemStatus?.tamperDetected && (
+          {/* Alert banner - shows when there are unresolved alerts */}
+          {systemStatus && systemStatus.alerts.filter(a => !a.resolved).length > 0 && (
             <Alert variant="destructive" className="mb-4">
               <AlertCircle className="h-4 w-4" />
-              <AlertTitle>Critical Security Alert</AlertTitle>
+              <AlertTitle>System Alert</AlertTitle>
               <AlertDescription>
-                Potential tampering detected with your solar installation. Please contact support immediately.
+                {(() => {
+                  const unresolvedAlerts = systemStatus.alerts.filter(a => !a.resolved);
+                  if (unresolvedAlerts.length === 1) {
+                    return `${unresolvedAlerts[0].message || 'An issue has been detected'}. Our team has been notified.`;
+                  }
+                  return `${unresolvedAlerts.length} issues detected with your installation. Our team has been notified.`;
+                })()}
               </AlertDescription>
             </Alert>
           )}
@@ -1067,19 +1129,12 @@ export default function DashboardPage() {
                 <CardTitle className="text-sm font-medium text-gray-600 dark:text-white/70">System Efficiency</CardTitle>
               </CardHeader>
               <CardContent className="px-6 pb-6">
-                <div className="flex items-center justify-between">
-                  <div className="text-2xl font-semibold text-gray-900 dark:text-white/90">
-                    {dashboardData?.averageEfficiencyPercentage !== undefined ? 
-                      `${(dashboardData.averageEfficiencyPercentage).toFixed(1)}%` : 
-                      dashboardData?.currentEfficiencyPercentage !== undefined ? 
-                      `${(dashboardData.currentEfficiencyPercentage).toFixed(1)}%` : 
-                      "0.0%"}
-                </div>
-                  {systemStatus && (
-                    <Badge className={`${getHealthColor(systemStatus.systemHealth)} rounded-lg`}>
-                      {systemStatus.systemHealth}
-                    </Badge>
-                  )}
+                <div className="text-2xl font-semibold text-gray-900 dark:text-white/90">
+                  {dashboardData?.averageEfficiencyPercentage !== undefined ? 
+                    `${(dashboardData.averageEfficiencyPercentage).toFixed(1)}%` : 
+                    dashboardData?.currentEfficiencyPercentage !== undefined ? 
+                    `${(dashboardData.currentEfficiencyPercentage).toFixed(1)}%` : 
+                    "0.0%"}
                 </div>
                 <Progress 
                   className="h-2 mt-3" 
@@ -1196,14 +1251,7 @@ export default function DashboardPage() {
           {/* System Status Card */}
           <Card className="bg-white dark:bg-[#111318] border-gray-200 dark:border-white/10 rounded-2xl shadow-sm dark:shadow-none">
             <CardHeader className="pb-4 px-6 pt-6">
-              <CardTitle className="flex items-center justify-between text-gray-900 dark:text-white/90">
-                <span>System Status</span>
-                {systemStatus && (
-                  <Badge className={`${getHealthColor(systemStatus.systemHealth)} text-white rounded-lg`}>
-                    {systemStatus.systemHealth}
-                  </Badge>
-                )}
-              </CardTitle>
+              <CardTitle className="text-gray-900 dark:text-white/90">System Status</CardTitle>
             </CardHeader>
             <CardContent className="px-6 pb-6">
               {systemStatus ? (
