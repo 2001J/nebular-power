@@ -21,11 +21,6 @@ const nextConfig = {
   },
   // Enable standalone output mode for containerization
   output: 'standalone',
-  experimental: {
-    webpackBuildWorker: true,
-    parallelServerBuildTraces: true,
-    parallelServerCompiles: true,
-  },
   // Add rewrites for API proxy to solve CORS issues
   async rewrites() {
     // Use NEXT_PUBLIC_API_URL if set (Docker sets this), otherwise default to localhost
